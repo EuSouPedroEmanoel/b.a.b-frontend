@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Biblioteca Ginásio — sistema de gestão de acervo, empréstimos e reservas. Interface responsiva e acessível (W3C WCAG 2.2 AA)."
+    />
+    <meta name="theme-color" content="#0f4c75" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Anti-flash WCAG: aplica tema antes do primeiro paint
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          var m = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var d = t === 'dark' || (!t && m);
+          if (t === 'system') d = m;
+          if (d) document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = d ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
+    <title>Biblioteca Ginásio</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
