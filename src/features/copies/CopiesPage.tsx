@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import { bookStateLabel } from '@/lib/bookStates'
+import { bookConditionLabel, bookStateLabel } from '@/lib/bookStates'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
@@ -76,7 +76,7 @@ export function CopiesPage() {
                       <Badge tone={c.state === 'available' ? 'success' : c.state === 'borrowed' ? 'warning' : 'neutral'}>{bookStateLabel(c.state)}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge tone="info">{c.condition}</Badge>
+                      <Badge tone="info">{bookConditionLabel(c.condition)}</Badge>
                     </td>
                   </tr>
                 ))}
@@ -96,7 +96,7 @@ export function CopiesPage() {
                     <p className="text-xs text-slate-500">Escola #{c.school_id}</p>
                     <div className="mt-2 flex gap-2">
                       <Badge tone={c.state === 'available' ? 'success' : 'warning'}>{bookStateLabel(c.state)}</Badge>
-                      <Badge>{c.condition}</Badge>
+                      <Badge>{bookConditionLabel(c.condition)}</Badge>
                     </div>
                   </CardBody>
                 </Card>

@@ -140,14 +140,14 @@ export function BookCopyCreatePage() {
               <Plus className="h-4 w-4 mr-2" aria-hidden="true" /> Adicionar
             </Button>
           </form>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex gap-2" role="group" aria-label="Ações do cadastro">
             <Link
               to={`/acervo/${id}`}
-              className="inline-flex items-center px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 min-h-[44px] text-sm"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100 dark:active:bg-slate-700 min-h-[44px] text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
             >
               Concluir / Voltar ao livro
             </Link>
-            <Link to="/acervo" className="inline-flex items-center px-4 py-2 rounded-md bg-slate-100 dark:bg-slate-700 min-h-[44px] text-sm">
+            <Link to="/acervo" className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 active:bg-slate-200 dark:active:bg-slate-600 min-h-[44px] text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2">
               Voltar ao Acervo
             </Link>
           </div>

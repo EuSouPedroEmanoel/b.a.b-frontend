@@ -10,6 +10,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { Select } from '@/components/ui/Select'
 
 type AppUser = {
   id: number
@@ -363,42 +364,21 @@ export function UsersPage() {
 
       <Card>
         <CardBody className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="user-role" className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              Tipo de usuário
-            </label>
-            <select
-              id="user-role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-base bg-white dark:bg-slate-800 min-h-[44px] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
-            >
-              {filterRoleOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Tipo de usuário"
+            id="user-role"
+            value={role}
+            onChange={setRole}
+            options={filterRoleOptions.map((o) => ({ value: o.value, label: o.label }))}
+          />
           {isSuperAdmin && (
-            <div>
-              <label htmlFor="user-school" className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                Escola
-              </label>
-              <select
-                id="user-school"
-                value={schoolFilter}
-                onChange={(e) => setSchoolFilter(e.target.value)}
-                className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-base bg-white dark:bg-slate-800 min-h-[44px] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
-              >
-                <option value="">Todas as escolas</option>
-                {(schoolsData?.items ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Escola"
+              id="user-school"
+              value={schoolFilter}
+              onChange={setSchoolFilter}
+              options={[{ value: '', label: 'Todas as escolas' }, ...((schoolsData?.items ?? []).map((s) => ({ value: String(s.id), label: s.name })))]}
+            />
           )}
         </CardBody>
       </Card>
@@ -515,25 +495,13 @@ export function UsersPage() {
                 {createError}
               </p>
             )}
-            <div>
-              <label htmlFor="create-type" className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                Tipo de usuário
-              </label>
-              <select
-                id="create-type"
-                value={createForm.type}
-                onChange={(e) => setCreateForm((f) => ({ ...f, type: e.target.value }))}
-                className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-base bg-white dark:bg-slate-800 min-h-[44px] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
-              >
-                {availableCreateTypes
-                  .filter((o) => o.value !== '')
-                  .map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            <Select
+              label="Tipo de usuário"
+              id="create-type"
+              value={createForm.type}
+              onChange={(v) => setCreateForm((f) => ({ ...f, type: v }))}
+              options={availableCreateTypes.filter((o) => o.value !== '').map((o) => ({ value: o.value, label: o.label }))}
+            />
 
             {createForm.type === 'student' ? (
               <>

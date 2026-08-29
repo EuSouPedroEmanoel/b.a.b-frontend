@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Plus } from 'lucide-react'
 import api from '@/lib/api'
-import { bookStateLabel } from '@/lib/bookStates'
+import { bookConditionLabel, bookStateLabel } from '@/lib/bookStates'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 
@@ -72,7 +72,7 @@ export function BookCopyListPage() {
             <Link
               to={`/acervo/${id}/exemplares/novo`}
               aria-label="Cadastrar exemplar"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0f4c75] text-white hover:bg-[#0e3f61] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 min-h-[44px] font-medium shadow-sm transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-[#0f4c75] text-white hover:bg-[#0e3f61] active:bg-[#0c3d5e] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:active:bg-slate-200 min-h-[44px] font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
             >
               <Plus className="h-4 w-4" aria-hidden="true" /> Cadastrar exemplar
             </Link>
@@ -109,7 +109,7 @@ export function BookCopyListPage() {
                           <Badge tone={c.state === 'available' ? 'success' : 'neutral'}>{bookStateLabel(c.state)}</Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge tone="info">{c.condition}</Badge>
+                          <Badge tone="info">{bookConditionLabel(c.condition)}</Badge>
                         </td>
                       </tr>
                     ))}
@@ -121,7 +121,7 @@ export function BookCopyListPage() {
                   <li key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <span className="font-mono text-sm">{c.code}</span>
                     <span className="flex gap-1">
-                      <Badge tone={c.state === 'available' ? 'success' : 'neutral'}>{c.state}</Badge>
+                      <Badge tone={c.state === 'available' ? 'success' : 'neutral'}>{bookStateLabel(c.state)}</Badge>
                     </span>
                   </li>
                 ))}

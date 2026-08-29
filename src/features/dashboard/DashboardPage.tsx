@@ -13,33 +13,38 @@ export function DashboardPage() {
         </p>
       </header>
 
-      <section aria-labelledby="atalhos-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Atalhos — ul/li para navegação por lista (tecla L no NVDA/JAWS, rotor no VO) não pular para footer */}
+      <section aria-labelledby="atalhos-heading">
         <h2 id="atalhos-heading" className="sr-only">Atalhos</h2>
-        {[
-          { to: '/acervo', title: 'Acervo', desc: 'Clique no livro para ver e cadastrar exemplares (código único por escola)', tone: 'bg-sky-50 dark:bg-sky-900/20' },
-          { to: '/emprestimos', title: 'Empréstimos', desc: 'Emprestar e devolver, cálculo de atraso', tone: 'bg-amber-50 dark:bg-amber-900/20' },
-          { to: '/reservas', title: 'Reservas', desc: 'Reservar títulos e acompanhar fila', tone: 'bg-violet-50 dark:bg-violet-900/20' },
-          { to: '/exemplares', title: 'Exemplares', desc: 'Acesso via Acervo — clique no livro', tone: 'bg-emerald-50 dark:bg-emerald-900/20' },
-        ].map((c) => (
-          <Link
-            key={c.to}
-            to={c.to}
-            className={`rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md transition-shadow focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${c.tone}`}
-          >
-            <h3 className="font-semibold">{c.title}</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{c.desc}</p>
-            <span className="inline-flex mt-3 text-sm font-medium text-[var(--color-primary)]">Acessar →</span>
-          </Link>
-        ))}
+        <ul aria-labelledby="atalhos-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 list-none m-0 p-0">
+          {[
+            { to: '/acervo', title: 'Acervo', desc: 'Clique no livro para ver e cadastrar exemplares (código único por escola)', tone: 'bg-sky-50 dark:bg-sky-900/20' },
+            { to: '/emprestimos', title: 'Empréstimos', desc: 'Emprestar e devolver, cálculo de atraso', tone: 'bg-amber-50 dark:bg-amber-900/20' },
+            { to: '/reservas', title: 'Reservas', desc: 'Reservar títulos e acompanhar fila', tone: 'bg-violet-50 dark:bg-violet-900/20' },
+            { to: '/exemplares', title: 'Exemplares', desc: 'Acesso via Acervo — clique no livro', tone: 'bg-emerald-50 dark:bg-emerald-900/20' },
+          ].map((c) => (
+            <li key={c.to}>
+              <Link
+                to={c.to}
+                aria-label={`${c.title} — ${c.desc}`}
+                className={`flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md active:shadow-sm active:bg-slate-50 dark:active:bg-slate-800 transition-all focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 min-h-[44px] ${c.tone}`}
+              >
+                <h3 className="font-semibold" aria-hidden="true">{c.title}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1" aria-hidden="true">{c.desc}</p>
+                <span className="inline-flex mt-3 text-sm font-medium text-[var(--color-primary)]" aria-hidden="true">Acessar →</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <h2 className="font-semibold">Como usar</h2>
+            <h2 id="como-usar-heading" className="font-semibold">Como usar</h2>
           </CardHeader>
           <CardBody>
-            <ol className="list-decimal pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+            <ol aria-labelledby="como-usar-heading" className="list-decimal pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-300">
               <li>Faça login com seu usuário da escola.</li>
               <li>Consulte o acervo em <em>Acervo</em> — busca por título (mín. 3 caracteres).</li>
               <li>Bibliotecários cadastram livros por ISBN (auto-preenche via Google Books).</li>
@@ -51,15 +56,15 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-semibold">Acessibilidade</h2>
+            <h2 id="acessibilidade-heading" className="font-semibold">Acessibilidade</h2>
           </CardHeader>
           <CardBody>
-            <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <li>✓ Skip link, landmarks e hierarquia de headings</li>
-              <li>✓ Contraste AA, foco visível e tamanho mínimo 44×44px</li>
-              <li>✓ Formulários com label, aria-invalid e live region</li>
-              <li>✓ Tabelas responsivas → cards em mobile</li>
-              <li>✓ Respeita prefers-reduced-motion e color-scheme</li>
+            <ul aria-labelledby="acessibilidade-heading" className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <li><span aria-hidden="true">✓ </span>Skip link, landmarks e hierarquia de headings</li>
+              <li><span aria-hidden="true">✓ </span>Contraste AA, foco visível e tamanho mínimo 44×44px</li>
+              <li><span aria-hidden="true">✓ </span>Formulários com label, aria-invalid e live region</li>
+              <li><span aria-hidden="true">✓ </span>Tabelas responsivas <span aria-hidden="true">→</span> cards em mobile</li>
+              <li><span aria-hidden="true">✓ </span>Respeita prefers-reduced-motion e color-scheme</li>
             </ul>
           </CardBody>
         </Card>

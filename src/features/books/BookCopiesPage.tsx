@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Barcode, Plus } from 'lucide-react'
 import api from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
-import { bookStateLabel } from '@/lib/bookStates'
+import { bookConditionLabel, bookStateLabel } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -157,7 +157,7 @@ export function BookCopiesPage() {
             <h2 className="font-semibold" aria-live="polite">
               Exemplares cadastrados — {isLoading ? '...' : `${count} unidade${count !== 1 ? 's' : ''}`}
             </h2>
-            <Link to="/acervo" className="text-sm px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 min-h-[44px] inline-flex items-center">
+            <Link to="/acervo" className="inline-flex items-center justify-center text-sm px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 active:bg-slate-100 dark:active:bg-slate-700 min-h-[44px] font-medium transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2">
               Concluir / Voltar ao Acervo
             </Link>
           </div>
@@ -191,7 +191,7 @@ export function BookCopiesPage() {
                           <Badge tone={c.state === 'available' ? 'success' : 'neutral'}>{bookStateLabel(c.state)}</Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge tone="info">{c.condition}</Badge>
+                          <Badge tone="info">{bookConditionLabel(c.condition)}</Badge>
                         </td>
                       </tr>
                     ))}

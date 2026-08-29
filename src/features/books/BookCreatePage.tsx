@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Barcode, Edit3, Check, Search } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Barcode, Edit3, Check, Search, X } from 'lucide-react'
 import api from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
@@ -9,11 +9,15 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Badge } from '@/components/ui/Badge'
 
 type Book = { id: number; title: string; description: string | null; state: string; isbn: string | null; is_active: boolean; added_by: number }
-type Lookup = { isbn: string; title: string | null; description: string | null; found: boolean; already_exists: boolean; existing_book_id: number | null }
+type Lookup = { isbn: string; title: string | null; description: string | null; cover_url: string | null; published_date: string | null; genres: string[]; authors: string[]; found: boolean; already_exists: boolean; existing_book_id: number | null }
 
 type Step = 'scan' | 'confirm' | 'edit'
+
+type GenrePublic = { id: number; name: string; slug: string }
+type AuthorPublic = { id: number; name: string; slug: string }
 
 export function BookCreatePage() {
   const { user } = useAuth()
@@ -24,12 +28,54 @@ export function BookCreatePage() {
   const [step, setStep] = useState<Step>('scan')
   const [isbn, setIsbn] = useState('')
   const [preview, setPreview] = useState<Lookup | null>(null)
-  const [manual, setManual] = useState({ title: '', description: '' })
+  const [manual, setManual] = useState({ title: '', description: '', cover_url: '', published_date: '' })
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([])
+  const [genreInput, setGenreInput] = useState('')
+  const [genreSuggestOpen, setGenreSuggestOpen] = useState(false)
+  const [selectedAuthors, setSelectedAuthors] = useState<string[]>([])
+  const [authorInput, setAuthorInput] = useState('')
+  const [authorSuggestOpen, setAuthorSuggestOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const isbnRef = useRef<HTMLInputElement>(null)
 
   const allowed = ['librarian', 'school_admin']
   const canCreate = !!user && allowed.includes(user.role)
+
+  const { data: genreSuggest } = useQuery({
+    queryKey: ['genres-suggest', genreInput],
+    queryFn: async () => {
+      const { data } = await api.get<{ items: GenrePublic[] }>('/genres/', { params: { q: genreInput, size: 8 } })
+      return data.items
+    },
+    enabled: genreInput.trim().length >= 2 && genreSuggestOpen,
+  })
+  const { data: authorSuggest } = useQuery({
+    queryKey: ['authors-suggest', authorInput],
+    queryFn: async () => {
+      const { data } = await api.get<{ items: AuthorPublic[] }>('/authors/', { params: { q: authorInput, size: 8 } })
+      return data.items
+    },
+    enabled: authorInput.trim().length >= 2 && authorSuggestOpen,
+  })
+
+  const addGenre = (name: string) => {
+    const clean = name.trim()
+    if (!clean) return
+    if (selectedGenres.some((g) => g.toLowerCase() === clean.toLowerCase())) return
+    setSelectedGenres((prev) => [...prev, clean])
+    setGenreInput('')
+    setGenreSuggestOpen(false)
+  }
+  const removeGenre = (name: string) => setSelectedGenres((prev) => prev.filter((g) => g !== name))
+  const addAuthor = (name: string) => {
+    const clean = name.trim()
+    if (!clean) return
+    if (selectedAuthors.some((a) => a.toLowerCase() === clean.toLowerCase())) return
+    setSelectedAuthors((prev) => [...prev, clean])
+    setAuthorInput('')
+    setAuthorSuggestOpen(false)
+  }
+  const removeAuthor = (name: string) => setSelectedAuthors((prev) => prev.filter((a) => a !== name))
 
   const lookupMut = useMutation({
     mutationFn: async (rawIsbn: string) => {
@@ -39,6 +85,12 @@ export function BookCreatePage() {
     },
     onSuccess: (data) => {
       setPreview(data)
+      if (data.cover_url) setManual((s) => ({ ...s, cover_url: data.cover_url || '' }))
+      if (data.published_date) setManual((s) => ({ ...s, published_date: data.published_date ? String(data.published_date).slice(0, 10) : '' }))
+      if (data.genres?.length) setSelectedGenres(data.genres)
+      else setSelectedGenres([])
+      if (data.authors?.length) setSelectedAuthors(data.authors)
+      else setSelectedAuthors([])
       if (data.already_exists) {
         announce('Livro já cadastrado', 'polite')
         setStep('confirm')
@@ -47,7 +99,9 @@ export function BookCreatePage() {
         setStep('confirm')
       } else {
         announce('Livro não encontrado, preencha manualmente', 'assertive')
-        setManual({ title: '', description: '' })
+        setManual({ title: '', description: '', cover_url: data.cover_url || '', published_date: data.published_date ? String(data.published_date).slice(0, 10) : '' })
+        if (!data.genres?.length) setSelectedGenres([])
+        if (!data.authors?.length) setSelectedAuthors([])
         setStep('edit')
       }
     },
@@ -59,7 +113,7 @@ export function BookCreatePage() {
   })
 
   const createMut = useMutation({
-    mutationFn: async (payload: Record<string, string>) => {
+    mutationFn: async (payload: Record<string, unknown>) => {
       const { data } = await api.post<Book>('/books/', payload)
       return data
     },
@@ -76,7 +130,7 @@ export function BookCreatePage() {
   })
 
   const patchMut = useMutation({
-    mutationFn: async (payload: Record<string, string>) => {
+    mutationFn: async (payload: Record<string, unknown>) => {
       if (!preview?.existing_book_id) throw new Error('ID do livro não encontrado')
       const { data } = await api.patch<Book>(`/books/${preview.existing_book_id}`, payload)
       return data
@@ -103,8 +157,10 @@ export function BookCreatePage() {
     if (clean.length >= 10) {
       lookupMut.mutate(clean)
     } else {
-      setPreview({ isbn: clean || initialIsbn, title: null, description: null, found: false, already_exists: false, existing_book_id: null })
-      setManual({ title: '', description: '' })
+      setPreview({ isbn: clean || initialIsbn, title: null, description: null, cover_url: null, published_date: null, genres: [], authors: [], found: false, already_exists: false, existing_book_id: null })
+      setManual({ title: '', description: '', cover_url: '', published_date: '' })
+      setSelectedGenres([])
+      setSelectedAuthors([])
       setStep('edit')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,12 +183,17 @@ export function BookCreatePage() {
   const handleConfirm = () => {
     if (!preview) return
     setFormError(null)
-    const payload: Record<string, string> = { isbn: preview.isbn }
+    const payload: Record<string, unknown> = { isbn: preview.isbn }
     if (preview.title) payload.title = preview.title
     if (preview.description) payload.description = preview.description
-    // Se título veio vazio (found false não acontece aqui), fallback para manual
+    const cover = manual.cover_url?.trim() || preview.cover_url || undefined
+    if (cover) payload.cover_url = cover
+    if (preview.published_date) payload.published_date = preview.published_date
+    else if (manual.published_date?.trim()) payload.published_date = manual.published_date.trim()
+    if (selectedGenres.length) payload.genre_names = selectedGenres
+    if (selectedAuthors.length) payload.author_names = selectedAuthors
     if (!payload.title) {
-      setManual({ title: preview.title || '', description: preview.description || '' })
+      setManual({ title: preview.title || '', description: preview.description || '', cover_url: (preview.cover_url as string) || '', published_date: preview.published_date ? String(preview.published_date).slice(0, 10) : manual.published_date || '' })
       setStep('edit')
       return
     }
@@ -148,12 +209,31 @@ export function BookCreatePage() {
       announce(msg, 'assertive')
       return
     }
+    let genres = selectedGenres
+    if (genreInput.trim()) {
+      const pending = genreInput.trim()
+      if (!genres.some((g) => g.toLowerCase() === pending.toLowerCase())) genres = [...genres, pending]
+    }
+    let authors = selectedAuthors
+    if (authorInput.trim()) {
+      const pending = authorInput.trim()
+      if (!authors.some((a) => a.toLowerCase() === pending.toLowerCase())) authors = [...authors, pending]
+    }
+    const payload: Record<string, unknown> = {
+      title: manual.title.trim(),
+      description: manual.description.trim() || null,
+      cover_url: manual.cover_url.trim() || null,
+      published_date: manual.published_date.trim() || null,
+    }
+    if (genres.length) payload.genre_names = genres
+    else if (selectedGenres.length === 0 && genreInput.trim() === '') payload.genre_names = []
+    if (authors.length) payload.author_names = authors
+    else if (selectedAuthors.length === 0 && authorInput.trim() === '') payload.author_names = []
     if (!preview) return
     if (preview.already_exists && preview.existing_book_id) {
-      // Atualiza livro já cadastrado — permite librarian corrigir dados do acervo
-      patchMut.mutate({ title: manual.title.trim(), description: manual.description.trim() })
+      patchMut.mutate(payload)
     } else {
-      createMut.mutate({ isbn: preview.isbn, title: manual.title.trim(), description: manual.description.trim() })
+      createMut.mutate({ isbn: preview.isbn, ...payload })
     }
   }
 
@@ -163,8 +243,8 @@ export function BookCreatePage() {
         <h1 className="text-2xl font-bold">Sem permissão</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">Apenas bibliotecários e administradores escolares podem cadastrar livros.</p>
         <p className="mt-1 text-sm text-slate-500">Seu perfil: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{user?.role ?? 'desconhecido'}</code></p>
-        <Link to="/acervo" className="inline-flex mt-6 px-4 py-2 rounded-md bg-[var(--color-primary)] text-white min-h-[44px] items-center">
-          <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" /> Voltar ao acervo
+        <Link to="/acervo" className="inline-flex items-center justify-center gap-2 mt-6 px-4 py-2 rounded-md bg-[#0f4c75] text-white hover:bg-[#0e3f61] active:bg-[#0c3d5e] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:active:bg-slate-200 min-h-[44px] font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Voltar ao acervo
         </Link>
       </div>
     )
@@ -206,25 +286,21 @@ export function BookCreatePage() {
                 required
               />
               <p id="isbn-help" className="text-xs text-slate-500 -mt-2">O leitor envia Enter automaticamente após bipar.</p>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-3" role="group" aria-label="Ações de busca">
                 <Button type="submit" disabled={lookupMut.isPending} aria-busy={lookupMut.isPending} className="flex-1 sm:flex-none">
-                  {lookupMut.isPending ? (
-                    'Buscando...'
-                  ) : (
-                    <>
-                      <Search className="h-4 w-4 mr-2" aria-hidden="true" /> Buscar
-                    </>
-                  )}
+                  {lookupMut.isPending ? 'Buscando...' : <><Search className="h-4 w-4 mr-2" aria-hidden="true" /> Buscar</>}
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => {
                     const clean = isbn.replace(/[^0-9X]/gi, '')
-                    if (clean.length >= 10) setPreview({ isbn: clean, title: null, description: null, found: false, already_exists: false, existing_book_id: null })
-                    else if (isbn.trim()) setPreview({ isbn: isbn.trim(), title: null, description: null, found: false, already_exists: false, existing_book_id: null })
-                    else setPreview({ isbn: '', title: null, description: null, found: false, already_exists: false, existing_book_id: null })
-                    setManual({ title: '', description: '' })
+                    if (clean.length >= 10) setPreview({ isbn: clean, title: null, description: null, cover_url: null, published_date: null, genres: [], authors: [], found: false, already_exists: false, existing_book_id: null })
+                    else if (isbn.trim()) setPreview({ isbn: isbn.trim(), title: null, description: null, cover_url: null, published_date: null, genres: [], authors: [], found: false, already_exists: false, existing_book_id: null })
+                    else setPreview({ isbn: '', title: null, description: null, cover_url: null, published_date: null, genres: [], authors: [], found: false, already_exists: false, existing_book_id: null })
+                    setManual({ title: '', description: '', cover_url: '', published_date: '' })
+                    setSelectedGenres([])
+                    setSelectedAuthors([])
                     setStep('edit')
                     setFormError(null)
                   }}
@@ -274,13 +350,48 @@ export function BookCreatePage() {
                   {preview.description || '—'}
                 </dd>
               </div>
+              <div>
+                <dt className="text-sm font-medium text-slate-600 dark:text-slate-300">Capa (URL)</dt>
+                <dd className="mt-1 p-3 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm break-all">
+                  {preview.cover_url || manual.cover_url || '—'}
+                </dd>
+                {preview.cover_url && <dd className="mt-2"><img src={preview.cover_url} alt="preview" className="h-32 rounded border" onError={(e)=> (e.currentTarget.style.display='none')} /></dd>}
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-slate-600 dark:text-slate-300">Data de lançamento</dt>
+                <dd className="mt-1 p-3 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+                  {preview.published_date ? new Date(preview.published_date).toLocaleDateString('pt-BR') : manual.published_date ? new Date(manual.published_date).toLocaleDateString('pt-BR') : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-slate-600 dark:text-slate-300">Gêneros</dt>
+                <dd className="mt-1 flex flex-wrap gap-2">
+                  {selectedGenres.length ? selectedGenres.map((g) => <Badge key={g} tone="neutral">{g}</Badge>) : <span className="text-sm text-slate-500">—</span>}
+                </dd>
+                <p className="text-xs text-slate-500 mt-1">Gêneros vindos da API serão criados automaticamente ao confirmar.</p>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-slate-600 dark:text-slate-300">Autores</dt>
+                <dd className="mt-1 flex flex-wrap gap-2">
+                  {selectedAuthors.length ? selectedAuthors.map((a) => <Badge key={a} tone="neutral">{a}</Badge>) : <span className="text-sm text-slate-500">—</span>}
+                </dd>
+                <p className="text-xs text-slate-500 mt-1">Autores vindos da API serão criados automaticamente ao confirmar.</p>
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="confirm-cover" className="text-sm font-medium text-slate-700 dark:text-slate-200">Editar link da capa (opcional)</label>
+                <input id="confirm-cover" value={manual.cover_url} onChange={(e) => setManual((s) => ({ ...s, cover_url: e.target.value }))} placeholder="https://..." className="w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-sm bg-white dark:bg-slate-800" />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="confirm-published" className="text-sm font-medium text-slate-700 dark:text-slate-200">Data de lançamento (opcional)</label>
+                <input id="confirm-published" type="date" value={manual.published_date} onChange={(e) => setManual((s) => ({ ...s, published_date: e.target.value }))} className="w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-sm bg-white dark:bg-slate-800" />
+              </div>
             </dl>
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3" role="group" aria-label="Ações de confirmação">
               {preview.already_exists ? (
                 <>
                   <Link
                     to={`/acervo/${preview.existing_book_id}`}
-                    className="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-sky-600 text-white hover:bg-sky-700 min-h-[44px] font-medium"
+                    className="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:active:bg-slate-200 min-h-[44px] font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
                   >
                     Ir para o livro
                   </Link>
@@ -288,7 +399,7 @@ export function BookCreatePage() {
                     type="button"
                     variant="secondary"
                     onClick={() => {
-                      setManual({ title: preview.title || '', description: preview.description || '' })
+                      setManual({ title: preview.title || '', description: preview.description || '', cover_url: preview.cover_url || '', published_date: preview.published_date ? String(preview.published_date).slice(0, 10) : manual.published_date || '' })
                       setStep('edit')
                     }}
                   >
@@ -305,7 +416,7 @@ export function BookCreatePage() {
                   type="button"
                   variant="secondary"
                   onClick={() => {
-                    setManual({ title: preview.title || '', description: preview.description || '' })
+                    setManual({ title: preview.title || '', description: preview.description || '', cover_url: preview.cover_url || '', published_date: preview.published_date ? String(preview.published_date).slice(0, 10) : manual.published_date || '' })
                     setStep('edit')
                   }}
                 >
@@ -324,7 +435,7 @@ export function BookCreatePage() {
         <Card>
           <CardHeader>
             <h2 className="font-semibold">Editar dados do livro</h2>
-            <p className="text-sm text-slate-500">Revise título e descrição antes de cadastrar. ISBN permanece bloqueado.</p>
+            <p className="text-sm text-slate-500">Revise título, descrição, capa, gêneros e autores antes de cadastrar. ISBN permanece bloqueado.</p>
           </CardHeader>
           <CardBody>
             {formError && (
@@ -352,9 +463,7 @@ export function BookCreatePage() {
                 autoFocus
               />
               <div>
-                <label htmlFor="book-desc-edit" className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Descrição
-                </label>
+                <label htmlFor="book-desc-edit" className="text-sm font-medium text-slate-700 dark:text-slate-200">Descrição</label>
                 <textarea
                   id="book-desc-edit"
                   value={manual.description}
@@ -364,7 +473,93 @@ export function BookCreatePage() {
                   placeholder="Descrição opcional"
                 />
               </div>
-              <div className="flex gap-3">
+              <Input
+                label="Link da capa (URL)"
+                id="book-cover-edit"
+                value={manual.cover_url}
+                onChange={(e) => setManual((s) => ({ ...s, cover_url: e.target.value }))}
+                placeholder="https://... (opcional)"
+                type="url"
+              />
+              <Input
+                label="Data de lançamento"
+                id="book-published-edit"
+                value={manual.published_date}
+                onChange={(e) => setManual((s) => ({ ...s, published_date: e.target.value }))}
+                type="date"
+                hint="Opcional — informe a data de publicação do livro"
+              />
+              <div>
+                <label htmlFor="book-genres-edit" className="text-sm font-medium text-slate-700 dark:text-slate-200">Gêneros (pressione Enter para adicionar)</label>
+                <div className="mt-1.5 flex flex-wrap gap-2 mb-2">
+                  {selectedGenres.map((g) => (
+                    <Badge key={g} tone="neutral" className="flex items-center gap-1 pr-1">
+                      {g} <button type="button" onClick={() => removeGenre(g)} aria-label={`Remover ${g}`} className="ml-1 rounded p-0.5 hover:bg-slate-200 dark:hover:bg-slate-600"><X className="h-3 w-3" /></button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="relative">
+                  <input
+                    id="book-genres-edit"
+                    value={genreInput}
+                    onChange={(e) => { setGenreInput(e.target.value); setGenreSuggestOpen(true) }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); addGenre(genreInput) }
+                      if (e.key === 'Backspace' && !genreInput && selectedGenres.length) removeGenre(selectedGenres[selectedGenres.length - 1])
+                    }}
+                    onBlur={() => setTimeout(() => setGenreSuggestOpen(false), 150)}
+                    onFocus={() => genreInput.trim().length >= 2 && setGenreSuggestOpen(true)}
+                    placeholder="Digite um gênero e pressione Enter"
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-base bg-white dark:bg-slate-800 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
+                  />
+                  {genreSuggestOpen && genreSuggest && genreSuggest.length > 0 && (
+                    <ul className="absolute z-20 top-full left-0 right-0 mt-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg max-h-40 overflow-auto">
+                      {genreSuggest.filter((g) => !selectedGenres.some((s) => s.toLowerCase() === g.name.toLowerCase())).map((g) => (
+                        <li key={g.id} onMouseDown={(e) => { e.preventDefault(); addGenre(g.name) }} className="px-3 py-2 text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700">
+                          {g.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Gêneros inexistentes serão criados automaticamente ao salvar.</p>
+              </div>
+              <div>
+                <label htmlFor="book-authors-edit" className="text-sm font-medium text-slate-700 dark:text-slate-200">Autores (pressione Enter para adicionar)</label>
+                <div className="mt-1.5 flex flex-wrap gap-2 mb-2">
+                  {selectedAuthors.map((a) => (
+                    <Badge key={a} tone="neutral" className="flex items-center gap-1 pr-1">
+                      {a} <button type="button" onClick={() => removeAuthor(a)} aria-label={`Remover ${a}`} className="ml-1 rounded p-0.5 hover:bg-slate-200 dark:hover:bg-slate-600"><X className="h-3 w-3" /></button>
+                    </Badge>
+                  ))}
+                </div>
+                <div className="relative">
+                  <input
+                    id="book-authors-edit"
+                    value={authorInput}
+                    onChange={(e) => { setAuthorInput(e.target.value); setAuthorSuggestOpen(true) }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); addAuthor(authorInput) }
+                      if (e.key === 'Backspace' && !authorInput && selectedAuthors.length) removeAuthor(selectedAuthors[selectedAuthors.length - 1])
+                    }}
+                    onBlur={() => setTimeout(() => setAuthorSuggestOpen(false), 150)}
+                    onFocus={() => authorInput.trim().length >= 2 && setAuthorSuggestOpen(true)}
+                    placeholder="Digite um autor e pressione Enter"
+                    className="w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-base bg-white dark:bg-slate-800 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
+                  />
+                  {authorSuggestOpen && authorSuggest && authorSuggest.length > 0 && (
+                    <ul className="absolute z-20 top-full left-0 right-0 mt-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg max-h-40 overflow-auto">
+                      {authorSuggest.filter((a) => !selectedAuthors.some((s) => s.toLowerCase() === a.name.toLowerCase())).map((a) => (
+                        <li key={a.id} onMouseDown={(e) => { e.preventDefault(); addAuthor(a.name) }} className="px-3 py-2 text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700">
+                          {a.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Autores inexistentes serão criados automaticamente ao salvar.</p>
+              </div>
+              <div className="flex gap-3" role="group" aria-label="Ações de edição">
                 <Button type="submit" disabled={isSaving} aria-busy={isSaving}>
                   {isSaving ? 'Salvando...' : preview.already_exists ? 'Salvar alterações' : 'Cadastrar livro'}
                 </Button>

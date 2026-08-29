@@ -3,12 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, BookOpen, Plus, Hand, Undo2, ImageOff } from 'lucide-react'
 import api from '@/lib/api'
-import { bookStateLabel } from '@/lib/bookStates'
+import { bookConditionLabel, bookStateLabel } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { Select } from '@/components/ui/Select'
 
 type Book = {
   id: number
@@ -16,6 +17,11 @@ type Book = {
   description: string | null
   isbn: string | null
   cover_url: string | null
+  published_date: string | null
+  created_at: string | null
+  updated_at: string | null
+  genres: { id: number; name: string; slug: string }[]
+  authors: { id: number; name: string; slug: string }[]
   is_active: boolean
   added_by: number
   edited_by: number | null
@@ -187,14 +193,31 @@ export function BookDetailPage() {
             {bookStateLabel(book.derived_state)}
           </Badge>
         </div>
-        {book.isbn && <p className="mt-1 font-mono text-sm text-slate-500">ISBN {book.isbn}</p>}
       </header>
 
       {canManage && (
-        <div className="flex flex-wrap gap-3">
+        <div
+          className="flex flex-wrap gap-3"
+          role="toolbar"
+          aria-label="Ações do livro"
+          aria-orientation="horizontal"
+          onKeyDown={(e) => {
+            if (!['ArrowRight','ArrowLeft','Home','End'].includes(e.key)) return
+            const els = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('a, button'))
+            const idx = els.indexOf(document.activeElement as HTMLElement)
+            if (idx === -1) return
+            e.preventDefault()
+            let next = idx
+            if (e.key === 'ArrowRight') next = (idx + 1) % els.length
+            if (e.key === 'ArrowLeft') next = (idx - 1 + els.length) % els.length
+            if (e.key === 'Home') next = 0
+            if (e.key === 'End') next = els.length - 1
+            els[next]?.focus()
+          }}
+        >
           <Link
             to={`/acervo/${id}/exemplares/novo`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0f4c75] text-white hover:bg-[#0e3f61] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 min-h-[44px] font-medium shadow-sm transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-[#0f4c75] text-white hover:bg-[#0e3f61] active:bg-[#0c3d5e] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:active:bg-slate-200 min-h-[44px] font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
           >
             <Plus className="h-4 w-4" aria-hidden="true" /> Cadastrar exemplar
           </Link>
@@ -241,6 +264,32 @@ export function BookDetailPage() {
               <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
                 {book.description || 'Sem descrição disponível.'}
               </p>
+              <dl className="mt-6 grid gap-4 border-t border-slate-200 dark:border-slate-700 pt-4 text-sm">
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="text-slate-500">ISBN</dt>
+                  <dd className="col-span-2 font-mono text-slate-700 dark:text-slate-200 break-all">{book.isbn ?? '—'}</dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="text-slate-500">Lançamento</dt>
+                  <dd className="col-span-2 text-slate-700 dark:text-slate-200">{book.published_date ? new Date(book.published_date).toLocaleDateString('pt-BR') : '—'}</dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="text-slate-500">Cadastrado em</dt>
+                  <dd className="col-span-2 text-slate-700 dark:text-slate-200">{book.created_at ? new Date(book.created_at).toLocaleDateString('pt-BR') : '—'}</dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="text-slate-500">Autores</dt>
+                  <dd className="col-span-2 flex flex-wrap gap-1.5">
+                    {book.authors?.length ? book.authors.map((a) => <Badge key={a.id} tone="info">{a.name}</Badge>) : <span className="text-slate-500">—</span>}
+                  </dd>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <dt className="text-slate-500">Gêneros</dt>
+                  <dd className="col-span-2 flex flex-wrap gap-1.5">
+                    {book.genres?.length ? book.genres.map((g) => <Badge key={g.id} tone="neutral">{g.name}</Badge>) : <span className="text-slate-500">—</span>}
+                  </dd>
+                </div>
+              </dl>
             </CardBody>
           </Card>
 
@@ -273,7 +322,7 @@ export function BookDetailPage() {
                         <span className="font-mono">{c.code}</span>
                         <span className="flex items-center gap-2">
                           <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'}>
-                            {c.condition}
+                            {bookConditionLabel(c.condition)}
                           </Badge>
                           <Badge tone={c.state === 'available' ? 'success' : c.state === 'borrowed' ? 'warning' : 'neutral'}>
                             {bookStateLabel(c.state)}
@@ -348,47 +397,23 @@ export function BookDetailPage() {
             </CardHeader>
             <CardBody>
               <form onSubmit={submitLoan} className="grid gap-4">
-                <div>
-                  <label htmlFor="loan-copy" className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Exemplar disponível
-                  </label>
-                  <select
-                    id="loan-copy"
-                    value={copyId}
-                    onChange={(e) => setCopyId(e.target.value ? Number(e.target.value) : '')}
-                    required
-                    className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-base bg-white dark:bg-slate-800 min-h-[44px] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
-                  >
-                    <option value="">Selecione...</option>
-                    {availableCopies.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.code}
-                      </option>
-                    ))}
-                  </select>
-                  {availableCopies.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">Nenhum exemplar disponível no momento.</p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="loan-user" className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Usuário da escola
-                  </label>
-                  <select
-                    id="loan-user"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value ? Number(e.target.value) : '')}
-                    required
-                    className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-base bg-white dark:bg-slate-800 min-h-[44px] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
-                  >
-                    <option value="">Selecione...</option>
-                    {usersPage?.items.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="Exemplar disponível"
+                  id="loan-copy"
+                  value={copyId === '' ? '' : String(copyId)}
+                  onChange={(v) => setCopyId(v ? Number(v) : '')}
+                  options={[{ value: '', label: 'Selecione...' }, ...availableCopies.map((c) => ({ value: String(c.id), label: c.code }))]}
+                />
+                {availableCopies.length === 0 && (
+                  <p className="text-xs text-amber-600 -mt-2">Nenhum exemplar disponível no momento.</p>
+                )}
+                <Select
+                  label="Usuário da escola"
+                  id="loan-user"
+                  value={userId === '' ? '' : String(userId)}
+                  onChange={(v) => setUserId(v ? Number(v) : '')}
+                  options={[{ value: '', label: 'Selecione...' }, ...((usersPage?.items ?? []).map((u) => ({ value: String(u.id), label: u.username })))]}
+                />
                 <div className="flex justify-end gap-3 pt-2">
                   <Button type="button" variant="secondary" onClick={() => setLoanOpen(false)}>
                     Cancelar

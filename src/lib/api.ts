@@ -30,7 +30,10 @@ function processQueue(error: unknown, token: string | null = null) {
 api.interceptors.response.use(
   (r) => r,
   async (error) => {
-    const original = error.config as { _retry?: boolean; headers: Record<string, string> } & typeof error.config
+    const original = error.config as { _retry?: boolean; headers: Record<string, string>; url?: string } & typeof error.config
+    // 401 em /auth/* (login com credencial errada) é erro esperado — não tenta refresh nem recarrega página
+    const isAuthRequest = typeof original.url === 'string' && original.url.includes('/auth/')
+    if (isAuthRequest) return Promise.reject(error)
     if (error.response?.status === 401 && !original._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

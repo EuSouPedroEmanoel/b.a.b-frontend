@@ -148,7 +148,7 @@ export const router = createBrowserRouter([
           <div className="py-16 text-center">
             <h1 className="text-2xl font-bold">Página não encontrada</h1>
             <p className="text-slate-500 mt-2">Verifique o endereço ou volte ao início.</p>
-            <a href="/" className="inline-flex mt-4 px-4 py-2 rounded-md bg-[var(--color-primary)] text-white">
+            <a href="/" className="inline-flex items-center justify-center mt-4 px-4 py-2 rounded-md bg-[#0f4c75] text-white hover:bg-[#0e3f61] active:bg-[#0c3d5e] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:active:bg-slate-200 min-h-[44px] font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2">
               Voltar ao início
             </a>
           </div>
