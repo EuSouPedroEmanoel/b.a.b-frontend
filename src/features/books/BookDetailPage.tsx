@@ -1,9 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, Plus, Hand, Undo2, ImageOff } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ArrowLeft, BookOpen, Plus, Hand, Undo2, X } from 'lucide-react'
 import api from '@/lib/api'
 import { bookConditionLabel, bookStateLabel } from '@/lib/bookStates'
+import { CoverImage } from '@/components/ui/CoverImage'
+import { getCoverProxyUrl } from '@/lib/imageProxy'
+import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
+import { useAverageColor } from '@/hooks/useAverageColor'
+import { generateCoverColor } from '@/lib/coverColor'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -45,8 +51,101 @@ export function BookDetailPage() {
   const [loanOpen, setLoanOpen] = useState(false)
   const [copyId, setCopyId] = useState<number | ''>('')
   const [userId, setUserId] = useState<number | ''>('')
-  const [imgError, setImgError] = useState(false)
   const [loansError, setLoansError] = useState<string | null>(null)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(0) // 0:1.0, 1:1.5, 2:2.5
+  const [origin, setOrigin] = useState({ x: '50%', y: '50%' })
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [pinchScale, setPinchScale] = useState<number | null>(null)
+  const [lightboxImgError, setLightboxImgError] = useState(false)
+  const [lightboxTriedDirect, setLightboxTriedDirect] = useState(false)
+  const lastTapRef = useRef(0)
+  const pinchStartDistRef = useRef(0)
+  const pinchStartScaleRef = useRef(1)
+  const panStartRef = useRef({ x: 0, y: 0 })
+  const panRef = useRef({ x: 0, y: 0 })
+  const isMouseDraggingRef = useRef(false)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+  }, [id])
+
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxOpen(false)
+        setZoomLevel(0)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [lightboxOpen])
+
+  useEffect(() => {
+    if (!lightboxOpen) {
+      setZoomLevel(0)
+      setOrigin({ x: '50%', y: '50%' })
+      setPan({ x: 0, y: 0 })
+      panRef.current = { x: 0, y: 0 }
+      setPinchScale(null)
+    }
+  }, [lightboxOpen])
+
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const coarse = window.matchMedia('(pointer: coarse)').matches
+    const hoverNone = window.matchMedia('(hover: none)').matches
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    setIsTouchDevice(coarse && hoverNone && hasTouch)
+  }, [lightboxOpen])
+
+  // Rastreamento global do mouse/mousepad quando em zoom (1.5x ou 2.5x) – mesma lógica mouse e mousepad
+  useEffect(() => {
+    if (!lightboxOpen || zoomLevel === 0) return
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      // mousepad segue mouse: atualiza origin quando não está arrastando (hover segue cursor)
+      if (isMouseDraggingRef.current) return
+      const el = imgRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      let x = ((e.clientX - rect.left) / rect.width) * 100
+      let y = ((e.clientY - rect.top) / rect.height) * 100
+      x = Math.max(0, Math.min(100, x))
+      y = Math.max(0, Math.min(100, y))
+      setOrigin({ x: `${x}%`, y: `${y}%` })
+    }
+    window.addEventListener('mousemove', handleGlobalMouseMove)
+    return () => window.removeEventListener('mousemove', handleGlobalMouseMove)
+  }, [lightboxOpen, zoomLevel])
+
+  // Mousepad/mouse drag para pan – mesma lógica do mouse, não do touch
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      if (!isMouseDraggingRef.current || (zoomLevel === 0 && pinchScale === null)) return
+      const x = e.clientX - panStartRef.current.x
+      const y = e.clientY - panStartRef.current.y
+      panRef.current = { x, y }
+      setPan({ x, y })
+    }
+    const handleWindowMouseUp = () => {
+      isMouseDraggingRef.current = false
+    }
+    window.addEventListener('mousemove', handleWindowMouseMove)
+    window.addEventListener('mouseup', handleWindowMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove)
+      window.removeEventListener('mouseup', handleWindowMouseUp)
+    }
+  }, [lightboxOpen, zoomLevel, pinchScale])
 
   const { data: book, isLoading, isError, error } = useQuery({
     queryKey: ['book', id],
@@ -106,6 +205,19 @@ export function BookDetailPage() {
     const map = new Map((usersPage?.items ?? []).map((u) => [u.id, u.username]))
     return (userIdNum: number) => map.get(userIdNum) ?? String(userIdNum)
   }, [usersPage])
+
+  const proxiedUrlForGradient = useMemo(() => getCoverProxyUrl(book?.cover_url ?? null, 400), [book?.cover_url])
+  const { darkColor } = useAverageColor(proxiedUrlForGradient ?? null, !!proxiedUrlForGradient)
+  const fallbackColors = useMemo(() => (book ? generateCoverColor(book.title) : { bg: 'hsl(210, 65%, 30%)', darkBg: 'hsl(210, 65%, 20%)' }), [book])
+  const sobreSolid = useMemo(() => {
+    if (!book) return fallbackColors.darkBg
+    return darkColor ?? fallbackColors.darkBg
+  }, [book, darkColor, fallbackColors])
+
+  useEffect(() => {
+    setLightboxImgError(false)
+    setLightboxTriedDirect(false)
+  }, [book?.cover_url, lightboxOpen])
 
   const createLoan = useMutation({
     mutationFn: async () => {
@@ -182,7 +294,7 @@ export function BookDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl flex flex-col gap-6">
+    <div className="mx-auto max-w-full !max-w-4xl w-full overflow-visible flex flex-col gap-6">
       <header>
         <Link to="/acervo" className="inline-flex items-center text-sm text-slate-600 dark:text-slate-300 hover:text-[var(--color-primary)] mb-2">
           <ArrowLeft className="h-4 w-4 mr-1" aria-hidden="true" /> Voltar ao acervo
@@ -233,93 +345,128 @@ export function BookDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-[220px_1fr]">
-        <div
-          className="h-72 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center"
-          aria-label="Capa do livro"
-        >
-          {book.cover_url && !imgError ? (
-            <img
+      <div className="grid gap-6 md:grid-cols-[220px_1fr] max-w-full overflow-visible py-6 px-2 -mx-2">
+        {book.cover_url ? (
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Ampliar capa do livro"
+            className="group relative w-fit h-fit mx-auto sm:mx-0 aspect-[2/3] w-full max-w-[280px] sm:w-[220px] sm:max-w-none border border-transparent bg-transparent cursor-pointer cursor-zoom-in focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 transition-all duration-300 ease-out hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(59,130,246,0.15)] hover:z-10 will-change-transform overflow-visible"
+            onClick={() => setLightboxOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setLightboxOpen(true)
+              }
+            }}
+          >
+            <CoverImage
               src={book.cover_url}
+              title={book.title}
               alt={`Capa de ${book.title}`}
-              className="h-full w-full object-cover"
-              onError={() => setImgError(true)}
+              width={400}
+              height={600}
+              priority
+              className="h-full w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 [&_img]:!object-cover w-full h-full object-cover [&_img]:rounded-xl"
+              sizes="(max-width: 640px) 280px, 220px"
             />
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-2 text-slate-400 p-4 text-center">
-              <ImageOff className="h-10 w-10" aria-hidden="true" />
-              <span className="text-sm">Imagem em breve</span>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Ampliar capa do livro"
+            className="group relative w-fit h-fit mx-auto sm:mx-0 aspect-[2/3] w-full max-w-[280px] sm:w-[220px] sm:max-w-none border border-transparent bg-transparent cursor-pointer cursor-zoom-in focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 transition-all duration-300 ease-out hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(59,130,246,0.15)] hover:z-10 will-change-transform overflow-visible"
+            onClick={() => setLightboxOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setLightboxOpen(true)
+              }
+            }}
+          >
+            <CoverImage
+              src={book.cover_url}
+              title={book.title}
+              alt={`Capa de ${book.title}`}
+              width={400}
+              height={600}
+              priority
+              className="h-full w-full overflow-hidden rounded-xl aspect-[2/3] border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 [&_img]:rounded-xl"
+              sizes="(max-width: 640px) 280px, 220px"
+            />
+          </div>
+        )}
 
         <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader>
-              <h2 className="font-semibold flex items-center gap-2">
-                <BookOpen className="h-5 w-5" aria-hidden="true" /> Sobre o livro
+          <Card className="relative overflow-hidden border-white/20 text-white" style={{ background: sobreSolid }}>
+            <div className="absolute inset-0 bg-black/10 pointer-events-none" aria-hidden="true" />
+            <CardHeader className="relative border-white/15">
+              <h2 className="font-semibold flex items-center gap-2 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+                <BookOpen className="h-5 w-5 text-white/90" aria-hidden="true" /> Sobre o livro
               </h2>
             </CardHeader>
-            <CardBody>
-              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+            <CardBody className="relative">
+              <p className="text-sm leading-relaxed text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]">
                 {book.description || 'Sem descrição disponível.'}
               </p>
-              <dl className="mt-6 grid gap-4 border-t border-slate-200 dark:border-slate-700 pt-4 text-sm">
+              <dl className="mt-6 grid gap-4 border-t border-white/15 pt-4 text-sm">
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-slate-500">ISBN</dt>
-                  <dd className="col-span-2 font-mono text-slate-700 dark:text-slate-200 break-all">{book.isbn ?? '—'}</dd>
+                  <dt className="text-white/60">ISBN</dt>
+                  <dd className="col-span-2 font-mono text-white break-all drop-shadow-sm">{book.isbn ?? '—'}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-slate-500">Lançamento</dt>
-                  <dd className="col-span-2 text-slate-700 dark:text-slate-200">{book.published_date ? new Date(book.published_date).toLocaleDateString('pt-BR') : '—'}</dd>
+                  <dt className="text-white/60">Lançamento</dt>
+                  <dd className="col-span-2 text-white drop-shadow-sm">{book.published_date ? new Date(book.published_date).toLocaleDateString('pt-BR') : '—'}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-slate-500">Cadastrado em</dt>
-                  <dd className="col-span-2 text-slate-700 dark:text-slate-200">{book.created_at ? new Date(book.created_at).toLocaleDateString('pt-BR') : '—'}</dd>
+                  <dt className="text-white/60">Cadastrado em</dt>
+                  <dd className="col-span-2 text-white drop-shadow-sm">{book.created_at ? new Date(book.created_at).toLocaleDateString('pt-BR') : '—'}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-slate-500">Autores</dt>
+                  <dt className="text-white/60">Autores</dt>
                   <dd className="col-span-2 flex flex-wrap gap-1.5">
-                    {book.authors?.length ? book.authors.map((a) => <Badge key={a.id} tone="info">{a.name}</Badge>) : <span className="text-slate-500">—</span>}
+                    {book.authors?.length ? book.authors.map((a) => <Badge key={a.id} tone="info">{a.name}</Badge>) : <span className="text-white/50">—</span>}
                   </dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-slate-500">Gêneros</dt>
+                  <dt className="text-white/60">Gêneros</dt>
                   <dd className="col-span-2 flex flex-wrap gap-1.5">
-                    {book.genres?.length ? book.genres.map((g) => <Badge key={g.id} tone="neutral">{g.name}</Badge>) : <span className="text-slate-500">—</span>}
+                    {book.genres?.length ? book.genres.map((g) => <Badge key={g.id} tone="neutral">{g.name}</Badge>) : <span className="text-white/50">—</span>}
                   </dd>
                 </div>
               </dl>
             </CardBody>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <h2 className="font-semibold">Exemplares</h2>
+          <Card className="relative overflow-hidden border-white/20 text-white" style={{ background: sobreSolid }}>
+            <div className="absolute inset-0 bg-black/10 pointer-events-none" aria-hidden="true" />
+            <CardHeader className="relative border-white/15">
+              <h2 className="font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">Exemplares</h2>
             </CardHeader>
-            <CardBody>
+            <CardBody className="relative">
               {copies.length === 0 ? (
-                <p className="text-sm text-slate-500">Nenhum exemplar cadastrado para este livro nesta escola.</p>
+                <p className="text-sm text-white/70">Nenhum exemplar cadastrado para este livro nesta escola.</p>
               ) : (
                 <>
                   <dl className="grid grid-cols-3 gap-3 text-center mb-4">
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-                      <dt className="text-xs text-slate-500 uppercase">Total</dt>
-                      <dd className="mt-1 text-2xl font-bold">{copies.length}</dd>
+                    <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-3">
+                      <dt className="text-xs text-white/60 uppercase">Total</dt>
+                      <dd className="mt-1 text-2xl font-bold text-white">{copies.length}</dd>
                     </div>
-                    <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 p-3">
-                      <dt className="text-xs text-emerald-600 uppercase">Disponíveis</dt>
-                      <dd className="mt-1 text-2xl font-bold">{available}</dd>
+                    <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-3">
+                      <dt className="text-xs text-white/70 uppercase">Disponíveis</dt>
+                      <dd className="mt-1 text-2xl font-bold text-white">{available}</dd>
                     </div>
-                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 p-3">
-                      <dt className="text-xs text-amber-600 uppercase">Emprestados</dt>
-                      <dd className="mt-1 text-2xl font-bold">{borrowed}</dd>
+                    <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-3">
+                      <dt className="text-xs text-white/70 uppercase">Emprestados</dt>
+                      <dd className="mt-1 text-2xl font-bold text-white">{borrowed}</dd>
                     </div>
                   </dl>
-                  <ul className="divide-y divide-slate-200 dark:divide-slate-700" role="list">
+                  <ul className="divide-y divide-white/15" role="list">
                     {copies.map((c) => (
                       <li key={c.id} className="flex items-center justify-between py-2.5 text-sm">
-                        <span className="font-mono">{c.code}</span>
+                        <span className="font-mono text-white/90">{c.code}</span>
                         <span className="flex items-center gap-2">
                           <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'}>
                             {bookConditionLabel(c.condition)}
@@ -344,27 +491,28 @@ export function BookDetailPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold flex items-center gap-2" aria-live="polite">
-            <Undo2 className="h-5 w-5" aria-hidden="true" /> Devoluções — empréstimos ativos deste livro
+      <Card className="relative overflow-hidden border-white/20 text-white" style={{ background: sobreSolid }}>
+        <div className="absolute inset-0 bg-black/10 pointer-events-none" aria-hidden="true" />
+        <CardHeader className="relative border-white/15">
+          <h2 className="font-semibold flex items-center gap-2 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" aria-live="polite">
+            <Undo2 className="h-5 w-5 text-white/90" aria-hidden="true" /> Devoluções — empréstimos ativos deste livro
           </h2>
         </CardHeader>
-        <CardBody>
-          {loansLoading && <p aria-live="polite">Carregando empréstimos...</p>}
+        <CardBody className="relative">
+          {loansLoading && <p aria-live="polite" className="text-white/80">Carregando empréstimos...</p>}
           {!loansLoading && activeLoans && activeLoans.length === 0 && (
-            <p className="text-sm text-slate-500 py-4 text-center">Nenhum empréstimo ativo para este livro.</p>
+            <p className="text-sm text-white/70 py-4 text-center">Nenhum empréstimo ativo para este livro.</p>
           )}
           {activeLoans && activeLoans.length > 0 && (
-            <ul className="divide-y divide-slate-200 dark:divide-slate-700" role="list">
+            <ul className="divide-y divide-white/15" role="list">
               {activeLoans.map((l) => (
                 <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="text-sm">
-                    <p>
+                    <p className="text-white/90">
                       <span className="font-mono">#{l.id}</span> · Exemplar{' '}
                       <span className="font-mono">{copyCode(l.copy_id)}</span> · {userLabel(l.user_id)}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-white/60 mt-0.5">
                       Emprestado em {new Date(l.borrowed_at).toLocaleDateString('pt-BR')} · Devolução em{' '}
                       {new Date(l.due_date).toLocaleDateString('pt-BR')}
                     </p>
@@ -427,6 +575,153 @@ export function BookDetailPage() {
           </div>
         </div>
       )}
+
+      <AnimatePresence>
+        {lightboxOpen && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Capa ampliada"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setLightboxOpen(false)
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            <motion.button
+              type="button"
+              aria-label="Fechar"
+              onClick={() => setLightboxOpen(false)}
+              className="absolute top-4 right-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm border border-white/20 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 18, mass: 0.8 }}
+            >
+              <X className="h-6 w-6" aria-hidden="true" />
+            </motion.button>
+            <motion.img
+              ref={imgRef}
+              src={(() => {
+                const proxied = getCoverProxyUrl(book.cover_url, 400)
+                const fallback = generateFallbackCoverDataUrl(book.title, 400, 600)
+                if (!book.cover_url || lightboxImgError) return fallback
+                if (lightboxTriedDirect) return book.cover_url
+                return proxied ?? fallback
+              })()}
+              alt={`Capa de ${book.title}`}
+              crossOrigin={lightboxImgError || !book.cover_url || lightboxTriedDirect ? undefined : 'anonymous'}
+              className={`${isTouchDevice ? 'max-h-[85vh]' : 'max-h-[90vh]'} w-auto max-w-[90vw] ${!book.cover_url || lightboxImgError ? 'aspect-[2/3] w-[400px] h-auto object-cover' : 'object-contain'} rounded-lg shadow-2xl ${zoomLevel === 2 || (pinchScale !== null && pinchScale >= 2) ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
+              style={{
+                transformOrigin: `${origin.x} ${origin.y}`,
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${pinchScale ?? [1, 1.5, 2.5][zoomLevel]})`,
+                transition: 'transform 0.15s ease-out, transform-origin 0.05s ease-out',
+                touchAction: isTouchDevice && (zoomLevel !== 0 || pinchScale !== null) ? 'none' : 'auto',
+              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{
+                type: 'spring',
+                stiffness: 300,
+                damping: 18,
+                mass: 0.8,
+                opacity: { duration: 0.2 },
+              }}
+              decoding="async"
+              loading="eager"
+              fetchPriority="high"
+              onError={() => {
+                if (book.cover_url && !lightboxImgError) {
+                  if (!lightboxTriedDirect && getCoverProxyUrl(book.cover_url, 400) !== book.cover_url) {
+                    setLightboxTriedDirect(true)
+                  } else {
+                    setLightboxImgError(true)
+                  }
+                }
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setZoomLevel((prev) => (prev + 1) % 3)
+              }}
+              onMouseDown={(e) => {
+                if (zoomLevel === 0 && pinchScale === null) return
+                isMouseDraggingRef.current = true
+                panStartRef.current = { x: e.clientX - panRef.current.x, y: e.clientY - panRef.current.y }
+                e.preventDefault()
+              }}
+              onTouchStart={(e) => {
+                if (e.touches.length === 1) {
+                  panStartRef.current = { x: e.touches[0].clientX - panRef.current.x, y: e.touches[0].clientY - panRef.current.y }
+                } else if (e.touches.length === 2) {
+                  const dx = e.touches[0].clientX - e.touches[1].clientX
+                  const dy = e.touches[0].clientY - e.touches[1].clientY
+                  pinchStartDistRef.current = Math.hypot(dx, dy)
+                  pinchStartScaleRef.current = pinchScale ?? [1, 1.5, 2.5][zoomLevel]
+                }
+              }}
+              onTouchMove={(e) => {
+                if (e.touches.length === 1 && (zoomLevel !== 0 || pinchScale !== null)) {
+                  const x = e.touches[0].clientX - panStartRef.current.x
+                  const y = e.touches[0].clientY - panStartRef.current.y
+                  panRef.current = { x, y }
+                  setPan({ x, y })
+                } else if (e.touches.length === 2) {
+                  e.preventDefault()
+                  const dx = e.touches[0].clientX - e.touches[1].clientX
+                  const dy = e.touches[0].clientY - e.touches[1].clientY
+                  const dist = Math.hypot(dx, dy)
+                  const scale = Math.max(1, Math.min(2.5, pinchStartScaleRef.current * (dist / (pinchStartDistRef.current || dist))))
+                  setPinchScale(scale)
+                  const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
+                  const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
+                  const el = imgRef.current
+                  if (el) {
+                    const rect = el.getBoundingClientRect()
+                    let px = ((cx - rect.left) / rect.width) * 100
+                    let py = ((cy - rect.top) / rect.height) * 100
+                    px = Math.max(0, Math.min(100, px))
+                    py = Math.max(0, Math.min(100, py))
+                    setOrigin({ x: `${px}%`, y: `${py}%` })
+                  }
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (e.touches.length === 0) {
+                  const now = Date.now()
+                  const isDoubleTap = now - lastTapRef.current < 300
+                  lastTapRef.current = now
+                  if (isDoubleTap) {
+                    e.preventDefault()
+                    if (zoomLevel === 0 && pinchScale === null) {
+                      setZoomLevel(2)
+                      setOrigin({ x: '50%', y: '50%' })
+                      setPan({ x: 0, y: 0 })
+                      panRef.current = { x: 0, y: 0 }
+                    } else {
+                      setZoomLevel(0)
+                      setPinchScale(null)
+                      setPan({ x: 0, y: 0 })
+                      panRef.current = { x: 0, y: 0 }
+                      setOrigin({ x: '50%', y: '50%' })
+                    }
+                  }
+                  if (pinchScale !== null) {
+                    const s = pinchScale
+                    if (s < 1.25) setZoomLevel(0)
+                    else if (s < 2) setZoomLevel(1)
+                    else setZoomLevel(2)
+                    setTimeout(() => setPinchScale(null), 150)
+                  }
+                }
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

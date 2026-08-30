@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Plus, Table } from 'lucide-react'
 import api from '@/lib/api'
 import { bookStateLabel } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
@@ -12,8 +12,12 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
 import { Select } from '@/components/ui/Select'
+import { OverflowTags } from '@/components/ui/OverflowTags'
+import { CoverImage } from '@/components/ui/CoverImage'
+import { getBookCoverGradient } from '@/lib/coverColor'
+import { GridCard } from './GridCard'
 
-type Book = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; is_active: boolean; added_by: number; cover_url: string | null; published_date: string | null; created_at: string | null; updated_at: string | null; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
+type Book = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; is_active: boolean; added_by: number; cover_url: string | null; published_date: string | null; created_at: string | null; updated_at: string | null; total_copies?: number; available_copies?: number; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 type Resolve = { kind: 'isbn' | 'internal_code' | 'title' | 'none'; book_id: number | null }
 type BookSuggestion = { id: number; title: string; isbn: string | null }
@@ -73,6 +77,17 @@ export function BooksPage() {
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const filterWrapperRef = useRef<HTMLDivElement>(null)
   const filterMenuRef = useRef<HTMLDivElement>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('acervo:viewMode') as 'table' | 'grid' | null
+      return saved === 'grid' ? 'grid' : 'table'
+    }
+    return 'table'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('acervo:viewMode', viewMode)
+  }, [viewMode])
 
   useEffect(() => {
     searchInputRef.current?.focus()
@@ -351,7 +366,7 @@ export function BooksPage() {
                         setPage(1)
                       }}
                       options={[
-                        { value: 'created_at', label: 'Data de cadastro' },
+                        { value: 'created_at', label: 'Cadastro' },
                         { value: 'published_date', label: 'Data de lançamento' },
                         { value: 'title', label: 'Nome' },
                         { value: 'author', label: 'Autor' },
@@ -390,7 +405,7 @@ export function BooksPage() {
                     </div>
                   </div>
                 )}
-                <Button type="submit" className="flex-1 sm:flex-none">
+                <Button type="submit" className="flex-1 sm:flex-none !bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700">
                   Buscar
                 </Button>
               </div>
@@ -418,15 +433,47 @@ export function BooksPage() {
         </CardBody>
       </Card>
 
+      <div className="flex justify-end">
+        <div role="group" aria-label="Modo de visualização" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
+          <Button
+            size="sm"
+            variant={viewMode === 'table' ? 'primary' : 'secondary'}
+            aria-pressed={viewMode === 'table'}
+            onClick={() => setViewMode('table')}
+            aria-label="Visualização em tabela"
+            className={`gap-1.5 ${viewMode === 'table' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : ''}`}
+          >
+            <Table className="h-4 w-4" aria-hidden="true" /> Tabela
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === 'grid' ? 'primary' : 'secondary'}
+            aria-pressed={viewMode === 'grid'}
+            onClick={() => setViewMode('grid')}
+            aria-label="Visualização em grade"
+            className={`gap-1.5 ${viewMode === 'grid' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : ''}`}
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Grade
+          </Button>
+        </div>
+      </div>
+
       <section aria-labelledby="books-list-heading">
         <h2 id="books-list-heading" className="sr-only">
           Lista de livros
         </h2>
 
-        {isLoading && (
+        {isLoading && viewMode === 'table' && (
           <div className="grid gap-3" aria-busy="true" aria-live="polite">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-24 rounded-xl border border-slate-200 dark:border-slate-700 animate-pulse bg-slate-50 dark:bg-slate-800" />
+            ))}
+          </div>
+        )}
+        {isLoading && viewMode === 'grid' && (
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6" aria-busy="true" aria-live="polite">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="aspect-[2/3] rounded-xl border border-slate-200 dark:border-slate-700 animate-pulse bg-slate-100 dark:bg-slate-800" />
             ))}
           </div>
         )}
@@ -437,36 +484,39 @@ export function BooksPage() {
           </div>
         )}
 
-        {data && (
+        {data && viewMode === 'table' && (
           <>
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <table className="w-full text-sm table-fixed">
-                <caption className="sr-only">Tabela de livros com título, ISBN, estado, data de cadastro e lançamento</caption>
+                <caption className="sr-only">Tabela de livros com capa, título, ISBN, estado, data de cadastro e lançamento</caption>
                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-left">
                   <tr>
-                    <th scope="col" className="px-4 py-3 font-semibold w-[20%]">
+                    <th scope="col" className="px-3 py-3 font-semibold w-14 text-center">
+                      Capa
+                    </th>
+                    <th scope="col" className="px-3 py-3 font-semibold w-[20%]">
                       Título
                     </th>
-                    <th scope="col" className="px-4 py-3 font-semibold">
+                    <th scope="col" className="px-3 py-3 font-semibold">
                       ISBN
                     </th>
-                    <th scope="col" className="px-4 py-3 font-semibold">
+                    <th scope="col" className="px-3 py-3 font-semibold">
                       Autores
                     </th>
-                    <th scope="col" className="px-4 py-3 font-semibold">
+                    <th scope="col" className="px-3 py-3 font-semibold">
                       Gêneros
                     </th>
-                    <th scope="col" className="px-4 py-3 font-semibold">
+                    <th scope="col" className="px-3 py-3 font-semibold">
                       Estado
                     </th>
-                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
                       Lançamento
                     </th>
-                    <th scope="col" className="px-4 py-3 font-semibold">
+                    <th scope="col" className="px-3 py-3 font-semibold">
                       Descrição
                     </th>
-                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
-                      Data de cadastro
+                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
+                      Cadastro
                     </th>
                   </tr>
                 </thead>
@@ -486,28 +536,44 @@ export function BooksPage() {
                       aria-label={`Abrir livro ${b.title}`}
                       className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-[-2px]"
                     >
-                      <td className="px-4 py-3 font-medium w-[20%]">
+                      <td className="px-2 py-2">
+                        {b.cover_url ? (
+                          <CoverImage
+                            src={b.cover_url}
+                            title={b.title}
+                            alt={`Capa de ${b.title}`}
+                            width={72}
+                            height={108}
+                            className="h-12 w-9 mx-auto rounded-md border border-slate-200 dark:border-slate-600"
+                            sizes="36px"
+                          />
+                        ) : (
+                          <div
+                            className="w-9 h-12 rounded overflow-hidden flex items-center justify-center shadow-sm mx-auto border border-slate-200 dark:border-slate-600"
+                            style={{ background: getBookCoverGradient(b.title) }}
+                          >
+                            <BookOpen className="h-5 w-5 text-white/80 drop-shadow-sm" aria-hidden="true" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 font-medium w-[20%]">
                         <span className="line-clamp-2 break-words" title={b.title}>
                           {b.title}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-500">{b.isbn ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1 max-w-[20ch]">
-                          {b.authors?.length ? b.authors.map((a) => <Badge key={a.id} tone="info">{a.name}</Badge>) : <span className="text-slate-400">—</span>}
-                        </div>
+                      <td className="px-3 py-3 text-slate-500 text-xs font-mono">{b.isbn ?? '—'}</td>
+                      <td className="px-3 py-3">
+                        <OverflowTags items={b.authors} tone="info" maxVisibleFallback={1} className="max-w-[16ch]" />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1 max-w-[20ch]">
-                          {b.genres?.length ? b.genres.map((g) => <Badge key={g.id} tone="neutral">{g.name}</Badge>) : <span className="text-slate-400">—</span>}
-                        </div>
+                      <td className="px-3 py-3">
+                        <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} className="max-w-[16ch]" />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <Badge tone={b.derived_state === 'available' ? 'success' : 'neutral'}>{bookStateLabel(b.derived_state)}</Badge>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</td>
-                      <td className="px-4 py-3 max-w-[32ch] truncate text-slate-500">{b.description ?? '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-500 text-xs">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td className="px-3 py-3 max-w-[24ch] truncate text-slate-500 text-xs">{b.description ?? '—'}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-500 text-xs">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -525,36 +591,15 @@ export function BooksPage() {
                     className="flex gap-4 p-4 focus-visible:outline-none"
                     aria-label={`Ver detalhes de ${b.title}`}
                   >
-                    <div className="h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 border border-slate-200 dark:border-slate-600 flex items-center justify-center relative">
-                      {b.cover_url ? (
-                        <>
-                          <img
-                            src={b.cover_url}
-                            alt={`Capa de ${b.title}`}
-                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                            onError={(e) => {
-                              const t = e.currentTarget as HTMLImageElement
-                              t.style.display = 'none'
-                              const fb = document.getElementById(`fallback-${b.id}`)
-                              if (fb) {
-                                fb.classList.remove('hidden')
-                                fb.classList.add('flex')
-                              }
-                            }}
-                          />
-                          <div id={`fallback-${b.id}`} className="hidden absolute inset-0 flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 text-slate-400">
-                            <BookOpen className="h-7 w-7 opacity-60" aria-hidden="true" />
-                            <span className="text-[9px] font-medium uppercase tracking-widest opacity-60">Sem capa</span>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-1.5 text-slate-400">
-                          <BookOpen className="h-7 w-7 opacity-60" aria-hidden="true" />
-                          <span className="text-[9px] font-medium uppercase tracking-widest opacity-60">Sem capa</span>
-                        </div>
-                      )}
-                    </div>
+                    <CoverImage
+                      src={b.cover_url}
+                      title={b.title}
+                      alt={`Capa de ${b.title}`}
+                      width={160}
+                      height={240}
+                      className="h-28 w-20 shrink-0 rounded-xl border border-slate-200 dark:border-slate-600"
+                      sizes="80px"
+                    />
                     <div className="flex min-w-0 flex-1 flex-col gap-2">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
@@ -571,26 +616,36 @@ export function BooksPage() {
                       {(b.authors?.length > 0 || b.genres?.length > 0) && (
                         <div className="flex flex-col gap-1.5">
                           {b.authors?.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {b.authors.slice(0, 2).map((a) => (
-                                <Badge key={a.id} tone="info" className="text-[11px] px-2 py-0">
+                            <div className="flex flex-nowrap gap-1 items-center">
+                              {b.authors.slice(0, 1).map((a) => (
+                                <Badge key={a.id} tone="info" className="text-[11px] px-2 py-0 shrink-0 whitespace-nowrap">
                                   {a.name}
                                 </Badge>
                               ))}
-                              {b.authors.length > 2 && (
-                                <span className="text-[11px] text-slate-500 self-center">+{b.authors.length - 2}</span>
+                              {b.authors.length > 1 && (
+                                <span className="relative inline-flex group/authors shrink-0">
+                                  <span className="cursor-help rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700">+{b.authors.length - 1}</span>
+                                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-xl border border-slate-700 group-hover/authors:block mb-1 max-w-[200px] text-center">
+                                    {b.authors.slice(1).map((a) => a.name).join(', ')}
+                                  </span>
+                                </span>
                               )}
                             </div>
                           )}
                           {b.genres?.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {b.genres.slice(0, 3).map((g) => (
-                                <Badge key={g.id} tone="neutral" className="text-[11px] px-2 py-0">
+                            <div className="flex flex-nowrap gap-1 items-center">
+                              {b.genres.slice(0, 2).map((g) => (
+                                <Badge key={g.id} tone="neutral" className="text-[11px] px-2 py-0 shrink-0 whitespace-nowrap">
                                   {g.name}
                                 </Badge>
                               ))}
-                              {b.genres.length > 3 && (
-                                <span className="text-[11px] text-slate-500 self-center">+{b.genres.length - 3}</span>
+                              {b.genres.length > 2 && (
+                                <span className="relative inline-flex group/genres shrink-0">
+                                  <span className="cursor-help rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:text-slate-200">+{b.genres.length - 2}</span>
+                                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-xl border border-slate-700 group-hover/genres:block mb-1 max-w-[200px] text-center">
+                                    {b.genres.slice(2).map((g) => g.name).join(', ')}
+                                  </span>
+                                </span>
                               )}
                             </div>
                           )}
@@ -641,6 +696,19 @@ export function BooksPage() {
             {data.items.length === 0 && <p className="text-sm text-slate-500 py-8 text-center">Nenhum livro encontrado.</p>}
 
             <div className="mt-4">
+              <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
+            </div>
+          </>
+        )}
+        {data && viewMode === 'grid' && (
+          <>
+            <div role="grid" aria-label="Grade de livros" className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {data.items.map((b, index) => (
+                <GridCard key={b.id} book={b as any} index={index} />
+              ))}
+            </div>
+            {data.items.length === 0 && <p className="text-sm text-slate-500 py-8 text-center">Nenhum livro encontrado.</p>}
+            <div className="mt-6">
               <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
             </div>
           </>

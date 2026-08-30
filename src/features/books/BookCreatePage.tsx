@@ -10,6 +10,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { getCoverProxyUrl } from '@/lib/imageProxy'
 
 type Book = { id: number; title: string; description: string | null; state: string; isbn: string | null; is_active: boolean; added_by: number }
 type Lookup = { isbn: string; title: string | null; description: string | null; cover_url: string | null; published_date: string | null; genres: string[]; authors: string[]; found: boolean; already_exists: boolean; existing_book_id: number | null }
@@ -355,7 +356,20 @@ export function BookCreatePage() {
                 <dd className="mt-1 p-3 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm break-all">
                   {preview.cover_url || manual.cover_url || '—'}
                 </dd>
-                {preview.cover_url && <dd className="mt-2"><img src={preview.cover_url} alt="preview" className="h-32 rounded border" onError={(e)=> (e.currentTarget.style.display='none')} /></dd>}
+                {preview.cover_url && (
+                  <dd className="mt-2">
+                    <img
+                      src={getCoverProxyUrl(preview.cover_url, 320) ?? preview.cover_url}
+                      alt="preview"
+                      className="h-32 rounded border object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      width={220}
+                      height={320}
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  </dd>
+                )}
               </div>
               <div>
                 <dt className="text-sm font-medium text-slate-600 dark:text-slate-300">Data de lançamento</dt>

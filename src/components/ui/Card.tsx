@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({ children, className = '', style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <div
+      style={style}
       className={`card rounded-xl border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 shadow-md dark:shadow-none hover:shadow-lg transition-shadow duration-300 ${className}`}
     >
       {children}
