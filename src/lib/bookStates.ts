@@ -10,6 +10,22 @@ export function bookStateLabel(state: string): string {
   return BOOK_STATE_LABELS[state] ?? state
 }
 
+export function bookStateTone(state: string): 'success' | 'warning' | 'info' | 'danger' | 'neutral' {
+  switch (state) {
+    case 'available':
+      return 'success'
+    case 'borrowed':
+      return 'warning'
+    case 'reserved':
+      return 'info'
+    case 'lost':
+      return 'danger'
+    case 'archived':
+    default:
+      return 'neutral'
+  }
+}
+
 export const BOOK_CONDITION_LABELS: Record<string, string> = {
   new: 'Novo',
   good: 'Bom',

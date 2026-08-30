@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Plus, Hand, Undo2, X } from 'lucide-react'
 import api from '@/lib/api'
-import { bookConditionLabel, bookStateLabel } from '@/lib/bookStates'
+import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
@@ -301,7 +301,7 @@ export function BookDetailPage() {
         </Link>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold">{book.title}</h1>
-          <Badge tone={book.derived_state === 'available' ? 'success' : book.derived_state === 'borrowed' ? 'warning' : 'neutral'}>
+          <Badge tone={bookStateTone(book.derived_state)}>
             {bookStateLabel(book.derived_state)}
           </Badge>
         </div>
@@ -471,7 +471,7 @@ export function BookDetailPage() {
                           <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'}>
                             {bookConditionLabel(c.condition)}
                           </Badge>
-                          <Badge tone={c.state === 'available' ? 'success' : c.state === 'borrowed' ? 'warning' : 'neutral'}>
+                          <Badge tone={bookStateTone(c.state)}>
                             {bookStateLabel(c.state)}
                           </Badge>
                         </span>

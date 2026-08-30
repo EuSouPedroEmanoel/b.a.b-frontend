@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Plus } from 'lucide-react'
 import api from '@/lib/api'
-import { bookConditionLabel, bookStateLabel } from '@/lib/bookStates'
+import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 
@@ -106,7 +106,7 @@ export function BookCopyListPage() {
                       <tr key={c.id}>
                         <td className="px-4 py-3 font-mono text-sm">{c.code}</td>
                         <td className="px-4 py-3">
-                          <Badge tone={c.state === 'available' ? 'success' : 'neutral'}>{bookStateLabel(c.state)}</Badge>
+                          <Badge tone={bookStateTone(c.state)}>{bookStateLabel(c.state)}</Badge>
                         </td>
                         <td className="px-4 py-3">
                           <Badge tone="info">{bookConditionLabel(c.condition)}</Badge>
@@ -121,7 +121,7 @@ export function BookCopyListPage() {
                   <li key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <span className="font-mono text-sm">{c.code}</span>
                     <span className="flex gap-1">
-                      <Badge tone={c.state === 'available' ? 'success' : 'neutral'}>{bookStateLabel(c.state)}</Badge>
+                      <Badge tone={bookStateTone(c.state)}>{bookStateLabel(c.state)}</Badge>
                     </span>
                   </li>
                 ))}

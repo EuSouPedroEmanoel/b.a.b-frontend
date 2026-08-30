@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Plus, Table } from 'lucide-react'
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
+import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Loader2, Plus, Table } from 'lucide-react'
 import api from '@/lib/api'
-import { bookStateLabel } from '@/lib/bookStates'
+import { bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -30,15 +30,58 @@ type SuggestItem =
 
 export function BooksPage() {
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('acervo:pageSize')
+      const n = saved ? parseInt(saved, 10) : 10
+      if ([10, 20, 30, 50].includes(n)) return n
+      if (n >= 5 && n <= 50) return Math.min(50, Math.max(5, n))
+    }
+    return 10
+  })
   const [query, setQuery] = useState('')
   const [queryQ, setQueryQ] = useState('')
   const [genreFilter, setGenreFilter] = useState('')
+  const [stateFilter, setStateFilter] = useState('')
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'published_date' | 'author'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const announce = useAnnouncer()
   const navigate = useNavigate()
   const { user } = useAuth()
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
+
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('acervo:viewMode') as 'table' | 'grid' | null
+      return saved === 'grid' ? 'grid' : 'table'
+    }
+    return 'table'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('acervo:viewMode', viewMode)
+  }, [viewMode])
+
+  useEffect(() => {
+    localStorage.setItem('acervo:pageSize', String(pageSize))
+  }, [pageSize])
+
+  const availabilityOptions = useMemo(() => {
+    const all = [
+      { value: '', label: 'Todas' },
+      { value: 'available', label: 'Disponível' },
+      { value: 'borrowed', label: 'Emprestado' },
+      { value: 'reserved', label: 'Reservado' },
+      { value: 'lost', label: 'Perdido' },
+      { value: 'archived', label: 'Arquivado' },
+    ]
+    if (user?.role === 'student') {
+      return all
+        .filter((o) => o.value === '' || o.value === 'available' || o.value === 'borrowed')
+        .map((o) => (o.value === 'borrowed' ? { ...o, label: 'Emprestado (meus)' } : o))
+    }
+    return all
+  }, [user?.role])
 
   const { data: genreOptions } = useQuery({
     queryKey: ['genres-list'],
@@ -48,18 +91,51 @@ export function BooksPage() {
     },
   })
 
+  // Tabela: paginação clássica (até 50)
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['books', page, queryQ, genreFilter, sortBy, sortOrder],
+    queryKey: ['books', 'table', page, pageSize, queryQ, genreFilter, stateFilter, sortBy, sortOrder],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), size: '10' })
+      const params = new URLSearchParams({ page: String(page), size: String(pageSize) })
       if (queryQ) params.set('q', queryQ)
       if (genreFilter) params.set('genre_id', genreFilter)
+      if (stateFilter) params.set('state', stateFilter)
       if (sortBy) params.set('sort_by', sortBy)
       if (sortOrder) params.set('sort_order', sortOrder)
       const { data } = await api.get<Paginated<Book>>(`/books/?${params}`)
       return data
     },
+    enabled: viewMode === 'table',
   })
+
+  // Grade: paginação infinita (size 18 = múltiplo de 2/3/6 para preencher linhas)
+  const GRID_SIZE = 18
+  const {
+    data: gridData,
+    isLoading: isGridLoading,
+    isError: isGridError,
+    error: gridError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['books', 'grid', queryQ, genreFilter, stateFilter, sortBy, sortOrder],
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = new URLSearchParams({ page: String(pageParam), size: String(GRID_SIZE) })
+      if (queryQ) params.set('q', queryQ)
+      if (genreFilter) params.set('genre_id', genreFilter)
+      if (stateFilter) params.set('state', stateFilter)
+      if (sortBy) params.set('sort_by', sortBy)
+      if (sortOrder) params.set('sort_order', sortOrder)
+      const { data } = await api.get<Paginated<Book>>(`/books/?${params}`)
+      return data
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.page < lastPage.pages ? lastPage.page + 1 : undefined),
+    enabled: viewMode === 'grid',
+  })
+
+  const gridItems = gridData?.pages.flatMap((p) => p.items) ?? []
+  const gridTotal = gridData?.pages[0]?.total ?? 0
 
   const resolveMut = useMutation({
     mutationFn: async (term: string) => {
@@ -77,17 +153,26 @@ export function BooksPage() {
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const filterWrapperRef = useRef<HTMLDivElement>(null)
   const filterMenuRef = useRef<HTMLDivElement>(null)
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('acervo:viewMode') as 'table' | 'grid' | null
-      return saved === 'grid' ? 'grid' : 'table'
-    }
-    return 'table'
-  })
 
+  // sentinel para scroll infinito no modo grade
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const onIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const first = entries[0]
+      if (first?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage()
+      }
+    },
+    [hasNextPage, isFetchingNextPage, fetchNextPage],
+  )
   useEffect(() => {
-    localStorage.setItem('acervo:viewMode', viewMode)
-  }, [viewMode])
+    if (viewMode !== 'grid') return
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(onIntersect, { rootMargin: '600px 0px', threshold: 0 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [viewMode, onIntersect, gridItems.length])
 
   useEffect(() => {
     searchInputRef.current?.focus()
@@ -333,9 +418,9 @@ export function BooksPage() {
                 >
                   <Funnel className="h-4 w-4" aria-hidden="true" />
                   Filtros
-                  {(genreFilter || sortBy !== 'created_at' || sortOrder !== 'desc') && (
+                  {(genreFilter || stateFilter || sortBy !== 'created_at' || sortOrder !== 'desc') && (
                     <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0f4c75] px-1.5 text-xs font-bold text-white dark:bg-white dark:text-slate-900" aria-hidden="true">
-                      {[genreFilter, sortBy !== 'created_at' ? sortBy : null, sortOrder !== 'desc' ? sortOrder : null].filter(Boolean).length}
+                      {[genreFilter, stateFilter, sortBy !== 'created_at' ? sortBy : null, sortOrder !== 'desc' ? sortOrder : null].filter(Boolean).length}
                     </span>
                   )}
                 </Button>
@@ -356,6 +441,16 @@ export function BooksPage() {
                         setPage(1)
                       }}
                       options={[{ value: '', label: 'Todos' }, ...((genreOptions ?? []).map((g) => ({ value: String(g.id), label: g.name })))]}
+                    />
+                    <Select
+                      label="Disponibilidade"
+                      id="state-filter"
+                      value={stateFilter}
+                      onChange={(v) => {
+                        setStateFilter(v)
+                        setPage(1)
+                      }}
+                      options={availabilityOptions}
                     />
                     <Select
                       label="Ordenar por"
@@ -392,6 +487,7 @@ export function BooksPage() {
                         variant="secondary"
                         onClick={() => {
                           setGenreFilter('')
+                          setStateFilter('')
                           setSortBy('created_at')
                           setSortOrder('desc')
                           setPage(1)
@@ -410,10 +506,11 @@ export function BooksPage() {
                 </Button>
               </div>
             </div>
-            {(queryQ || genreFilter) && (
+            {(queryQ || genreFilter || stateFilter) && (
               <div className="flex flex-wrap gap-2">
                 {queryQ && <Badge tone="info">Busca: {queryQ}</Badge>}
                 {genreFilter && <Badge tone="neutral">Gênero aplicado</Badge>}
+                {stateFilter && <Badge tone="neutral">Disponibilidade: {availabilityOptions.find((o) => o.value === stateFilter)?.label}</Badge>}
                 <Button
                   type="button"
                   variant="secondary"
@@ -422,6 +519,7 @@ export function BooksPage() {
                     setQuery('')
                     setQueryQ('')
                     setGenreFilter('')
+                    setStateFilter('')
                     setPage(1)
                   }}
                 >
@@ -433,8 +531,42 @@ export function BooksPage() {
         </CardBody>
       </Card>
 
-      <div className="flex justify-end">
-        <div role="group" aria-label="Modo de visualização" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite" aria-atomic="true">
+          {viewMode === 'table'
+            ? isLoading
+              ? 'Carregando…'
+              : data
+                ? `${data.total} ${data.total === 1 ? 'livro encontrado' : 'livros encontrados'}`
+                : ''
+            : isGridLoading && gridItems.length === 0
+              ? 'Carregando…'
+              : `${gridTotal} ${gridTotal === 1 ? 'livro encontrado' : 'livros encontrados'}`}
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {viewMode === 'table' && (
+            <div className="flex items-center gap-2 text-sm">
+              <label htmlFor="page-size-select" className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                Itens por página
+              </label>
+              <select
+                id="page-size-select"
+                value={String(pageSize)}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value))
+                  setPage(1)
+                }}
+                className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm min-h-[36px] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+                aria-label="Itens por página"
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+          )}
+          <div role="group" aria-label="Modo de visualização" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
           <Button
             size="sm"
             variant={viewMode === 'table' ? 'primary' : 'secondary'}
@@ -456,6 +588,7 @@ export function BooksPage() {
             <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Grade
           </Button>
         </div>
+        </div>
       </div>
 
       <section aria-labelledby="books-list-heading">
@@ -470,17 +603,22 @@ export function BooksPage() {
             ))}
           </div>
         )}
-        {isLoading && viewMode === 'grid' && (
+        {isGridLoading && viewMode === 'grid' && (
           <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6" aria-busy="true" aria-live="polite">
-            {Array.from({ length: 10 }).map((_, i) => (
+            {Array.from({ length: GRID_SIZE }).map((_, i) => (
               <div key={i} className="aspect-[2/3] rounded-xl border border-slate-200 dark:border-slate-700 animate-pulse bg-slate-100 dark:bg-slate-800" />
             ))}
           </div>
         )}
 
-        {isError && (
+        {isError && viewMode === 'table' && (
           <div role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 p-4 text-sm text-red-800 dark:text-red-200">
             Erro ao carregar acervo: {(error as { message?: string })?.message ?? 'tente novamente'}
+          </div>
+        )}
+        {isGridError && viewMode === 'grid' && (
+          <div role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 p-4 text-sm text-red-800 dark:text-red-200">
+            Erro ao carregar acervo: {(gridError as { message?: string })?.message ?? 'tente novamente'}
           </div>
         )}
 
@@ -488,17 +626,20 @@ export function BooksPage() {
           <>
             <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <table className="w-full text-sm table-fixed">
-                <caption className="sr-only">Tabela de livros com capa, título, ISBN, estado, data de cadastro e lançamento</caption>
+                <caption className="sr-only">Tabela de livros com capa, título e descrição, disponibilidade, exemplares, data de cadastro e lançamento</caption>
                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-left">
                   <tr>
                     <th scope="col" className="px-3 py-3 font-semibold w-14 text-center">
                       Capa
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold w-[20%]">
+                    <th scope="col" className="px-3 py-3 font-semibold w-[28%]">
                       Título
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold">
-                      ISBN
+                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
+                      Disponibilidade
+                    </th>
+                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
+                      Exemplares
                     </th>
                     <th scope="col" className="px-3 py-3 font-semibold">
                       Autores
@@ -506,14 +647,8 @@ export function BooksPage() {
                     <th scope="col" className="px-3 py-3 font-semibold">
                       Gêneros
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold">
-                      Estado
-                    </th>
                     <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
                       Lançamento
-                    </th>
-                    <th scope="col" className="px-3 py-3 font-semibold">
-                      Descrição
                     </th>
                     <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
                       Cadastro
@@ -556,23 +691,39 @@ export function BooksPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-3 font-medium w-[20%]">
-                        <span className="line-clamp-2 break-words" title={b.title}>
-                          {b.title}
-                        </span>
+                      <td className="px-3 py-3 w-[28%]">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="line-clamp-2 break-words font-medium text-slate-900 dark:text-slate-100" title={b.title}>
+                            {b.title}
+                          </span>
+                          {b.description ? (
+                            <span className="line-clamp-2 break-words text-xs leading-snug text-slate-500 dark:text-slate-400" title={b.description}>
+                              {b.description}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-3 py-3 text-slate-500 text-xs font-mono">{b.isbn ?? '—'}</td>
+                      <td className="px-3 py-3">
+                        <Badge tone={bookStateTone(b.derived_state)}>{bookStateLabel(b.derived_state)}</Badge>
+                      </td>
+                      <td className="px-3 py-3">
+                        {typeof b.total_copies === 'number' ? (
+                          <Badge tone="neutral" title={`${b.available_copies ?? 0} de ${b.total_copies} disponíveis`}>
+                            {b.available_copies ?? 0}/{b.total_copies}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-3">
                         <OverflowTags items={b.authors} tone="info" maxVisibleFallback={1} className="max-w-[16ch]" />
                       </td>
                       <td className="px-3 py-3">
                         <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} className="max-w-[16ch]" />
                       </td>
-                      <td className="px-3 py-3">
-                        <Badge tone={b.derived_state === 'available' ? 'success' : 'neutral'}>{bookStateLabel(b.derived_state)}</Badge>
-                      </td>
                       <td className="px-3 py-3 whitespace-nowrap text-slate-500 text-xs">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</td>
-                      <td className="px-3 py-3 max-w-[24ch] truncate text-slate-500 text-xs">{b.description ?? '—'}</td>
                       <td className="px-3 py-3 whitespace-nowrap text-slate-500 text-xs">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
                     </tr>
                   ))}
@@ -605,7 +756,7 @@ export function BooksPage() {
                         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
                           {b.title}
                         </h3>
-                        <Badge tone={b.derived_state === 'available' ? 'success' : 'neutral'} className="shrink-0 text-[11px] px-2 py-0.5">
+                        <Badge tone={bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5">
                           {bookStateLabel(b.derived_state)}
                         </Badge>
                       </div>
@@ -700,17 +851,38 @@ export function BooksPage() {
             </div>
           </>
         )}
-        {data && viewMode === 'grid' && (
+        {viewMode === 'grid' && gridData && (
           <>
             <div role="grid" aria-label="Grade de livros" className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-              {data.items.map((b, index) => (
+              {gridItems.map((b, index) => (
                 <GridCard key={b.id} book={b as any} index={index} />
               ))}
             </div>
-            {data.items.length === 0 && <p className="text-sm text-slate-500 py-8 text-center">Nenhum livro encontrado.</p>}
-            <div className="mt-6">
-              <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
-            </div>
+            {gridItems.length === 0 && !isGridLoading && <p className="text-sm text-slate-500 py-8 text-center">Nenhum livro encontrado.</p>}
+
+            {/* sentinel + estados da paginação infinita */}
+            <div ref={sentinelRef} aria-hidden="true" className="h-1" />
+
+            {isFetchingNextPage && (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-500" aria-live="polite" aria-busy="true">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Carregando mais livros…
+              </div>
+            )}
+
+            {!hasNextPage && gridItems.length > 0 && (
+              <p className="text-center text-xs text-slate-400 py-4">
+                {gridTotal} {gridTotal === 1 ? 'livro' : 'livros'} carregados — fim do acervo
+              </p>
+            )}
+
+            {hasNextPage && !isFetchingNextPage && (
+              <div className="flex justify-center pt-2">
+                <Button variant="secondary" size="sm" onClick={() => fetchNextPage()} aria-label="Carregar mais livros">
+                  Carregar mais
+                </Button>
+              </div>
+            )}
           </>
         )}
       </section>

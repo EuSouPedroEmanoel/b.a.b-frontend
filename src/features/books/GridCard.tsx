@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
-import { bookStateLabel } from '@/lib/bookStates'
+import { bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { useAverageColor } from '@/hooks/useAverageColor'
 import { OverflowTags } from '@/components/ui/OverflowTags'
 import { generateCoverColor, getBookCoverGradient, getHoverGradientNoCover } from '@/lib/coverColor'
@@ -111,7 +111,7 @@ export function GridCard({ book, index = 0 }: { book: Book; index?: number }) {
             </>
           )}
           <div className="absolute top-2 right-2 z-10">
-            <Badge tone={book.derived_state === 'available' ? 'success' : 'neutral'} className="shadow text-[10px] px-2 py-0.5 backdrop-blur-sm">
+            <Badge tone={bookStateTone(book.derived_state)} className="shadow text-[10px] px-2 py-0.5 backdrop-blur-sm">
               {bookStateLabel(book.derived_state)}
             </Badge>
           </div>
