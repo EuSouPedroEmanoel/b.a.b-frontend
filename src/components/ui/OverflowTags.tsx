@@ -86,14 +86,14 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
 
   const isDark = variant === 'dark'
   return (
-    <div ref={containerRef} className={`flex flex-nowrap gap-1 items-center overflow-hidden ${className}`}>
+    <div ref={containerRef} className={`flex flex-nowrap gap-1 items-center overflow-hidden min-w-0 ${className}`}>
       {visible.map((it) =>
         isDark ? (
-          <span key={it.id} className="shrink-0 whitespace-nowrap rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm border border-white/10">
+          <span key={it.id} title={it.name} className="shrink min-w-0 whitespace-nowrap rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm border border-white/10 max-w-[14ch] truncate overflow-hidden">
             {it.name}
           </span>
         ) : (
-          <Badge key={it.id} tone={tone} className="shrink-0 whitespace-nowrap">
+          <Badge key={it.id} tone={tone} title={it.name} className="shrink min-w-0 whitespace-nowrap max-w-[12ch] truncate overflow-hidden">
             {it.name}
           </Badge>
         ),

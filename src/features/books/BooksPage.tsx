@@ -632,25 +632,25 @@ export function BooksPage() {
                     <th scope="col" className="px-3 py-3 font-semibold w-14 text-center">
                       Capa
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold w-[28%]">
+                    <th scope="col" className="px-2 py-2 font-semibold w-[28%]">
                       Título
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
+                    <th scope="col" className="px-5 py-3 font-semibold whitespace-nowrap w-[120px] text-center">
                       Disponibilidade
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
+                    <th scope="col" className="px-5 py-3 font-semibold whitespace-nowrap w-[90px] text-center">
                       Exemplares
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold">
+                    <th scope="col" className="px-3 py-3 font-semibold w-[12%] min-w-[105px] text-center">
                       Autores
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold">
+                    <th scope="col" className="px-2 py-2 font-semibold text-center w-[96px]">
                       Gêneros
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
+                    <th scope="col" className="px-6 py-3 font-semibold whitespace-nowrap w-[88px] text-center">
                       Lançamento
                     </th>
-                    <th scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">
+                    <th scope="col" className="px-6 py-3 font-semibold whitespace-nowrap w-[90px] text-center">
                       Cadastro
                     </th>
                   </tr>
@@ -691,7 +691,7 @@ export function BooksPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-3 w-[28%]">
+                      <td className="px-2 py-2 w-[28%]">
                         <div className="flex flex-col gap-1 min-w-0">
                           <span className="line-clamp-2 break-words font-medium text-slate-900 dark:text-slate-100" title={b.title}>
                             {b.title}
@@ -705,10 +705,10 @@ export function BooksPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-5 py-3 text-center">
                         <Badge tone={bookStateTone(b.derived_state)}>{bookStateLabel(b.derived_state)}</Badge>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-5 py-3 text-center">
                         {typeof b.total_copies === 'number' ? (
                           <Badge tone="neutral" title={`${b.available_copies ?? 0} de ${b.total_copies} disponíveis`}>
                             {b.available_copies ?? 0}/{b.total_copies}
@@ -718,13 +718,13 @@ export function BooksPage() {
                         )}
                       </td>
                       <td className="px-3 py-3">
-                        <OverflowTags items={b.authors} tone="info" maxVisibleFallback={1} className="max-w-[16ch]" />
+                        <OverflowTags items={b.authors} tone="info" maxVisibleFallback={2} className="max-w-[15ch] mx-auto justify-center" />
                       </td>
-                      <td className="px-3 py-3">
-                        <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} className="max-w-[16ch]" />
+                      <td className="px-2 py-2">
+                        <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} className="max-w-[12ch] mx-auto justify-center" />
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-slate-500 text-xs">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</td>
-                      <td className="px-3 py-3 whitespace-nowrap text-slate-500 text-xs">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td className="px-6 py-3 whitespace-nowrap text-center bg-slate-50/70 dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td className="px-6 py-3 whitespace-nowrap text-center bg-slate-50/70 dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
