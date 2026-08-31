@@ -8,10 +8,10 @@ import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookSta
 import { CoverImage } from '@/components/ui/CoverImage'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
-import { useAverageColor } from '@/hooks/useAverageColor'
-import { generateCoverColor } from '@/lib/coverColor'
+import { generateCoverColor, stringToHsl } from '@/lib/coverColor'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
 import { useAuth } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -206,13 +206,71 @@ export function BookDetailPage() {
     return (userIdNum: number) => map.get(userIdNum) ?? String(userIdNum)
   }, [usersPage])
 
-  const proxiedUrlForGradient = useMemo(() => getCoverProxyUrl(book?.cover_url ?? null, 400), [book?.cover_url])
-  const { darkColor } = useAverageColor(proxiedUrlForGradient ?? null, !!proxiedUrlForGradient)
-  const fallbackColors = useMemo(() => (book ? generateCoverColor(book.title) : { bg: 'hsl(210, 65%, 30%)', darkBg: 'hsl(210, 65%, 20%)' }), [book])
-  const sobreSolid = useMemo(() => {
-    if (!book) return fallbackColors.darkBg
-    return darkColor ?? fallbackColors.darkBg
-  }, [book, darkColor, fallbackColors])
+  const { resolved } = useTheme()
+  const staticColors = useMemo(() => {
+    const key = book?.cover_url ?? book?.title ?? 'fallback'
+    return generateCoverColor(key)
+  }, [book?.cover_url, book?.title])
+  const cardBg1 = useMemo(() => {
+    const key = book?.cover_url ?? book?.title ?? 'fallback'
+    return resolved === 'dark' ? staticColors.darkBg : stringToHsl(key, 35, 96)
+  }, [book?.cover_url, book?.title, resolved, staticColors.darkBg])
+  const cardBg2 = useMemo(() => {
+    const key = book?.cover_url ?? book?.title ?? 'fallback'
+    return resolved === 'dark' ? staticColors.bg : stringToHsl(key, 40, 93)
+  }, [book?.cover_url, book?.title, resolved, staticColors.bg])
+  const cardBg3 = useMemo(() => {
+    const key = book?.cover_url ?? book?.title ?? 'fallback'
+    return resolved === 'dark' ? stringToHsl(key, 65, 24) : stringToHsl(key, 45, 90)
+  }, [book?.cover_url, book?.title, resolved])
+  const pageBg = useMemo(() => {
+    const key = book?.cover_url ?? book?.title ?? 'fallback'
+    return resolved === 'dark'
+      ? stringToHsl(key, 35, 14)
+      : stringToHsl(key, 45, 88)
+  }, [book?.cover_url, book?.title, resolved])
+
+  const isDark = resolved === 'dark'
+
+  // fundo estático da página (main + footer) baseado na capa, sem afetar nav - com transição sincronizada
+  useEffect(() => {
+    const main = document.getElementById('main-content') as HTMLElement | null
+    const footer = document.querySelector('footer') as HTMLElement | null
+    const prevMainBg = main?.style.background ?? ''
+    const prevMainBgColor = main?.style.backgroundColor ?? ''
+    const prevFooterBg = footer?.style.background ?? ''
+    const prevFooterBorder = footer?.style.borderTopColor ?? ''
+    const prevMainTransition = main?.style.transition ?? ''
+    const prevFooterTransition = footer?.style.transition ?? ''
+    const prevBodyTransition = document.body.style.transition
+    const transition = 'background-color 0.3s ease, background 0.3s ease, border-color 0.3s ease'
+    if (main) {
+      main.style.transition = transition
+      main.style.background = pageBg
+    }
+    if (footer) {
+      footer.style.transition = transition
+      footer.style.background = pageBg
+      footer.style.borderTopColor = 'transparent'
+    }
+    const prevBodyBg = document.body.style.background
+    document.body.style.transition = transition
+    document.body.style.background = pageBg
+    return () => {
+      if (main) {
+        main.style.background = prevMainBg
+        main.style.backgroundColor = prevMainBgColor
+        main.style.transition = prevMainTransition
+      }
+      if (footer) {
+        footer.style.background = prevFooterBg
+        footer.style.borderTopColor = prevFooterBorder
+        footer.style.transition = prevFooterTransition
+      }
+      document.body.style.background = prevBodyBg
+      document.body.style.transition = prevBodyTransition
+    }
+  }, [pageBg])
 
   useEffect(() => {
     setLightboxImgError(false)
@@ -294,18 +352,19 @@ export function BookDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-full !max-w-4xl w-full overflow-visible flex flex-col gap-6">
-      <header>
-        <Link to="/acervo" className="inline-flex items-center text-sm text-slate-600 dark:text-slate-300 hover:text-[var(--color-primary)] mb-2">
-          <ArrowLeft className="h-4 w-4 mr-1" aria-hidden="true" /> Voltar ao acervo
-        </Link>
+    <div style={{ background: pageBg, transition: 'background-color 0.3s ease, background 0.3s ease' }} className="w-full">
+      <div className="mx-auto max-w-full !max-w-4xl w-full overflow-visible flex flex-col gap-6">
+        <header>
+          <Link to="/acervo" className="inline-flex items-center text-sm text-slate-600 dark:text-slate-300 hover:text-[var(--color-primary)] mb-2">
+            <ArrowLeft className="h-4 w-4 mr-1" aria-hidden="true" /> Voltar ao acervo
+          </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl sm:text-3xl font-bold">{book.title}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{book.title}</h1>
           <Badge tone={bookStateTone(book.derived_state)}>
             {bookStateLabel(book.derived_state)}
           </Badge>
         </div>
-      </header>
+        </header>
 
       {canManage && (
         <div
@@ -399,74 +458,82 @@ export function BookDetailPage() {
         )}
 
         <div className="flex flex-col gap-4">
-          <Card className="relative overflow-hidden border-white/20 text-white" style={{ background: sobreSolid }}>
-            <div className="absolute inset-0 bg-black/10 pointer-events-none" aria-hidden="true" />
-            <CardHeader className="relative border-white/15">
-              <h2 className="font-semibold flex items-center gap-2 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
-                <BookOpen className="h-5 w-5 text-white/90" aria-hidden="true" /> Sobre o livro
+          <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg1 }}>
+            <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
+            <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
+              <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>
+                <BookOpen className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> Sobre o livro
               </h2>
             </CardHeader>
             <CardBody className="relative">
-              <p className="text-sm leading-relaxed text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]">
+              <p className={`text-sm leading-relaxed ${isDark ? 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]' : 'text-slate-600'}`}>
                 {book.description || 'Sem descrição disponível.'}
               </p>
-              <dl className="mt-6 grid gap-4 border-t border-white/15 pt-4 text-sm">
+              <dl className={`mt-6 grid gap-4 border-t pt-4 text-sm ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-white/60">ISBN</dt>
-                  <dd className="col-span-2 font-mono text-white break-all drop-shadow-sm">{book.isbn ?? '—'}</dd>
+                  <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>ISBN</dt>
+                  <dd className={`col-span-2 font-mono break-all ${isDark ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>{book.isbn ?? '—'}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-white/60">Lançamento</dt>
-                  <dd className="col-span-2 text-white drop-shadow-sm">{book.published_date ? new Date(book.published_date).toLocaleDateString('pt-BR') : '—'}</dd>
+                  <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Lançamento</dt>
+                  <dd className={isDark ? 'col-span-2 text-white drop-shadow-sm' : 'col-span-2 text-slate-800'}>{book.published_date ? new Date(book.published_date).toLocaleDateString('pt-BR') : '—'}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-white/60">Cadastrado em</dt>
-                  <dd className="col-span-2 text-white drop-shadow-sm">{book.created_at ? new Date(book.created_at).toLocaleDateString('pt-BR') : '—'}</dd>
+                  <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Cadastrado em</dt>
+                  <dd className={isDark ? 'col-span-2 text-white drop-shadow-sm' : 'col-span-2 text-slate-800'}>{book.created_at ? new Date(book.created_at).toLocaleDateString('pt-BR') : '—'}</dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-white/60">Autores</dt>
+                  <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Autores</dt>
                   <dd className="col-span-2 flex flex-wrap gap-1.5">
-                    {book.authors?.length ? book.authors.map((a) => <Badge key={a.id} tone="info">{a.name}</Badge>) : <span className="text-white/50">—</span>}
+                    {book.authors?.length ? book.authors.map((a) => {
+                      const bg = isDark ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
+                      const color = isDark ? '#fff' : stringToHsl(a.name, 65, 22)
+                      const border = isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
+                      return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border transition-colors duration-200 hover:brightness-110 hover:shadow-sm">{a.name}</span>
+                    }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <dt className="text-white/60">Gêneros</dt>
+                  <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Gêneros</dt>
                   <dd className="col-span-2 flex flex-wrap gap-1.5">
-                    {book.genres?.length ? book.genres.map((g) => <Badge key={g.id} tone="neutral">{g.name}</Badge>) : <span className="text-white/50">—</span>}
+                    {book.genres?.length ? book.genres.map((g) => {
+                      const bg = isDark ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
+                      return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border transition-colors duration-200 hover:brightness-110 hover:shadow-sm">{g.name}</span>
+                    }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
               </dl>
             </CardBody>
           </Card>
 
-          <Card className="relative overflow-hidden border-white/20 text-white" style={{ background: sobreSolid }}>
-            <div className="absolute inset-0 bg-black/10 pointer-events-none" aria-hidden="true" />
-            <CardHeader className="relative border-white/15">
-              <h2 className="font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">Exemplares</h2>
+          <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg2 }}>
+            <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
+            <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
+              <h2 className={`font-semibold ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>Exemplares</h2>
             </CardHeader>
             <CardBody className="relative">
               {copies.length === 0 ? (
-                <p className="text-sm text-white/70">Nenhum exemplar cadastrado para este livro nesta escola.</p>
+                <p className={`text-sm ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Nenhum exemplar cadastrado para este livro nesta escola.</p>
               ) : (
                 <>
                   <dl className="grid grid-cols-3 gap-3 text-center mb-4">
-                    <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-3">
-                      <dt className="text-xs text-white/60 uppercase">Total</dt>
-                      <dd className="mt-1 text-2xl font-bold text-white">{copies.length}</dd>
+                    <div className={`rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
+                      <dt className={`text-xs uppercase ${isDark ? 'text-white/60' : 'text-slate-500'}`}>Total</dt>
+                      <dd className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{copies.length}</dd>
                     </div>
-                    <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-3">
-                      <dt className="text-xs text-white/70 uppercase">Disponíveis</dt>
-                      <dd className="mt-1 text-2xl font-bold text-white">{available}</dd>
+                    <div className={`rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
+                      <dt className={`text-xs uppercase ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Disponíveis</dt>
+                      <dd className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{available}</dd>
                     </div>
-                    <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-3">
-                      <dt className="text-xs text-white/70 uppercase">Emprestados</dt>
-                      <dd className="mt-1 text-2xl font-bold text-white">{borrowed}</dd>
+                    <div className={`rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
+                      <dt className={`text-xs uppercase ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Emprestados</dt>
+                      <dd className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{borrowed}</dd>
                     </div>
                   </dl>
-                  <ul className="divide-y divide-white/15" role="list">
+                  <ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
                     {copies.map((c) => (
                       <li key={c.id} className="flex items-center justify-between py-2.5 text-sm">
-                        <span className="font-mono text-white/90">{c.code}</span>
+                        <span className={`font-mono ${isDark ? 'text-white/90' : 'text-slate-700'}`}>{c.code}</span>
                         <span className="flex items-center gap-2">
                           <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'}>
                             {bookConditionLabel(c.condition)}
@@ -491,28 +558,28 @@ export function BookDetailPage() {
         </div>
       )}
 
-      <Card className="relative overflow-hidden border-white/20 text-white" style={{ background: sobreSolid }}>
-        <div className="absolute inset-0 bg-black/10 pointer-events-none" aria-hidden="true" />
-        <CardHeader className="relative border-white/15">
-          <h2 className="font-semibold flex items-center gap-2 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" aria-live="polite">
-            <Undo2 className="h-5 w-5 text-white/90" aria-hidden="true" /> Devoluções — empréstimos ativos deste livro
+      <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg3 }}>
+        <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
+        <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
+          <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`} aria-live="polite">
+            <Undo2 className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> Devoluções — empréstimos ativos deste livro
           </h2>
         </CardHeader>
         <CardBody className="relative">
-          {loansLoading && <p aria-live="polite" className="text-white/80">Carregando empréstimos...</p>}
+          {loansLoading && <p aria-live="polite" className={isDark ? 'text-white/80' : 'text-slate-500'}>Carregando empréstimos...</p>}
           {!loansLoading && activeLoans && activeLoans.length === 0 && (
-            <p className="text-sm text-white/70 py-4 text-center">Nenhum empréstimo ativo para este livro.</p>
+            <p className={`text-sm py-4 text-center ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Nenhum empréstimo ativo para este livro.</p>
           )}
           {activeLoans && activeLoans.length > 0 && (
-            <ul className="divide-y divide-white/15" role="list">
+            <ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
               {activeLoans.map((l) => (
                 <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="text-sm">
-                    <p className="text-white/90">
+                    <p className={isDark ? 'text-white/90' : 'text-slate-800'}>
                       <span className="font-mono">#{l.id}</span> · Exemplar{' '}
                       <span className="font-mono">{copyCode(l.copy_id)}</span> · {userLabel(l.user_id)}
                     </p>
-                    <p className="text-xs text-white/60 mt-0.5">
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
                       Emprestado em {new Date(l.borrowed_at).toLocaleDateString('pt-BR')} · Devolução em{' '}
                       {new Date(l.due_date).toLocaleDateString('pt-BR')}
                     </p>
@@ -722,6 +789,7 @@ export function BookDetailPage() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   )
 }

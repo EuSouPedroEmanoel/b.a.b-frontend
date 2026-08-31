@@ -6,6 +6,8 @@ import api from '@/lib/api'
 import { bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
 import { useAuth } from '@/hooks/useAuth'
+import { useTheme } from '@/hooks/useTheme'
+import { stringToHsl } from '@/lib/coverColor'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -27,6 +29,7 @@ type SuggestItem =
   | { kind: 'author'; id: number; name: string }
   | { kind: 'genre'; id: number; name: string }
   | { kind: 'book'; id: number; title: string; isbn: string | null }
+  | { kind: 'availability'; state: string; label: string }
 
 export function BooksPage() {
   const [page, setPage] = useState(1)
@@ -42,12 +45,15 @@ export function BooksPage() {
   const [query, setQuery] = useState('')
   const [queryQ, setQueryQ] = useState('')
   const [genreFilter, setGenreFilter] = useState('')
+  const [authorFilter, setAuthorFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'published_date' | 'author'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const announce = useAnnouncer()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { resolved } = useTheme()
+  const isDarkTheme = resolved === 'dark'
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
 
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
@@ -66,22 +72,19 @@ export function BooksPage() {
     localStorage.setItem('acervo:pageSize', String(pageSize))
   }, [pageSize])
 
-  const availabilityOptions = useMemo(() => {
-    const all = [
+  const availabilityOptions = useMemo(
+    () => [
       { value: '', label: 'Todas' },
       { value: 'available', label: 'Disponível' },
       { value: 'borrowed', label: 'Emprestado' },
       { value: 'reserved', label: 'Reservado' },
       { value: 'lost', label: 'Perdido' },
       { value: 'archived', label: 'Arquivado' },
-    ]
-    if (user?.role === 'student') {
-      return all
-        .filter((o) => o.value === '' || o.value === 'available' || o.value === 'borrowed')
-        .map((o) => (o.value === 'borrowed' ? { ...o, label: 'Emprestado (meus)' } : o))
-    }
-    return all
-  }, [user?.role])
+    ],
+    [],
+  )
+
+  const hasActiveFilters = !!genreFilter || !!authorFilter || !!stateFilter || sortBy !== 'created_at' || sortOrder !== 'desc'
 
   const { data: genreOptions } = useQuery({
     queryKey: ['genres-list'],
@@ -93,11 +96,12 @@ export function BooksPage() {
 
   // Tabela: paginação clássica (até 50)
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['books', 'table', page, pageSize, queryQ, genreFilter, stateFilter, sortBy, sortOrder],
+    queryKey: ['books', 'table', page, pageSize, queryQ, genreFilter, authorFilter, stateFilter, sortBy, sortOrder],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), size: String(pageSize) })
       if (queryQ) params.set('q', queryQ)
       if (genreFilter) params.set('genre_id', genreFilter)
+      if (authorFilter) params.set('author_id', authorFilter)
       if (stateFilter) params.set('state', stateFilter)
       if (sortBy) params.set('sort_by', sortBy)
       if (sortOrder) params.set('sort_order', sortOrder)
@@ -118,11 +122,12 @@ export function BooksPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['books', 'grid', queryQ, genreFilter, stateFilter, sortBy, sortOrder],
+    queryKey: ['books', 'grid', queryQ, genreFilter, authorFilter, stateFilter, sortBy, sortOrder],
     queryFn: async ({ pageParam = 1 }) => {
       const params = new URLSearchParams({ page: String(pageParam), size: String(GRID_SIZE) })
       if (queryQ) params.set('q', queryQ)
       if (genreFilter) params.set('genre_id', genreFilter)
+      if (authorFilter) params.set('author_id', authorFilter)
       if (stateFilter) params.set('state', stateFilter)
       if (sortBy) params.set('sort_by', sortBy)
       if (sortOrder) params.set('sort_order', sortOrder)
@@ -229,8 +234,15 @@ export function BooksPage() {
           const authors: SuggestItem[] = (authorsRes.data.items || []).map((a) => ({ kind: 'author' as const, id: a.id, name: a.name }))
           const genres: SuggestItem[] = (genresRes.data.items || []).map((g) => ({ kind: 'genre' as const, id: g.id, name: g.name }))
           const books: SuggestItem[] = (booksRes.data.items || []).map((b) => ({ kind: 'book' as const, id: b.id, title: b.title, isbn: b.isbn }))
-          // mostra autor/gênero primeiro quando busca por eles, depois livros
-          const combined: SuggestItem[] = [...authors, ...genres, ...books].slice(0, 8)
+          // disponibilidade: mostra quando digita "disp", "emp", "res", etc.
+          const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          const rawNorm = normalize(raw)
+          const availOptions: SuggestItem[] = availabilityOptions
+            .filter((o) => o.value !== '' && rawNorm.length >= 2 && normalize(o.label).includes(rawNorm))
+            .slice(0, 2)
+            .map((o) => ({ kind: 'availability' as const, state: o.value, label: o.label }))
+          // mostra disponibilidade primeiro, depois autor/gênero, depois livros
+          const combined: SuggestItem[] = [...availOptions, ...authors, ...genres, ...books].slice(0, 8)
           setSuggestItems(combined)
           setActiveIndex(combined.length ? 0 : -1)
           setSuggestOpen(combined.length > 0)
@@ -243,7 +255,7 @@ export function BooksPage() {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query])
+  }, [query, availabilityOptions])
 
   const closeSuggestions = () => {
     setSuggestOpen(false)
@@ -256,6 +268,12 @@ export function BooksPage() {
       setQuery('')
       setQueryQ('')
       navigate(`/acervo/${s.id}`)
+    } else if (s.kind === 'availability') {
+      setQuery('')
+      setQueryQ(s.label)
+      setPage(1)
+      announce(`Filtrando por ${s.label}`, 'polite')
+      return
     } else {
       // autor ou gênero: filtra a lista por esse nome via busca unificada (q)
       const term = s.name
@@ -321,7 +339,7 @@ export function BooksPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl sm:text-3xl font-bold">Acervo</h1>
-          <p className="text-sm text-slate-500">Busca por título, ISBN, código interno, gênero ou autor. ISBN não cadastrado abre o cadastro automaticamente.</p>
+          <p className="text-sm text-slate-500">Busca por título, ISBN, código interno, gênero, autor ou disponibilidade. ISBN não cadastrado abre o cadastro automaticamente.</p>
         </header>
         {canCreate && (
           <Link
@@ -340,14 +358,14 @@ export function BooksPage() {
         </CardHeader>
         <CardBody>
           <form onSubmit={onSearch} className="flex flex-col gap-3" role="search" aria-label="Buscar livros">
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-end items-stretch">
-              <div className="flex-1 w-full relative">
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-end items-stretch">
+              <div className="flex-1 min-w-0 w-full relative max-w-[58%] sm:max-w-[62%]">
                 <div role="combobox" aria-expanded={suggestOpen} aria-controls={suggestListId} aria-haspopup="listbox">
                   <Input
                     label="Buscar"
                     id="book-search"
                     ref={searchInputRef}
-                    placeholder="Título, ISBN, código interno, gênero ou autor"
+                    placeholder="Título, ISBN, código interno, gênero, autor ou disponibilidade"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={onKeyDown}
@@ -355,19 +373,24 @@ export function BooksPage() {
                     onBlur={() => setTimeout(closeSuggestions, 120)}
                     aria-autocomplete="list"
                     aria-activedescendant={activeIndex >= 0 ? `${suggestListId}-${activeIndex}` : undefined}
-                    hint="Busque por título, gênero ou autor — autocomplete disponível"
+                    hint="Busque por título, gênero, autor ou disponibilidade — autocomplete disponível"
+                    rightElement={
+                      <Button type="submit" size="sm" className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700 px-3 py-1.5 min-h-0 h-8 transition-colors">
+                        Buscar
+                      </Button>
+                    }
                   />
                 </div>
                 {suggestOpen && suggestItems.length > 0 && (
                   <ul
                     id={suggestListId}
                     role="listbox"
-                    aria-label="Sugestões de livros, autores e gêneros"
+                    aria-label="Sugestões de livros, autores, gêneros e disponibilidade"
                     className="absolute z-20 top-full left-0 right-0 mt-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg overflow-hidden"
                   >
                     {suggestItems.map((s, i) => (
                       <li
-                        key={`${s.kind}-${s.id}`}
+                        key={`${s.kind}-${(s as any).id ?? (s as any).state}`}
                         id={`${suggestListId}-${i}`}
                         role="option"
                         aria-selected={i === activeIndex}
@@ -376,28 +399,31 @@ export function BooksPage() {
                           openSuggestion(s)
                         }}
                         onMouseEnter={() => setActiveIndex(i)}
-                        className={`flex items-baseline justify-between gap-3 px-3 py-2.5 text-sm cursor-pointer min-h-[44px] ${
-                          i === activeIndex ? 'bg-[#0f4c75] text-white' : 'text-slate-800 dark:text-slate-100'
-                        }`}
+                        className={`flex items-center justify-between gap-3 px-3 py-2.5 text-sm cursor-pointer min-h-[44px] border-b last:border-0 border-slate-100 dark:border-slate-700 ${i === activeIndex ? 'bg-[#0f4c75] text-white' : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                       >
                         {s.kind === 'book' ? (
                           <>
-                            <span className="truncate">{s.title}</span>
+                            <span className="truncate min-w-0 flex-1 font-medium text-left">{s.title}</span>
                             {s.isbn && (
-                              <span className={`font-mono text-xs shrink-0 ${i === activeIndex ? 'text-white/80' : 'text-slate-400'}`}>
+                              <span className={`font-mono text-xs shrink-0 ${i === activeIndex ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}`}>
                                 {s.isbn}
                               </span>
                             )}
                           </>
+                        ) : s.kind === 'availability' ? (
+                          <>
+                            <span className="truncate min-w-0 flex-1 font-medium text-left">{(s as any).label}</span>
+                            <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}>Disponibilidade</span>
+                          </>
                         ) : s.kind === 'author' ? (
                           <>
-                            <span className="truncate font-medium">{s.name}</span>
-                            <span className={`text-xs shrink-0 ${i === activeIndex ? 'text-white/80' : 'text-slate-500'}`}>Autor</span>
+                            <span className="truncate min-w-0 flex-1 font-semibold text-left">{s.name}</span>
+                            <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'}`}>Autor</span>
                           </>
                         ) : (
                           <>
-                            <span className="truncate">{s.name}</span>
-                            <span className={`text-xs shrink-0 ${i === activeIndex ? 'text-white/80' : 'text-slate-500'}`}>Gênero</span>
+                            <span className="truncate min-w-0 flex-1 font-medium text-left">{s.name}</span>
+                            <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>Gênero</span>
                           </>
                         )}
                       </li>
@@ -405,22 +431,22 @@ export function BooksPage() {
                   </ul>
                 )}
               </div>
-              <div ref={filterWrapperRef} className="relative flex items-center gap-2 w-full sm:w-auto sm:self-end sm:mb-[21px]">
+              <div ref={filterWrapperRef} className="relative flex items-center justify-end gap-2 w-full sm:w-auto sm:self-end sm:mb-[21px] shrink-0">
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant={hasActiveFilters ? 'primary' : 'secondary'}
                   onClick={() => setFilterMenuOpen((o) => !o)}
                   aria-haspopup="menu"
                   aria-expanded={filterMenuOpen}
                   aria-controls="filter-menu"
                   aria-label="Filtros"
-                  className="w-full sm:w-auto gap-2"
+                  className={`w-full sm:w-auto gap-2 transition-colors ${hasActiveFilters ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
                 >
                   <Funnel className="h-4 w-4" aria-hidden="true" />
                   Filtros
-                  {(genreFilter || stateFilter || sortBy !== 'created_at' || sortOrder !== 'desc') && (
-                    <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0f4c75] px-1.5 text-xs font-bold text-white dark:bg-white dark:text-slate-900" aria-hidden="true">
-                      {[genreFilter, stateFilter, sortBy !== 'created_at' ? sortBy : null, sortOrder !== 'desc' ? sortOrder : null].filter(Boolean).length}
+                  {hasActiveFilters && (
+                    <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600 dark:bg-white dark:text-slate-900" aria-hidden="true">
+                      {[genreFilter, authorFilter, stateFilter, sortBy !== 'created_at' ? sortBy : null, sortOrder !== 'desc' ? sortOrder : null].filter(Boolean).length}
                     </span>
                   )}
                 </Button>
@@ -430,7 +456,7 @@ export function BooksPage() {
                     ref={filterMenuRef}
                     role="menu"
                     aria-label="Opções de filtro"
-                    className="absolute right-0 top-full mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl p-4 z-30 flex flex-col gap-4"
+                    className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl p-4 z-30 flex flex-col gap-4"
                   >
                     <Select
                       label="Gênero"
@@ -487,6 +513,7 @@ export function BooksPage() {
                         variant="secondary"
                         onClick={() => {
                           setGenreFilter('')
+                          setAuthorFilter('')
                           setStateFilter('')
                           setSortBy('created_at')
                           setSortOrder('desc')
@@ -501,15 +528,18 @@ export function BooksPage() {
                     </div>
                   </div>
                 )}
-                <Button type="submit" className="flex-1 sm:flex-none !bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700">
-                  Buscar
-                </Button>
               </div>
+              {(queryQ || genreFilter || authorFilter || stateFilter) && (
+                <Button type="button" variant="secondary" size="sm" onClick={() => { setQuery(''); setQueryQ(''); setGenreFilter(''); setAuthorFilter(''); setStateFilter(''); setPage(1) }} className="hidden sm:inline-flex whitespace-nowrap shrink-0 self-end sm:mb-[21px] ml-2" aria-label="Limpar busca">
+                  Limpar
+                </Button>
+              )}
             </div>
-            {(queryQ || genreFilter || stateFilter) && (
+            {(queryQ || genreFilter || authorFilter || stateFilter) && (
               <div className="flex flex-wrap gap-2">
                 {queryQ && <Badge tone="info">Busca: {queryQ}</Badge>}
                 {genreFilter && <Badge tone="neutral">Gênero aplicado</Badge>}
+                {authorFilter && <Badge tone="info">Autor aplicado</Badge>}
                 {stateFilter && <Badge tone="neutral">Disponibilidade: {availabilityOptions.find((o) => o.value === stateFilter)?.label}</Badge>}
                 <Button
                   type="button"
@@ -519,9 +549,11 @@ export function BooksPage() {
                     setQuery('')
                     setQueryQ('')
                     setGenreFilter('')
+                    setAuthorFilter('')
                     setStateFilter('')
                     setPage(1)
                   }}
+                  className="sm:hidden"
                 >
                   Limpar busca
                 </Button>
@@ -706,7 +738,7 @@ export function BooksPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3 text-center">
-                        <Badge tone={bookStateTone(b.derived_state)}>{bookStateLabel(b.derived_state)}</Badge>
+                        <Badge tone={bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); const label = bookStateLabel(b.derived_state); setQuery(''); setQueryQ(label); setPage(1); announce(`Filtrando por ${label}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); const label = bookStateLabel(b.derived_state); setQuery(''); setQueryQ(label); setPage(1) } }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>{bookStateLabel(b.derived_state)}</Badge>
                       </td>
                       <td className="px-5 py-3 text-center">
                         {typeof b.total_copies === 'number' ? (
@@ -718,10 +750,10 @@ export function BooksPage() {
                         )}
                       </td>
                       <td className="px-3 py-3">
-                        <OverflowTags items={b.authors} tone="info" maxVisibleFallback={2} className="max-w-[15ch] mx-auto justify-center" />
+                        <OverflowTags items={b.authors} tone="info" maxVisibleFallback={2} className="max-w-[15ch] mx-auto justify-center" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setAuthorFilter(String(item.id)); setPage(1); announce(`Filtrando por autor ${item.name}`, 'polite') }} />
                       </td>
                       <td className="px-2 py-2">
-                        <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} className="max-w-[12ch] mx-auto justify-center" />
+                        <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} className="max-w-[12ch] mx-auto justify-center" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setGenreFilter(String(item.id)); setPage(1); announce(`Filtrando por gênero ${item.name}`, 'polite') }} />
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap text-center bg-slate-50/70 dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</td>
                       <td className="px-6 py-3 whitespace-nowrap text-center bg-slate-50/70 dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
@@ -756,7 +788,7 @@ export function BooksPage() {
                         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
                           {b.title}
                         </h3>
-                        <Badge tone={bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5">
+                        <Badge tone={bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5 cursor-pointer" onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); const label = bookStateLabel(b.derived_state); setQuery(''); setQueryQ(label); setPage(1); announce(`Filtrando por ${label}`, 'polite') }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>
                           {bookStateLabel(b.derived_state)}
                         </Badge>
                       </div>
@@ -768,14 +800,15 @@ export function BooksPage() {
                         <div className="flex flex-col gap-1.5">
                           {b.authors?.length > 0 && (
                             <div className="flex flex-nowrap gap-1 items-center">
-                              {b.authors.slice(0, 1).map((a) => (
-                                <Badge key={a.id} tone="info" className="text-[11px] px-2 py-0 shrink-0 whitespace-nowrap">
-                                  {a.name}
-                                </Badge>
-                              ))}
+                              {b.authors.slice(0, 1).map((a) => {
+                                const bg = isDarkTheme ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
+                                const color = isDarkTheme ? '#fff' : stringToHsl(a.name, 65, 22)
+                                const border = isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
+                                return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center rounded-full border px-2 py-0 text-[11px] font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1); announce(`Filtrando por autor ${a.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1) } }}>{a.name}</span>
+                              })}
                               {b.authors.length > 1 && (
                                 <span className="relative inline-flex group/authors shrink-0">
-                                  <span className="cursor-help rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700">+{b.authors.length - 1}</span>
+                                  <span className="cursor-help rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-colors duration-200 hover:brightness-110">+{b.authors.length - 1}</span>
                                   <span className="pointer-events-none absolute bottom-full left-1/2 z-20 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-xl border border-slate-700 group-hover/authors:block mb-1 max-w-[200px] text-center">
                                     {b.authors.slice(1).map((a) => a.name).join(', ')}
                                   </span>
@@ -785,14 +818,13 @@ export function BooksPage() {
                           )}
                           {b.genres?.length > 0 && (
                             <div className="flex flex-nowrap gap-1 items-center">
-                              {b.genres.slice(0, 2).map((g) => (
-                                <Badge key={g.id} tone="neutral" className="text-[11px] px-2 py-0 shrink-0 whitespace-nowrap">
-                                  {g.name}
-                                </Badge>
-                              ))}
+                              {b.genres.slice(0, 2).map((g) => {
+                                const bg = isDarkTheme ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
+                                return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center rounded-full border px-2 py-0 text-[11px] font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1); announce(`Filtrando por gênero ${g.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1) } }}>{g.name}</span>
+                              })}
                               {b.genres.length > 2 && (
                                 <span className="relative inline-flex group/genres shrink-0">
-                                  <span className="cursor-help rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:text-slate-200">+{b.genres.length - 2}</span>
+                                  <span className="cursor-help rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition-colors duration-200 hover:brightness-110">+{b.genres.length - 2}</span>
                                   <span className="pointer-events-none absolute bottom-full left-1/2 z-20 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-xl border border-slate-700 group-hover/genres:block mb-1 max-w-[200px] text-center">
                                     {b.genres.slice(2).map((g) => g.name).join(', ')}
                                   </span>

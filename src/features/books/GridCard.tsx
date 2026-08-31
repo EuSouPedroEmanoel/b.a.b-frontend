@@ -192,7 +192,7 @@ export function GridCard({ book, index = 0 }: { book: Book; index?: number }) {
             </div>
             <div className="flex flex-wrap gap-1">
               <span
-                className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-default"
+                className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-default transition-colors duration-200 hover:brightness-110 hover:shadow-md"
                 title={typeof book.total_copies === 'number' ? `${book.available_copies ?? 0}/${book.total_copies} cópias` : undefined}
               >
                 {bookStateLabel(book.derived_state)}

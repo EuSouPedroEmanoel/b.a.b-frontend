@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
+import { stringToHsl } from '@/lib/coverColor'
+import { useTheme } from '@/hooks/useTheme'
 
 type Item = { id: number; name: string }
 
@@ -9,11 +11,21 @@ type Props = {
   variant?: 'light' | 'dark'
   maxVisibleFallback?: number
   className?: string
+  onItemClick?: (item: Item) => void
 }
 
-export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVisibleFallback = 2, className = '' }: Props) {
+export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVisibleFallback = 2, className = '', onItemClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState<number>(() => Math.min(items.length, maxVisibleFallback))
+  let resolved: 'light' | 'dark' = 'light'
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const theme = useTheme()
+    resolved = theme.resolved
+  } catch {
+    resolved = 'light'
+  }
+  const isDarkTheme = resolved === 'dark'
 
   useEffect(() => {
     const el = containerRef.current
@@ -85,25 +97,66 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
   const visible = items.slice(0, visibleCount)
 
   const isDark = variant === 'dark'
+  const clickable = !!onItemClick
   return (
     <div ref={containerRef} className={`flex flex-nowrap gap-1 items-center overflow-hidden min-w-0 ${className}`}>
-      {visible.map((it) =>
-        isDark ? (
-          <span key={it.id} title={it.name} className="shrink min-w-0 whitespace-nowrap rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm border border-white/10 max-w-[14ch] truncate overflow-hidden">
-            {it.name}
-          </span>
-        ) : (
-          <Badge key={it.id} tone={tone} title={it.name} className="shrink min-w-0 whitespace-nowrap max-w-[12ch] truncate overflow-hidden">
+      {visible.map((it) => {
+        const handleClick = (e: React.MouseEvent) => {
+          e.stopPropagation()
+          onItemClick?.(it)
+        }
+        const handleKey = (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            e.stopPropagation()
+            onItemClick?.(it)
+          }
+        }
+        const clickableProps = clickable
+          ? {
+              role: 'button' as const,
+              tabIndex: 0,
+              onClick: handleClick,
+              onKeyDown: handleKey,
+            }
+          : {}
+        if (isDark) {
+          return (
+            <span key={it.id} title={it.name} {...clickableProps} className={`shrink min-w-0 whitespace-nowrap rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm border border-white/10 max-w-[14ch] truncate overflow-hidden transition-colors duration-200 hover:brightness-110 hover:bg-white/20 ${clickable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-white' : ''}`}>
+              {it.name}
+            </span>
+          )
+        }
+        if (tone === 'info') {
+          const bg = isDarkTheme ? stringToHsl(it.name, 65, 28) : stringToHsl(it.name, 65, 82)
+          const color = isDarkTheme ? '#fff' : stringToHsl(it.name, 65, 22)
+          const border = isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(it.name, 65, 70)
+          return (
+            <span key={it.id} title={it.name} style={{ background: bg, color, borderColor: border }} {...clickableProps} className={`shrink min-w-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium border max-w-[12ch] truncate overflow-hidden transition-colors duration-200 hover:brightness-110 hover:shadow-sm ${clickable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]' : ''}`}>
+              {it.name}
+            </span>
+          )
+        }
+        if (tone === 'neutral' && !isDark) {
+          const bg = isDarkTheme ? stringToHsl(it.name, 75, 32) : stringToHsl(it.name, 75, 45)
+          return (
+            <span key={it.id} title={it.name} style={{ background: bg, color: '#fff', borderColor: isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(it.name, 75, 30) }} {...clickableProps} className={`shrink min-w-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium border max-w-[12ch] truncate overflow-hidden transition-colors duration-200 hover:brightness-110 hover:shadow-sm ${clickable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]' : ''}`}>
+              {it.name}
+            </span>
+          )
+        }
+        return (
+          <Badge key={it.id} tone={tone} title={it.name} className="shrink min-w-0 whitespace-nowrap max-w-[12ch] truncate overflow-hidden" onClick={clickable ? (handleClick as any) : undefined} onKeyDown={clickable ? (handleKey as any) : undefined} role={clickable ? 'button' : undefined} tabIndex={clickable ? 0 : undefined}>
             {it.name}
           </Badge>
-        ),
-      )}
+        )
+      })}
       {hidden.length > 0 && (
         <span
           className={
             isDark
-              ? 'cursor-default shrink-0 whitespace-nowrap rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold text-white border border-white/20'
-              : 'cursor-default shrink-0 whitespace-nowrap rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600'
+              ? 'cursor-default shrink-0 whitespace-nowrap rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold text-white border border-white/20 transition-colors duration-200 hover:brightness-110 hover:bg-white/30'
+              : 'cursor-default shrink-0 whitespace-nowrap rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition-colors duration-200 hover:brightness-105 hover:shadow-sm'
           }
           title={hidden.map((h) => h.name).join(', ')}
         >

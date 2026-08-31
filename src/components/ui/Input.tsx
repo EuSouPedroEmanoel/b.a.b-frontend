@@ -4,28 +4,31 @@ type Props = InputHTMLAttributes<HTMLInputElement> & {
   label: string
   error?: string
   hint?: string
+  rightElement?: React.ReactNode
 }
 
-export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label, error, hint, id, required, ...props }, ref) {
+export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label, error, hint, id, required, rightElement, className, ...props }, ref) {
   const inputId = id ?? `input-${label.toLowerCase().replace(/\s+/g, '-')}`
   const errId = error ? `${inputId}-error` : undefined
   const hintId = hint ? `${inputId}-hint` : undefined
+  const inputClass = `w-full rounded-md border px-3 py-2.5 text-base bg-white dark:bg-slate-800 min-h-[44px] placeholder:text-slate-400 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${error ? 'border-red-600' : 'border-slate-300 dark:border-slate-600'} ${rightElement ? 'pr-20' : ''} ${className ?? ''}`
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={inputId} className="text-sm font-medium text-slate-700 dark:text-slate-200">
         {label} {required && <span aria-hidden="true" className="text-red-600">*</span>}
       </label>
-      <input
-        ref={ref}
-        id={inputId}
-        aria-invalid={!!error}
-        aria-describedby={[errId, hintId].filter(Boolean).join(' ') || undefined}
-        required={required}
-        className={`w-full rounded-md border px-3 py-2.5 text-base bg-white dark:bg-slate-800 min-h-[44px] placeholder:text-slate-400 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${
-          error ? 'border-red-600' : 'border-slate-300 dark:border-slate-600'
-        }`}
-        {...props}
-      />
+      <div className="relative">
+        <input
+          ref={ref}
+          id={inputId}
+          aria-invalid={!!error}
+          aria-describedby={[errId, hintId].filter(Boolean).join(' ') || undefined}
+          required={required}
+          className={inputClass}
+          {...props}
+        />
+        {rightElement && <div className="absolute right-1 top-1/2 -translate-y-1/2">{rightElement}</div>}
+      </div>
       {hint && !error && (
         <p id={hintId} className="text-xs text-slate-500">
           {hint}
