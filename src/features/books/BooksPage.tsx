@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Loader2, Plus, Table } from 'lucide-react'
 import api from '@/lib/api'
@@ -48,13 +48,26 @@ export function BooksPage() {
   const [authorFilter, setAuthorFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'published_date' | 'author'>('created_at')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [tableTime, setTableTime] = useState<number | null>(null)
+  const [gridTime, setGridTime] = useState<number | null>(null)
   const announce = useAnnouncer()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const { resolved } = useTheme()
   const isDarkTheme = resolved === 'dark'
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
+
+  const saveAcervoPosition = useCallback(() => {
+    try {
+      sessionStorage.setItem('acervo:scrollY', String(window.scrollY))
+      sessionStorage.setItem('acervo:search', location.search)
+    } catch {
+      /* storage indisponível */
+    }
+  }, [location.search])
 
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
     if (typeof window !== 'undefined') {
@@ -84,7 +97,47 @@ export function BooksPage() {
     [],
   )
 
-  const hasActiveFilters = !!genreFilter || !!authorFilter || !!stateFilter || sortBy !== 'created_at' || sortOrder !== 'desc'
+  const hasActiveFilters = !!genreFilter || !!authorFilter || !!stateFilter || sortBy !== 'created_at'
+
+  // Inicializa a partir da URL para link de query page compartilhável
+  useEffect(() => {
+    const q = searchParams.get('q') ?? ''
+    const genre = searchParams.get('genre_id') ?? ''
+    const author = searchParams.get('author_id') ?? ''
+    const state = searchParams.get('state') ?? ''
+    const p = parseInt(searchParams.get('page') ?? '1', 10)
+    const size = parseInt(searchParams.get('size') ?? '', 10)
+    const sort = searchParams.get('sort_by') as any
+    const order = searchParams.get('sort_order') as any
+    if (q) {
+      setQuery(q)
+      setQueryQ(q)
+    }
+    if (genre) setGenreFilter(genre)
+    if (author) setAuthorFilter(author)
+    if (state) setStateFilter(state)
+    if (!Number.isNaN(p) && p !== 1) setPage(p)
+    if (!Number.isNaN(size) && [10, 20, 30, 50].includes(size)) setPageSize(size)
+    if (sort && sort !== sortBy) setSortBy(sort)
+    if (order && (order === 'asc' || order === 'desc') && order !== sortOrder) setSortOrder(order)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Sincroniza estado com URL para link compartilhável
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (queryQ) params.set('q', queryQ)
+    if (genreFilter) params.set('genre_id', genreFilter)
+    if (authorFilter) params.set('author_id', authorFilter)
+    if (stateFilter) params.set('state', stateFilter)
+    if (page !== 1) params.set('page', String(page))
+    if (pageSize !== 10) params.set('size', String(pageSize))
+    if (sortBy !== 'created_at') params.set('sort_by', sortBy)
+    if (sortOrder !== 'asc') params.set('sort_order', sortOrder)
+    const cur = searchParams.toString()
+    const next = params.toString()
+    if (cur !== next) setSearchParams(params, { replace: true })
+  }, [queryQ, genreFilter, authorFilter, stateFilter, page, pageSize, sortBy, sortOrder, searchParams, setSearchParams])
 
   const { data: genreOptions } = useQuery({
     queryKey: ['genres-list'],
@@ -98,6 +151,7 @@ export function BooksPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['books', 'table', page, pageSize, queryQ, genreFilter, authorFilter, stateFilter, sortBy, sortOrder],
     queryFn: async () => {
+      const t0 = performance.now()
       const params = new URLSearchParams({ page: String(page), size: String(pageSize) })
       if (queryQ) params.set('q', queryQ)
       if (genreFilter) params.set('genre_id', genreFilter)
@@ -106,6 +160,7 @@ export function BooksPage() {
       if (sortBy) params.set('sort_by', sortBy)
       if (sortOrder) params.set('sort_order', sortOrder)
       const { data } = await api.get<Paginated<Book>>(`/books/?${params}`)
+      setTableTime(performance.now() - t0)
       return data
     },
     enabled: viewMode === 'table',
@@ -124,6 +179,7 @@ export function BooksPage() {
   } = useInfiniteQuery({
     queryKey: ['books', 'grid', queryQ, genreFilter, authorFilter, stateFilter, sortBy, sortOrder],
     queryFn: async ({ pageParam = 1 }) => {
+      const t0 = performance.now()
       const params = new URLSearchParams({ page: String(pageParam), size: String(GRID_SIZE) })
       if (queryQ) params.set('q', queryQ)
       if (genreFilter) params.set('genre_id', genreFilter)
@@ -132,6 +188,7 @@ export function BooksPage() {
       if (sortBy) params.set('sort_by', sortBy)
       if (sortOrder) params.set('sort_order', sortOrder)
       const { data } = await api.get<Paginated<Book>>(`/books/?${params}`)
+      if (pageParam === 1) setGridTime(performance.now() - t0)
       return data
     },
     initialPageParam: 1,
@@ -179,7 +236,40 @@ export function BooksPage() {
     return () => obs.disconnect()
   }, [viewMode, onIntersect, gridItems.length])
 
+  // Restaura scroll ao voltar do detalhe (preserva altura da página)
   useEffect(() => {
+    let cancelled = false
+    const tryRestore = () => {
+      if (cancelled) return
+      try {
+        const raw = sessionStorage.getItem('acervo:scrollY')
+        if (raw === null) return
+        const y = parseInt(raw, 10)
+        if (!Number.isFinite(y) || y <= 0) return
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (cancelled) return
+            window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+          }, 50)
+        })
+      } catch { /* ignore */ }
+    }
+    tryRestore()
+    const t = setTimeout(tryRestore, 300)
+    const clearTimer = setTimeout(() => {
+      try {
+        if (sessionStorage.getItem('acervo:scrollY')) sessionStorage.removeItem('acervo:scrollY')
+      } catch { /* ignore */ }
+    }, 2000)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+      clearTimeout(clearTimer)
+    }
+  }, [isLoading, isGridLoading])
+
+  useEffect(() => {
+    if (searchParams.has('q')) return
     searchInputRef.current?.focus()
   }, [])
 
@@ -191,15 +281,26 @@ export function BooksPage() {
         setFilterMenuOpen(false)
       }
     }
+    const onClickCapture = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (filterWrapperRef.current && !filterWrapperRef.current.contains(t)) {
+        e.preventDefault()
+        e.stopPropagation()
+        // mousedown já fechou, garante fechado
+        setFilterMenuOpen(false)
+      }
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setFilterMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', onDown)
+    document.addEventListener('click', onClickCapture, true)
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('click', onClickCapture, true)
       document.removeEventListener('keydown', onKey)
     }
   }, [filterMenuOpen])
@@ -264,13 +365,16 @@ export function BooksPage() {
 
   const openSuggestion = (s: SuggestItem) => {
     closeSuggestions()
+    searchInputRef.current?.blur()
     if (s.kind === 'book') {
+      saveAcervoPosition()
       setQuery('')
       setQueryQ('')
-      navigate(`/acervo/${s.id}`)
+      navigate(`/acervo/${s.id}`, { state: { from: location.pathname + location.search } })
     } else if (s.kind === 'availability') {
       setQuery('')
-      setQueryQ(s.label)
+      setQueryQ('')
+      setStateFilter(s.state)
       setPage(1)
       announce(`Filtrando por ${s.label}`, 'polite')
       return
@@ -303,6 +407,7 @@ export function BooksPage() {
   const onSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     closeSuggestions()
+    searchInputRef.current?.blur()
     const raw = query.trim()
     if (!raw) return
     const clean = raw.replace(/[^0-9X]/gi, '')
@@ -318,11 +423,13 @@ export function BooksPage() {
     }
 
     if (res.kind === 'isbn' && res.book_id) {
-      navigate(`/acervo/${res.book_id}`)
+      saveAcervoPosition()
+      navigate(`/acervo/${res.book_id}`, { state: { from: location.pathname + location.search } })
       return
     }
     if (res.kind === 'internal_code' && res.book_id) {
-      navigate(`/acervo/${res.book_id}`)
+      saveAcervoPosition()
+      navigate(`/acervo/${res.book_id}`, { state: { from: location.pathname + location.search } })
       return
     }
     if (isIsbn && res.kind === 'none') {
@@ -446,17 +553,25 @@ export function BooksPage() {
                   Filtros
                   {hasActiveFilters && (
                     <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600 dark:bg-white dark:text-slate-900" aria-hidden="true">
-                      {[genreFilter, authorFilter, stateFilter, sortBy !== 'created_at' ? sortBy : null, sortOrder !== 'desc' ? sortOrder : null].filter(Boolean).length}
+                      {[genreFilter, authorFilter, stateFilter, sortBy !== 'created_at' ? sortBy : null].filter(Boolean).length}
                     </span>
                   )}
                 </Button>
                 {filterMenuOpen && (
-                  <div
-                    id="filter-menu"
-                    ref={filterMenuRef}
-                    role="menu"
-                    aria-label="Opções de filtro"
-                    className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl p-4 z-30 flex flex-col gap-4"
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Fechar filtros"
+                      onClick={() => setFilterMenuOpen(false)}
+                      className="fixed inset-0 z-20 bg-transparent cursor-default"
+                      tabIndex={-1}
+                    />
+                    <div
+                      id="filter-menu"
+                      ref={filterMenuRef}
+                      role="menu"
+                      aria-label="Opções de filtro"
+                      className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl p-4 z-30 flex flex-col gap-4"
                   >
                     <Select
                       label="Gênero"
@@ -493,20 +608,6 @@ export function BooksPage() {
                         { value: 'author', label: 'Autor' },
                       ]}
                     />
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Ordem</span>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-                        aria-label={sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
-                        title={sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
-                      >
-                        {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" aria-hidden="true" /> : <ArrowDown className="h-4 w-4" aria-hidden="true" />}
-                        <span className="ml-2 text-xs">{sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}</span>
-                      </Button>
-                    </div>
                     <div className="flex justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                       <Button
                         type="button"
@@ -516,21 +617,34 @@ export function BooksPage() {
                           setAuthorFilter('')
                           setStateFilter('')
                           setSortBy('created_at')
-                          setSortOrder('desc')
+                          setSortOrder('asc')
                           setPage(1)
                         }}
+                        className="hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
                       >
                         Limpar filtros
                       </Button>
-                      <Button type="button" onClick={() => setFilterMenuOpen(false)}>
+                      <Button type="button" onClick={() => setFilterMenuOpen(false)} className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700">
                         Aplicar
                       </Button>
                     </div>
                   </div>
+                  </>
                 )}
               </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                aria-label={sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
+                title={sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
+                className="shrink-0 self-end sm:mb-[21px] hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
+              >
+                {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+              </Button>
               {(queryQ || genreFilter || authorFilter || stateFilter) && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => { setQuery(''); setQueryQ(''); setGenreFilter(''); setAuthorFilter(''); setStateFilter(''); setPage(1) }} className="hidden sm:inline-flex whitespace-nowrap shrink-0 self-end sm:mb-[21px] ml-2" aria-label="Limpar busca">
+                <Button type="button" variant="secondary" size="sm" onClick={() => { setQuery(''); setQueryQ(''); setGenreFilter(''); setAuthorFilter(''); setStateFilter(''); setPage(1) }} className="hidden sm:inline-flex whitespace-nowrap shrink-0 self-end sm:mb-[21px] ml-2 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors" aria-label="Limpar busca">
                   Limpar
                 </Button>
               )}
@@ -553,7 +667,7 @@ export function BooksPage() {
                     setStateFilter('')
                     setPage(1)
                   }}
-                  className="sm:hidden"
+                  className="sm:hidden hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
                 >
                   Limpar busca
                 </Button>
@@ -569,11 +683,11 @@ export function BooksPage() {
             ? isLoading
               ? 'Carregando…'
               : data
-                ? `${data.total} ${data.total === 1 ? 'livro encontrado' : 'livros encontrados'}`
+                ? `${data.total} ${data.total === 1 ? 'livro encontrado' : 'livros encontrados'}${tableTime !== null ? ` em ${tableTime < 1000 ? `${Math.round(tableTime)}ms` : `${(tableTime / 1000).toFixed(2)}s`}` : ''}`
                 : ''
             : isGridLoading && gridItems.length === 0
               ? 'Carregando…'
-              : `${gridTotal} ${gridTotal === 1 ? 'livro encontrado' : 'livros encontrados'}`}
+              : `${gridTotal} ${gridTotal === 1 ? 'livro encontrado' : 'livros encontrados'}${gridTime !== null ? ` em ${gridTime < 1000 ? `${Math.round(gridTime)}ms` : `${(gridTime / 1000).toFixed(2)}s`}` : ''}`}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           {viewMode === 'table' && (
@@ -605,7 +719,7 @@ export function BooksPage() {
             aria-pressed={viewMode === 'table'}
             onClick={() => setViewMode('table')}
             aria-label="Visualização em tabela"
-            className={`gap-1.5 ${viewMode === 'table' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : ''}`}
+            className={`gap-1.5 ${viewMode === 'table' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
           >
             <Table className="h-4 w-4" aria-hidden="true" /> Tabela
           </Button>
@@ -615,7 +729,7 @@ export function BooksPage() {
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
             aria-label="Visualização em grade"
-            className={`gap-1.5 ${viewMode === 'grid' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : ''}`}
+            className={`gap-1.5 ${viewMode === 'grid' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
           >
             <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Grade
           </Button>
@@ -691,11 +805,12 @@ export function BooksPage() {
                   {data.items.map((b) => (
                     <tr
                       key={b.id}
-                      onClick={() => navigate(`/acervo/${b.id}`)}
+                      onClick={() => { saveAcervoPosition(); navigate(`/acervo/${b.id}`, { state: { from: location.pathname + location.search } }) }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          navigate(`/acervo/${b.id}`)
+                          saveAcervoPosition()
+                          navigate(`/acervo/${b.id}`, { state: { from: location.pathname + location.search } })
                         }
                       }}
                       tabIndex={0}
@@ -738,7 +853,7 @@ export function BooksPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3 text-center">
-                        <Badge tone={bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); const label = bookStateLabel(b.derived_state); setQuery(''); setQueryQ(label); setPage(1); announce(`Filtrando por ${label}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); const label = bookStateLabel(b.derived_state); setQuery(''); setQueryQ(label); setPage(1) } }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>{bookStateLabel(b.derived_state)}</Badge>
+                        <Badge tone={bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1) } }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>{bookStateLabel(b.derived_state)}</Badge>
                       </td>
                       <td className="px-5 py-3 text-center">
                         {typeof b.total_copies === 'number' ? (
@@ -771,6 +886,8 @@ export function BooksPage() {
                 >
                   <Link
                     to={`/acervo/${b.id}`}
+                    state={{ from: location.pathname + location.search }}
+                    onClick={saveAcervoPosition}
                     className="flex gap-4 p-4 focus-visible:outline-none"
                     aria-label={`Ver detalhes de ${b.title}`}
                   >
@@ -788,7 +905,7 @@ export function BooksPage() {
                         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
                           {b.title}
                         </h3>
-                        <Badge tone={bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5 cursor-pointer" onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); const label = bookStateLabel(b.derived_state); setQuery(''); setQueryQ(label); setPage(1); announce(`Filtrando por ${label}`, 'polite') }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>
+                        <Badge tone={bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5 cursor-pointer" onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>
                           {bookStateLabel(b.derived_state)}
                         </Badge>
                       </div>
@@ -804,7 +921,7 @@ export function BooksPage() {
                                 const bg = isDarkTheme ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
                                 const color = isDarkTheme ? '#fff' : stringToHsl(a.name, 65, 22)
                                 const border = isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
-                                return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center rounded-full border px-2 py-0 text-[11px] font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1); announce(`Filtrando por autor ${a.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1) } }}>{a.name}</span>
+                                return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1); announce(`Filtrando por autor ${a.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1) } }}>{a.name}</span>
                               })}
                               {b.authors.length > 1 && (
                                 <span className="relative inline-flex group/authors shrink-0">
@@ -820,7 +937,7 @@ export function BooksPage() {
                             <div className="flex flex-nowrap gap-1 items-center">
                               {b.genres.slice(0, 2).map((g) => {
                                 const bg = isDarkTheme ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
-                                return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center rounded-full border px-2 py-0 text-[11px] font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1); announce(`Filtrando por gênero ${g.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1) } }}>{g.name}</span>
+                                return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1); announce(`Filtrando por gênero ${g.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1) } }}>{g.name}</span>
                               })}
                               {b.genres.length > 2 && (
                                 <span className="relative inline-flex group/genres shrink-0">

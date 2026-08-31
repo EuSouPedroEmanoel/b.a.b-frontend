@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Plus, Hand, Undo2, X } from 'lucide-react'
@@ -8,7 +8,8 @@ import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookSta
 import { CoverImage } from '@/components/ui/CoverImage'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
-import { generateCoverColor, stringToHsl } from '@/lib/coverColor'
+import { stringToHsl } from '@/lib/coverColor'
+import { useAverageColor } from '@/hooks/useAverageColor'
 import { useAnnouncer } from '@/components/feedback/LiveRegion'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
@@ -16,6 +17,8 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Select } from '@/components/ui/Select'
+import { Carousel } from '@/components/ui/Carousel'
+import { GridCard } from '@/features/books/GridCard'
 
 type Book = {
   id: number
@@ -46,7 +49,29 @@ export function BookDetailPage() {
   const announce = useAnnouncer()
   const qc = useQueryClient()
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const canManage = !!user && MANAGE_ROLES.includes(user.role)
+
+  const handleBack = useCallback(() => {
+    const fromState = (location.state as { from?: string } | null)?.from
+    if (fromState && typeof fromState === 'string' && fromState.startsWith('/acervo')) {
+      navigate(fromState)
+      return
+    }
+    try {
+      const savedSearch = sessionStorage.getItem('acervo:search')
+      if (savedSearch) {
+        navigate(`/acervo${savedSearch}`)
+        return
+      }
+    } catch { /* ignore */ }
+    if (window.history.length > 1) {
+      navigate(-1)
+    } else {
+      navigate('/acervo')
+    }
+  }, [location.state, navigate])
 
   const [loanOpen, setLoanOpen] = useState(false)
   const [copyId, setCopyId] = useState<number | ''>('')
@@ -189,6 +214,18 @@ export function BookDetailPage() {
     enabled: Number.isFinite(id) && canManage,
   })
 
+  const { data: similarBooks, isLoading: similarLoading } = useQuery({
+    queryKey: ['books', 'recommendations', book?.id],
+    queryFn: async () => {
+      const { data } = await api.get(`/books/${id}/recommendations?limit=16`)
+      if (Array.isArray(data)) return data as Book[]
+      if (data && Array.isArray((data as { items?: unknown }).items)) return (data as Paginated<Book>).items as Book[]
+      return (data as Book[]) ?? []
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled: Number.isFinite(id) && !!book?.id,
+  })
+
   const availableCopies = useMemo(
     () => (copiesPage?.items ?? []).filter((c) => c.state === 'available'),
     [copiesPage],
@@ -207,28 +244,33 @@ export function BookDetailPage() {
   }, [usersPage])
 
   const { resolved } = useTheme()
-  const staticColors = useMemo(() => {
-    const key = book?.cover_url ?? book?.title ?? 'fallback'
-    return generateCoverColor(key)
-  }, [book?.cover_url, book?.title])
-  const cardBg1 = useMemo(() => {
-    const key = book?.cover_url ?? book?.title ?? 'fallback'
-    return resolved === 'dark' ? staticColors.darkBg : stringToHsl(key, 35, 96)
-  }, [book?.cover_url, book?.title, resolved, staticColors.darkBg])
-  const cardBg2 = useMemo(() => {
-    const key = book?.cover_url ?? book?.title ?? 'fallback'
-    return resolved === 'dark' ? staticColors.bg : stringToHsl(key, 40, 93)
-  }, [book?.cover_url, book?.title, resolved, staticColors.bg])
-  const cardBg3 = useMemo(() => {
-    const key = book?.cover_url ?? book?.title ?? 'fallback'
-    return resolved === 'dark' ? stringToHsl(key, 65, 24) : stringToHsl(key, 45, 90)
-  }, [book?.cover_url, book?.title, resolved])
-  const pageBg = useMemo(() => {
-    const key = book?.cover_url ?? book?.title ?? 'fallback'
-    return resolved === 'dark'
-      ? stringToHsl(key, 35, 14)
-      : stringToHsl(key, 45, 88)
-  }, [book?.cover_url, book?.title, resolved])
+  // otimizado: proxy 40px + cache FastAverageColor + hash memoizado; sem placeholder neutro (transição suave)
+  const proxiedForAvg = useMemo(() => getCoverProxyUrl(book?.cover_url ?? null, 40), [book?.cover_url])
+  const { color: avgHex } = useAverageColor(proxiedForAvg ?? null, !!book?.cover_url)
+  const baseHue = useMemo(() => {
+    if (avgHex) {
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(avgHex)
+      if (m) {
+        const r = parseInt(m[1], 16) / 255, g = parseInt(m[2], 16) / 255, b = parseInt(m[3], 16) / 255
+        const max = Math.max(r, g, b), min = Math.min(r, g, b)
+        if (max !== min) {
+          const d = max - min
+          let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+          h *= 60
+          if (h < 0) h += 360
+          return Math.round(h)
+        }
+        return 0
+      }
+    }
+    const key = book?.title ?? 'fallback'
+    let hash = 0
+    const s = (key ?? '').trim() || 'fallback'
+    for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash)
+    return Math.abs(hash) % 360
+  }, [avgHex, book?.title])
+  const cardBg = useMemo(() => (resolved === 'dark' ? `hsl(${baseHue}, 65%, 20%)` : `hsl(${baseHue}, 35%, 96%)`), [baseHue, resolved])
+  const pageBg = useMemo(() => (resolved === 'dark' ? `hsl(${baseHue}, 65%, 14%)` : `hsl(${baseHue}, 35%, 90%)`), [baseHue, resolved])
 
   const isDark = resolved === 'dark'
 
@@ -338,15 +380,24 @@ export function BookDetailPage() {
     )
   }
 
+  if (book?.cover_url && !avgHex) {
+    return (
+      <div className="mx-auto max-w-4xl flex flex-col gap-6" aria-busy="true" aria-live="polite">
+        <div className="h-12 w-40 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
+        <div className="h-56 rounded-xl border border-slate-200 dark:border-slate-700 animate-pulse bg-slate-50 dark:bg-slate-800" />
+      </div>
+    )
+  }
+
   if (isError || !book) {
     return (
       <div className="mx-auto max-w-4xl">
         <div role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 p-4 text-sm text-red-800 dark:text-red-200">
           Erro ao carregar livro: {(error as { message?: string })?.message ?? 'tente novamente'}
         </div>
-        <Link to="/acervo" className="inline-flex items-center text-sm text-slate-600 dark:text-slate-300 hover:text-[var(--color-primary)] mt-4">
-          <ArrowLeft className="h-4 w-4 mr-1" aria-hidden="true" /> Voltar ao acervo
-        </Link>
+        <button type="button" onClick={handleBack} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm sm:text-[15px] font-medium shadow-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-[var(--color-primary)] dark:hover:text-white transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 mt-4">
+          <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" /> Voltar ao acervo
+        </button>
       </div>
     )
   }
@@ -354,21 +405,14 @@ export function BookDetailPage() {
   return (
     <div style={{ background: pageBg, transition: 'background-color 0.3s ease, background 0.3s ease' }} className="w-full">
       <div className="mx-auto max-w-full !max-w-4xl w-full overflow-visible flex flex-col gap-6">
-        <header>
-          <Link to="/acervo" className="inline-flex items-center text-sm text-slate-600 dark:text-slate-300 hover:text-[var(--color-primary)] mb-2">
-            <ArrowLeft className="h-4 w-4 mr-1" aria-hidden="true" /> Voltar ao acervo
-          </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{book.title}</h1>
-          <Badge tone={bookStateTone(book.derived_state)}>
-            {bookStateLabel(book.derived_state)}
-          </Badge>
-        </div>
-        </header>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button type="button" onClick={handleBack} aria-label="Voltar ao acervo" className="inline-flex items-center justify-center gap-2 px-5 py-3 min-h-[48px] rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm sm:text-base font-semibold shadow-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-[var(--color-primary)] dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-500 transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2">
+            <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" /> Voltar ao acervo
+          </button>
 
       {canManage && (
         <div
-          className="flex flex-wrap gap-3"
+          className="flex flex-wrap items-center justify-end gap-3 ml-auto"
           role="toolbar"
           aria-label="Ações do livro"
           aria-orientation="horizontal"
@@ -403,6 +447,7 @@ export function BookDetailPage() {
           </Button>
         </div>
       )}
+        </div>
 
       <div className="grid gap-6 md:grid-cols-[220px_1fr] max-w-full overflow-visible py-6 px-2 -mx-2">
         {book.cover_url ? (
@@ -458,18 +503,24 @@ export function BookDetailPage() {
         )}
 
         <div className="flex flex-col gap-4">
-          <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg1 }}>
+          <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
             <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
-            <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
+            <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'} space-y-2`}>
               <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>
                 <BookOpen className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> Sobre o livro
               </h2>
-            </CardHeader>
-            <CardBody className="relative">
-              <p className={`text-sm leading-relaxed ${isDark ? 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]' : 'text-slate-600'}`}>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <h1 className={`text-xl sm:text-2xl font-bold leading-tight ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-900'}`}>{book.title}</h1>
+                <Badge tone={bookStateTone(book.derived_state)} className="cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?state=${book.derived_state}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?state=${book.derived_state}`) } }} title={`Buscar por ${bookStateLabel(book.derived_state)}`}>
+                  {bookStateLabel(book.derived_state)}
+                </Badge>
+              </div>
+              <p className={`text-sm leading-relaxed mt-3 ${isDark ? 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]' : 'text-slate-600'}`}>
                 {book.description || 'Sem descrição disponível.'}
               </p>
-              <dl className={`mt-6 grid gap-4 border-t pt-4 text-sm ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
+            </CardHeader>
+            <CardBody className="relative">
+              <dl className={`grid gap-4 text-sm ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
                 <div className="grid grid-cols-3 gap-2">
                   <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>ISBN</dt>
                   <dd className={`col-span-2 font-mono break-all ${isDark ? 'text-white drop-shadow-sm' : 'text-slate-800'}`}>{book.isbn ?? '—'}</dd>
@@ -484,21 +535,21 @@ export function BookDetailPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Autores</dt>
-                  <dd className="col-span-2 flex flex-wrap gap-1.5">
+                  <dd className="col-span-2 flex flex-wrap items-center gap-1.5">
                     {book.authors?.length ? book.authors.map((a) => {
                       const bg = isDark ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
                       const color = isDark ? '#fff' : stringToHsl(a.name, 65, 22)
                       const border = isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
-                      return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border transition-colors duration-200 hover:brightness-110 hover:shadow-sm">{a.name}</span>
+                      return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?author_id=${a.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?author_id=${a.id}`) } }}>{a.name}</span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Gêneros</dt>
-                  <dd className="col-span-2 flex flex-wrap gap-1.5">
+                  <dd className="col-span-2 flex flex-wrap items-center gap-1.5">
                     {book.genres?.length ? book.genres.map((g) => {
                       const bg = isDark ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
-                      return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium border transition-colors duration-200 hover:brightness-110 hover:shadow-sm">{g.name}</span>
+                      return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?genre_id=${g.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?genre_id=${g.id}`) } }}>{g.name}</span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
@@ -506,7 +557,7 @@ export function BookDetailPage() {
             </CardBody>
           </Card>
 
-          <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg2 }}>
+          <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
             <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
             <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
               <h2 className={`font-semibold ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>Exemplares</h2>
@@ -535,10 +586,10 @@ export function BookDetailPage() {
                       <li key={c.id} className="flex items-center justify-between py-2.5 text-sm">
                         <span className={`font-mono ${isDark ? 'text-white/90' : 'text-slate-700'}`}>{c.code}</span>
                         <span className="flex items-center gap-2">
-                          <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'}>
+                          <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'} className="cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`) } }} title={`Buscar por ${bookConditionLabel(c.condition)}`}>
                             {bookConditionLabel(c.condition)}
                           </Badge>
-                          <Badge tone={bookStateTone(c.state)}>
+                          <Badge tone={bookStateTone(c.state)} className="cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?state=${c.state}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?state=${c.state}`) } }} title={`Buscar por ${bookStateLabel(c.state)}`}>
                             {bookStateLabel(c.state)}
                           </Badge>
                         </span>
@@ -558,7 +609,7 @@ export function BookDetailPage() {
         </div>
       )}
 
-      <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg3 }}>
+      <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
         <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
         <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
           <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`} aria-live="polite">
@@ -595,6 +646,39 @@ export function BookDetailPage() {
           )}
         </CardBody>
       </Card>
+
+      {similarLoading ? (
+        <Card className={`relative overflow-visible ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
+          <div className={`absolute inset-0 pointer-events-none rounded-xl overflow-hidden ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
+          <CardBody className="relative overflow-visible">
+            <div className="flex gap-4 overflow-hidden" aria-busy="true" aria-live="polite">
+              {Array.from({ length: 16 }).map((_, i) => (
+                <div key={i} className="w-[160px] sm:w-[180px] lg:w-[200px] shrink-0 flex flex-col gap-2">
+                  <div className="aspect-[2/3] rounded-xl bg-white/20 dark:bg-white/10 animate-pulse" />
+                  <div className="h-3 rounded bg-white/20 dark:bg-white/10 animate-pulse" />
+                  <div className="h-3 w-2/3 rounded bg-white/20 dark:bg-white/10 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      ) : similarBooks && similarBooks.length > 0 ? (
+        <Card className={`relative overflow-visible ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
+          <div className={`absolute inset-0 pointer-events-none rounded-xl overflow-hidden ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
+          <CardBody className="relative overflow-visible">
+            <Carousel
+              title="Você também pode gostar"
+              items={similarBooks}
+              circular
+              renderItem={(b, idx) => (
+                <div className="w-[160px] sm:w-[180px] lg:w-[200px] shrink-0">
+                  <GridCard book={b as any} index={idx} portalHover />
+                </div>
+              )}
+            />
+          </CardBody>
+        </Card>
+      ) : null}
 
       {loanOpen && canManage && (
         <div
