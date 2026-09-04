@@ -1,12 +1,5 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
-
-type Announce = (msg: string, politeness?: 'polite' | 'assertive') => void
-
-const AnnouncerCtx = createContext<Announce>(() => {})
-
-export function useAnnouncer() {
-  return useContext(AnnouncerCtx)
-}
+import { useCallback, useState, type ReactNode } from 'react'
+import { AnnouncerContext, type Announce } from './LiveRegionContext'
 
 export function LiveRegionProvider({ children }: { children: ReactNode }) {
   const [polite, setPolite] = useState<{ text: string; key: number }>({ text: '', key: 0 })
@@ -25,7 +18,7 @@ export function LiveRegionProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AnnouncerCtx.Provider value={announce}>
+    <AnnouncerContext.Provider value={announce}>
       {children}
       {/* Duas regiões vivas — WCAG 4.1.3. key força remontagem para mensagens idênticas */}
       <div key={`polite-${polite.key}`} aria-live="polite" aria-atomic="true" className="sr-only">
@@ -34,6 +27,6 @@ export function LiveRegionProvider({ children }: { children: ReactNode }) {
       <div key={`assertive-${assertive.key}`} aria-live="assertive" aria-atomic="true" className="sr-only">
         {assertive.text}
       </div>
-    </AnnouncerCtx.Provider>
+    </AnnouncerContext.Provider>
   )
 }

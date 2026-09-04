@@ -85,3 +85,24 @@ body {
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
+
+/* Ações principais do balcão: manter legibilidade também quando desabilitadas. */
+.loan-confirmation-button {
+  color: var(--color-primary-contrast) !important;
+}
+.loan-confirmation-button:disabled {
+  opacity: 1 !important;
+  background-color: #64748b !important;
+  color: #ffffff !important;
+}
+html.dark .loan-confirmation-button {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+html.dark .loan-confirmation-button:hover {
+  background-color: #1d4ed8 !important;
+}
+html.dark .loan-confirmation-button:disabled {
+  background-color: #475569 !important;
+  color: #ffffff !important;
+}

@@ -1,28 +1,6 @@
-import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import api from '@/lib/api'
-
-type User = {
-  id: number
-  username: string
-  email: string | null
-  cpf: string | null
-  birthdate: string | null
-  turma_numero: number | null
-  turma_letra: string | null
-  role: string
-  school_id: number | null
-  is_active: boolean
-}
-
-type AuthContextType = {
-  user: User | null
-  loading: boolean
-  login: (username: string, password: string) => Promise<void>
-  logout: () => Promise<void>
-  isAuthenticated: boolean
-}
-
-export const AuthContext = createContext<AuthContextType | null>(null)
+import { AuthContext, type User } from './auth-context'
 
 // Decode JWT payload without verification (only for display)
 function decodeSub(token: string): string | null {
@@ -81,7 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    fetchMe()
+    const timeout = window.setTimeout(() => {
+      void fetchMe()
+    }, 0)
+    return () => window.clearTimeout(timeout)
   }, [fetchMe])
 
   const login = useCallback(async (username: string, password: string) => {

@@ -32,6 +32,10 @@ function yearFromDate(dateStr: string | null): string | null {
 }
 
 export function GridCard({ book, index = 0, disableHover = false, portalHover = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean }) {
+  return <GridCardContent key={book.cover_url ?? 'fallback'} book={book} index={index} disableHover={disableHover} portalHover={portalHover} />
+}
+
+function GridCardContent({ book, index = 0, disableHover = false, portalHover = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
   const savePosition = () => {
@@ -62,12 +66,6 @@ export function GridCard({ book, index = 0, disableHover = false, portalHover = 
   const [portalHovered, setPortalHovered] = useState(false)
   const [portalRect, setPortalRect] = useState<DOMRect | null>(null)
   const hideTimeoutRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    setImgLoaded(false)
-    setImgError(false)
-    setTriedDirect(false)
-  }, [book.cover_url])
 
   useEffect(() => {
     if (!portalHover || !portalHovered) return

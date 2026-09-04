@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
 
@@ -15,6 +15,10 @@ type Props = {
 }
 
 export function CoverImage({ src, title, alt, width = 320, height = 480, priority = false, className = '', fallbackVariant: _fallbackVariant = 'gradient', sizes }: Props) {
+  return <CoverImageContent key={src ?? 'fallback'} src={src} title={title} alt={alt} width={width} height={height} priority={priority} className={className} fallbackVariant={_fallbackVariant} sizes={sizes} />
+}
+
+function CoverImageContent({ src, title, alt, width = 320, height = 480, priority = false, className = '', fallbackVariant: _fallbackVariant = 'gradient', sizes }: Props) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
   const [triedDirect, setTriedDirect] = useState(false)
@@ -23,12 +27,6 @@ export function CoverImage({ src, title, alt, width = 320, height = 480, priorit
   const proxied = useMemo(() => getCoverProxyUrl(src, width), [src, width])
   const displaySrc = triedDirect ? src : proxied
   const fallbackDataUrl = useMemo(() => generateFallbackCoverDataUrl(title, width, Math.round((width * 3) / 2)), [title, width])
-
-  useEffect(() => {
-    setLoaded(false)
-    setError(false)
-    setTriedDirect(false)
-  }, [src])
 
   const showFallback = !hasCover || isLoading
 

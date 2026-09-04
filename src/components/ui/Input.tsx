@@ -7,7 +7,7 @@ type Props = InputHTMLAttributes<HTMLInputElement> & {
   rightElement?: React.ReactNode
 }
 
-export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label, error, hint, id, required, rightElement, className, ...props }, ref) {
+export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label, error, hint, id, required, rightElement, className, 'aria-describedby': describedBy, ...props }, ref) {
   const inputId = id ?? `input-${label.toLowerCase().replace(/\s+/g, '-')}`
   const errId = error ? `${inputId}-error` : undefined
   const hintId = hint ? `${inputId}-hint` : undefined
@@ -22,7 +22,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label,
           ref={ref}
           id={inputId}
           aria-invalid={!!error}
-          aria-describedby={[errId, hintId].filter(Boolean).join(' ') || undefined}
+          aria-describedby={[errId, hintId, describedBy].filter(Boolean).join(' ') || undefined}
           required={required}
           className={inputClass}
           {...props}

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, useParams } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { LoginPage } from '@/features/auth/LoginPage'
@@ -13,27 +13,7 @@ import { SchoolsPage } from '@/features/schools/SchoolsPage'
 import { StudentsPage } from '@/features/students/StudentsPage'
 import { UsersPage } from '@/features/users/UsersPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
-import { useAuth } from '@/hooks/useAuth'
-import type { ReactNode } from 'react'
-
-function Protected({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useAuth()
-  if (loading) return <p className="p-8 text-center" aria-live="polite">Carregando…</p>
-  if (!isAuthenticated) return <Navigate to="/entrar" replace />
-  return <>{children}</>
-}
-
-function PublicOnly({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useAuth()
-  if (loading) return <p className="p-8 text-center" aria-live="polite">Carregando…</p>
-  if (isAuthenticated) return <Navigate to="/" replace />
-  return <>{children}</>
-}
-
-function RedirectBookCopies() {
-  const { bookId } = useParams<{ bookId: string }>()
-  return <Navigate to={`/acervo/${bookId}`} replace />
-}
+import { Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
 
 export const router = createBrowserRouter([
   {

@@ -1,24 +1,9 @@
-import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-
-type Theme = 'light' | 'dark' | 'system'
-type Resolved = 'light' | 'dark'
-
-type Ctx = {
-  theme: Theme
-  resolved: Resolved
-  toggle: () => void
-  setTheme: (t: Theme) => void
-}
-
-export const ThemeContext = createContext<Ctx | null>(null)
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ThemeContext, type Resolved, type Theme } from './theme-context'
 
 function getSystem(): Resolved {
   if (typeof window === 'undefined') return 'light'
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-function resolve(theme: Theme): Resolved {
-  return theme === 'system' ? getSystem() : theme
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -29,35 +14,30 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {}
     return 'system'
   })
-  const [resolved, setResolved] = useState<Resolved>(() => resolve(theme as Theme))
-
-  const apply = useCallback((t: Theme) => {
-    const r = resolve(t)
-    setResolved(r)
-    const root = document.documentElement
-    root.classList.toggle('dark', r === 'dark')
-    root.style.colorScheme = r
-    try {
-      localStorage.setItem('theme', t)
-    } catch {}
-  }, [])
+  const [systemTheme, setSystemTheme] = useState<Resolved>(getSystem)
+  const resolved = theme === 'system' ? systemTheme : theme
 
   useEffect(() => {
-    apply(theme)
-  }, [theme, apply])
+    const root = document.documentElement
+    root.classList.toggle('dark', resolved === 'dark')
+    root.style.colorScheme = resolved
+    try {
+      localStorage.setItem('theme', theme)
+    } catch {}
+  }, [resolved, theme])
 
   useEffect(() => {
     if (theme !== 'system') return
     const m = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => apply('system')
+    const handler = () => setSystemTheme(getSystem())
     m.addEventListener('change', handler)
     return () => m.removeEventListener('change', handler)
-  }, [theme, apply])
+  }, [theme])
 
   const setTheme = useCallback((t: Theme) => setThemeState(t), [])
   const toggle = useCallback(() => {
     setThemeState((prev) => {
-      const r = resolve(prev)
+      const r = prev === 'system' ? getSystem() : prev
       const next: Theme = r === 'dark' ? 'light' : 'dark'
       return next
     })

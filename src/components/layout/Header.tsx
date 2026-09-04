@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
-import { useAnnouncer } from '@/components/feedback/LiveRegion'
+import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 
 export function Header() {
   const { isAuthenticated, user, logout } = useAuth()
@@ -13,8 +13,6 @@ export function Header() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
 
-  // sem href = sem estado "visitado" no AT (NVDA/JAWS falam "link visitado" só para <a href>)
-  // mantém semântica de link via role="link" + aria-current="page"
   const isActivePath = (to: string) => (to === '/' ? location.pathname === '/' : location.pathname === to || location.pathname.startsWith(to + '/'))
   const navItemCls = (to: string) =>
     `px-3 py-2 rounded-md text-sm font-medium min-h-[44px] inline-flex items-center transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 active:bg-white/20 ${
@@ -35,9 +33,6 @@ export function Header() {
   const isUsersManager =
     !!user && (user.role === 'super_admin' || user.role === 'school_admin')
   const isLibrarian = user?.role === 'librarian'
-
-  // Base compartilhado: se parece botão, tem mesmos estados (hover, focus-visible, active) — regra de ouro
-  // navItemCls usa <button role="link"> para não expor estado "visitado" ao AT (só <a href> tem visited)
 
   // Ações (Tema / Entrar / Sair) — mesmos tokens de estado que links, mas Sair mantém destaque outline/destrutivo suave
   const themeBtnCls =
@@ -62,16 +57,16 @@ export function Header() {
             </span>
           </Link>
 
-          {/* Desktop nav — ul/li para leitor ler item inteiro com setas no modo navegação. button role=link evita "link visitado" */}
+          {/* Desktop nav — links reais para navegação e leitura semântica. */}
           <nav aria-label="Principal" className="hidden md:flex items-center">
             <ul className="flex items-center gap-1 list-none m-0 p-0">
-              <li><button type="button" role="link" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => navigate('/')} className={navItemCls('/')}>Início</button></li>
-              <li><button type="button" role="link" aria-current={isActivePath('/acervo') ? 'page' : undefined} onClick={() => navigate('/acervo')} className={navItemCls('/acervo')}>Acervo</button></li>
-              <li><button type="button" role="link" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => navigate('/emprestimos')} className={navItemCls('/emprestimos')}>Empréstimos</button></li>
-              <li><button type="button" role="link" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => navigate('/reservas')} className={navItemCls('/reservas')}>Reservas</button></li>
-              {isLibrarian && (<li><button type="button" role="link" aria-current={isActivePath('/alunos') ? 'page' : undefined} onClick={() => navigate('/alunos')} className={navItemCls('/alunos')}>Alunos</button></li>)}
-              {isUsersManager && (<li><button type="button" role="link" aria-current={isActivePath('/usuarios') ? 'page' : undefined} onClick={() => navigate('/usuarios')} className={navItemCls('/usuarios')}>Usuários</button></li>)}
-              {user?.role === 'super_admin' && (<li><button type="button" role="link" aria-current={isActivePath('/escolas') ? 'page' : undefined} onClick={() => navigate('/escolas')} className={navItemCls('/escolas')}>Escolas</button></li>)}
+              <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} className={navItemCls('/')}>Início</Link></li>
+              <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
+              <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>
+              <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>
+              {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
+              {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
+              {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
             </ul>
           </nav>
 
@@ -147,13 +142,13 @@ export function Header() {
         {open && (
           <nav id="mobile-nav" aria-label="Principal móvel" className="md:hidden pb-4 flex flex-col gap-1">
             <ul className="flex flex-col gap-1 list-none m-0 p-0">
-              <li><button type="button" role="link" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => { setOpen(false); navigate('/') }} className={navItemCls('/')}>Início</button></li>
-              <li><button type="button" role="link" aria-current={isActivePath('/acervo') ? 'page' : undefined} onClick={() => { setOpen(false); navigate('/acervo') }} className={navItemCls('/acervo')}>Acervo</button></li>
-              <li><button type="button" role="link" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => { setOpen(false); navigate('/emprestimos') }} className={navItemCls('/emprestimos')}>Empréstimos</button></li>
-              <li><button type="button" role="link" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => { setOpen(false); navigate('/reservas') }} className={navItemCls('/reservas')}>Reservas</button></li>
-              {isLibrarian && (<li><button type="button" role="link" aria-current={isActivePath('/alunos') ? 'page' : undefined} onClick={() => { setOpen(false); navigate('/alunos') }} className={navItemCls('/alunos')}>Alunos</button></li>)}
-              {isUsersManager && (<li><button type="button" role="link" aria-current={isActivePath('/usuarios') ? 'page' : undefined} onClick={() => { setOpen(false); navigate('/usuarios') }} className={navItemCls('/usuarios')}>Usuários</button></li>)}
-              {user?.role === 'super_admin' && (<li><button type="button" role="link" aria-current={isActivePath('/escolas') ? 'page' : undefined} onClick={() => { setOpen(false); navigate('/escolas') }} className={navItemCls('/escolas')}>Escolas</button></li>)}
+              <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/')}>Início</Link></li>
+              <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/acervo')}>Acervo</Link></li>
+              <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>
+              <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>
+              {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/alunos')}>Alunos</Link></li>)}
+              {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
+              {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/escolas')}>Escolas</Link></li>)}
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">
               {isAuthenticated ? (

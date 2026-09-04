@@ -10,7 +10,7 @@ import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
 import { stringToHsl } from '@/lib/coverColor'
 import { useAverageColor } from '@/hooks/useAverageColor'
-import { useAnnouncer } from '@/components/feedback/LiveRegion'
+import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -81,7 +81,10 @@ export function BookDetailPage() {
   const [zoomLevel, setZoomLevel] = useState(0) // 0:1.0, 1:1.5, 2:2.5
   const [origin, setOrigin] = useState({ x: '50%', y: '50%' })
   const imgRef = useRef<HTMLImageElement>(null)
-  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  const isTouchDevice = typeof window !== 'undefined'
+    && window.matchMedia('(pointer: coarse)').matches
+    && window.matchMedia('(hover: none)').matches
+    && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [pinchScale, setPinchScale] = useState<number | null>(null)
   const [lightboxImgError, setLightboxImgError] = useState(false)
@@ -93,6 +96,26 @@ export function BookDetailPage() {
   const panRef = useRef({ x: 0, y: 0 })
   const isMouseDraggingRef = useRef(false)
 
+  const resetLightbox = useCallback(() => {
+    setZoomLevel(0)
+    setOrigin({ x: '50%', y: '50%' })
+    setPan({ x: 0, y: 0 })
+    panRef.current = { x: 0, y: 0 }
+    setPinchScale(null)
+  }, [])
+
+  const openLightbox = useCallback(() => {
+    setLightboxImgError(false)
+    setLightboxTriedDirect(false)
+    resetLightbox()
+    setLightboxOpen(true)
+  }, [resetLightbox])
+
+  const closeLightbox = useCallback(() => {
+    setLightboxOpen(false)
+    resetLightbox()
+  }, [resetLightbox])
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
   }, [id])
@@ -101,10 +124,9 @@ export function BookDetailPage() {
     if (!lightboxOpen) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const onKey = (e: KeyboardEvent) => {
+      const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setLightboxOpen(false)
-        setZoomLevel(0)
+        closeLightbox()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -112,25 +134,7 @@ export function BookDetailPage() {
       document.body.style.overflow = prev
       document.removeEventListener('keydown', onKey)
     }
-  }, [lightboxOpen])
-
-  useEffect(() => {
-    if (!lightboxOpen) {
-      setZoomLevel(0)
-      setOrigin({ x: '50%', y: '50%' })
-      setPan({ x: 0, y: 0 })
-      panRef.current = { x: 0, y: 0 }
-      setPinchScale(null)
-    }
-  }, [lightboxOpen])
-
-  useEffect(() => {
-    if (!lightboxOpen) return
-    const coarse = window.matchMedia('(pointer: coarse)').matches
-    const hoverNone = window.matchMedia('(hover: none)').matches
-    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-    setIsTouchDevice(coarse && hoverNone && hasTouch)
-  }, [lightboxOpen])
+  }, [closeLightbox, lightboxOpen])
 
   // Rastreamento global do mouse/mousepad quando em zoom (1.5x ou 2.5x) – mesma lógica mouse e mousepad
   useEffect(() => {
@@ -314,11 +318,6 @@ export function BookDetailPage() {
     }
   }, [pageBg])
 
-  useEffect(() => {
-    setLightboxImgError(false)
-    setLightboxTriedDirect(false)
-  }, [book?.cover_url, lightboxOpen])
-
   const createLoan = useMutation({
     mutationFn: async () => {
       const { data } = await api.post<Loan>('/loans/', { copy_id: Number(copyId), user_id: Number(userId) })
@@ -456,11 +455,11 @@ export function BookDetailPage() {
             tabIndex={0}
             aria-label="Ampliar capa do livro"
             className="group relative w-fit h-fit mx-auto sm:mx-0 aspect-[2/3] w-full max-w-[280px] sm:w-[220px] sm:max-w-none border border-transparent bg-transparent cursor-pointer cursor-zoom-in focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 transition-all duration-300 ease-out hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(59,130,246,0.15)] hover:z-10 will-change-transform overflow-visible"
-            onClick={() => setLightboxOpen(true)}
+            onClick={openLightbox}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                setLightboxOpen(true)
+                openLightbox()
               }
             }}
           >
@@ -481,11 +480,11 @@ export function BookDetailPage() {
             tabIndex={0}
             aria-label="Ampliar capa do livro"
             className="group relative w-fit h-fit mx-auto sm:mx-0 aspect-[2/3] w-full max-w-[280px] sm:w-[220px] sm:max-w-none border border-transparent bg-transparent cursor-pointer cursor-zoom-in focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 transition-all duration-300 ease-out hover:scale-[1.03] hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(59,130,246,0.15)] hover:z-10 will-change-transform overflow-visible"
-            onClick={() => setLightboxOpen(true)}
+            onClick={openLightbox}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                setLightboxOpen(true)
+                openLightbox()
               }
             }}
           >
@@ -735,7 +734,7 @@ export function BookDetailPage() {
             aria-modal="true"
             aria-label="Capa ampliada"
             onClick={(e) => {
-              if (e.target === e.currentTarget) setLightboxOpen(false)
+              if (e.target === e.currentTarget) closeLightbox()
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -745,7 +744,7 @@ export function BookDetailPage() {
             <motion.button
               type="button"
               aria-label="Fechar"
-              onClick={() => setLightboxOpen(false)}
+              onClick={closeLightbox}
               className="absolute top-4 right-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm border border-white/20 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}

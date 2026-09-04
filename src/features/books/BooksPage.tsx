@@ -4,7 +4,7 @@ import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Loader2, Plus, Table } from 'lucide-react'
 import api from '@/lib/api'
 import { bookStateLabel, bookStateTone } from '@/lib/bookStates'
-import { useAnnouncer } from '@/components/feedback/LiveRegion'
+import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { stringToHsl } from '@/lib/coverColor'
@@ -268,10 +268,12 @@ export function BooksPage() {
     }
   }, [isLoading, isGridLoading])
 
+  const hasSearchQuery = searchParams.has('q')
+
   useEffect(() => {
-    if (searchParams.has('q')) return
+    if (hasSearchQuery) return
     searchInputRef.current?.focus()
-  }, [])
+  }, [hasSearchQuery])
 
   useEffect(() => {
     if (!filterMenuOpen) return
