@@ -16,7 +16,6 @@ import { useTheme } from '@/hooks/useTheme'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Select } from '@/components/ui/Select'
 import { Carousel } from '@/components/ui/Carousel'
 import { GridCard } from '@/features/books/GridCard'
 
@@ -73,9 +72,9 @@ export function BookDetailPage() {
     }
   }, [location.state, navigate])
 
-  const [loanOpen, setLoanOpen] = useState(false)
-  const [copyId, setCopyId] = useState<number | ''>('')
-  const [userId, setUserId] = useState<number | ''>('')
+  const [loanConfirmOpen, setLoanConfirmOpen] = useState(false)
+  const loanTriggerRef = useRef<HTMLButtonElement>(null)
+  const loanCancelRef = useRef<HTMLButtonElement>(null)
   const [loansError, setLoansError] = useState<string | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(0) // 0:1.0, 1:1.5, 2:2.5
@@ -318,26 +317,6 @@ export function BookDetailPage() {
     }
   }, [pageBg])
 
-  const createLoan = useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post<Loan>('/loans/', { copy_id: Number(copyId), user_id: Number(userId) })
-      return data
-    },
-    onSuccess: () => {
-      announce('Empréstimo criado com sucesso', 'polite')
-      setLoanOpen(false)
-      setCopyId('')
-      setUserId('')
-      qc.invalidateQueries({ queryKey: ['book', id] })
-      qc.invalidateQueries({ queryKey: ['copies', id] })
-      qc.invalidateQueries({ queryKey: ['book-loans', id] })
-    },
-    onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Erro ao emprestar'
-      announce(msg, 'assertive')
-    },
-  })
-
   const returnLoan = useMutation({
     mutationFn: async (loanId: number) => {
       const { data } = await api.post<Loan>(`/loans/${loanId}/return`)
@@ -356,15 +335,38 @@ export function BookDetailPage() {
     },
   })
 
-  const submitLoan = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (copyId === '' || userId === '') {
-      const msg = 'Selecione exemplar e usuário'
-      announce(msg, 'assertive')
-      return
+  const closeLoanConfirmation = useCallback(() => {
+    setLoanConfirmOpen(false)
+    window.requestAnimationFrame(() => loanTriggerRef.current?.focus())
+  }, [])
+
+  useEffect(() => {
+    if (!loanConfirmOpen) return
+    loanCancelRef.current?.focus()
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeLoanConfirmation()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const dialog = document.getElementById('loan-confirmation-dialog')
+      if (!dialog) return
+      const focusable = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])'))
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
-    createLoan.mutate()
-  }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [closeLoanConfirmation, loanConfirmOpen])
 
   if (!Number.isFinite(id)) {
     return <div role="alert" className="p-8 text-center">ID de livro inválido</div>
@@ -435,15 +437,17 @@ export function BookDetailPage() {
           >
             <Plus className="h-4 w-4" aria-hidden="true" /> Cadastrar exemplar
           </Link>
-          <Button
-            variant="secondary"
+          <button
+            type="button"
+            ref={loanTriggerRef}
+            aria-label={`Emprestar livro ${book.title}`}
+            className="inline-flex items-center justify-center font-medium rounded-md transition-colors min-h-[44px] min-w-[44px] px-4 py-2 text-sm !bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
             onClick={() => {
-              setLoanOpen(true)
-              setLoansError(null)
+              setLoanConfirmOpen(true)
             }}
           >
             <Hand className="h-4 w-4 mr-2" aria-hidden="true" /> Emprestar
-          </Button>
+          </button>
         </div>
       )}
         </div>
@@ -679,48 +683,44 @@ export function BookDetailPage() {
         </Card>
       ) : null}
 
-      {loanOpen && canManage && (
+      {loanConfirmOpen && canManage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="loan-dialog-title"
+          aria-labelledby="loan-confirmation-title"
+          aria-describedby="loan-confirmation-description"
+          id="loan-confirmation-dialog"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setLoanOpen(false)
+            if (e.target === e.currentTarget) closeLoanConfirmation()
           }}
         >
           <div className="w-full max-w-md rounded-xl bg-white dark:bg-slate-800 shadow-xl">
             <CardHeader>
-              <h2 id="loan-dialog-title" className="text-lg font-semibold">Emprestar — {book.title}</h2>
+              <h2 id="loan-confirmation-title" className="text-lg font-semibold">Emprestar livro {book.title}?</h2>
             </CardHeader>
             <CardBody>
-              <form onSubmit={submitLoan} className="grid gap-4">
-                <Select
-                  label="Exemplar disponível"
-                  id="loan-copy"
-                  value={copyId === '' ? '' : String(copyId)}
-                  onChange={(v) => setCopyId(v ? Number(v) : '')}
-                  options={[{ value: '', label: 'Selecione...' }, ...availableCopies.map((c) => ({ value: String(c.id), label: c.code }))]}
-                />
-                {availableCopies.length === 0 && (
-                  <p className="text-xs text-amber-600 -mt-2">Nenhum exemplar disponível no momento.</p>
-                )}
-                <Select
-                  label="Usuário da escola"
-                  id="loan-user"
-                  value={userId === '' ? '' : String(userId)}
-                  onChange={(v) => setUserId(v ? Number(v) : '')}
-                  options={[{ value: '', label: 'Selecione...' }, ...((usersPage?.items ?? []).map((u) => ({ value: String(u.id), label: u.username })))]}
-                />
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button type="button" variant="secondary" onClick={() => setLoanOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={createLoan.isPending} aria-busy={createLoan.isPending}>
-                    {createLoan.isPending ? 'Emprestando…' : 'Confirmar'}
-                  </Button>
-                </div>
-              </form>
+              <p id="loan-confirmation-description" className="text-sm text-slate-600 dark:text-slate-300">
+                Você será redirecionado para preencher os dados restantes do empréstimo.
+              </p>
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  ref={loanCancelRef}
+                  type="button"
+                  className="inline-flex items-center justify-center font-medium rounded-md transition-colors min-h-[44px] min-w-[44px] px-4 py-2 text-sm bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-200 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+                  onClick={closeLoanConfirmation}
+                >
+                  Cancelar
+                </button>
+                <Button
+                  type="button"
+                  className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700"
+                  aria-label={`Continuar empréstimo do livro ${book.title}`}
+                  onClick={() => navigate(`/emprestimos?book_id=${book.id}`)}
+                >
+                  Continuar
+                </Button>
+              </div>
             </CardBody>
           </div>
         </div>
