@@ -1,156 +1,65 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
+import { CoverImage } from '@/components/ui/CoverImage'
 
-type Reservation = { id: number; book_id: number; user_id: number; school_id: number; status: string; created_at: string }
+type Reservation = { id: number; book_id: number; user_id: number; school_id: number; status: string; created_at: string; book_title?: string; book_cover_url?: string | null; reserver_username?: string; queue_position?: number; queue_total?: number; copy_id?: number | null; internal_code?: string | null; ready_at?: string | null }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
+const MANAGE_ROLES = ['librarian', 'school_admin', 'super_admin']
+const getErrorMessage = (error: unknown, fallback: string) => (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? fallback
+const formatDate = (date?: string | null) => date ? new Date(date).toLocaleDateString('pt-BR') : null
 
 export function ReservationsPage() {
   const [page, setPage] = useState(1)
   const [bookId, setBookId] = useState('')
+  const [canceling, setCanceling] = useState<Reservation | null>(null)
+  const [cancelTrigger, setCancelTrigger] = useState<HTMLButtonElement | null>(null)
+  const confirmCancelRef = useRef<HTMLButtonElement>(null)
   const announce = useAnnouncer()
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const canManage = !!user && MANAGE_ROLES.includes(user.role)
+  const closeCancelDialog = useCallback(() => {
+    setCanceling(null)
+    requestAnimationFrame(() => cancelTrigger?.focus())
+  }, [cancelTrigger])
+  const { data } = useQuery({ queryKey: ['reservations', page], queryFn: async () => (await api.get<Paginated<Reservation>>(`/reservations/?page=${page}&size=10`)).data, enabled: !canManage })
+  const readyQuery = useQuery({ queryKey: ['reservations', 'ready'], queryFn: async () => (await api.get<Paginated<Reservation>>('/reservations/?status=ready')).data, enabled: canManage })
+  const activeQuery = useQuery({ queryKey: ['reservations', 'active'], queryFn: async () => (await api.get<Paginated<Reservation>>('/reservations/?status=active')).data, enabled: canManage })
+  const createMut = useMutation({ mutationFn: async () => (await api.post<Reservation>('/reservations/', { book_id: Number(bookId) })).data, onSuccess: () => { announce('Reserva criada', 'polite'); setBookId(''); void qc.invalidateQueries({ queryKey: ['reservations'] }) }, onError: (error: unknown) => announce(getErrorMessage(error, 'Erro ao reservar'), 'assertive') })
+  const cancelMut = useMutation({ mutationFn: async (id: number) => api.delete(`/reservations/${id}`), onSuccess: () => { const reservation = canceling; setCanceling(null); announce(`Reserva${reservation?.book_title ? ` de ${reservation.book_title}` : ''} cancelada`, 'polite'); void qc.invalidateQueries({ queryKey: ['reservations'] }); requestAnimationFrame(() => cancelTrigger?.focus()) }, onError: (error: unknown) => announce(`Não foi possível cancelar a reserva. ${getErrorMessage(error, 'Tente novamente.')}`, 'assertive') })
 
-  const { data } = useQuery({
-    queryKey: ['reservations', page],
-    queryFn: async () => {
-      const { data } = await api.get<Paginated<Reservation>>(`/reservations/?page=${page}&size=10`)
-      return data
-    },
-  })
+  useEffect(() => {
+    if (!canceling) return
+    confirmCancelRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape' && !cancelMut.isPending) closeCancelDialog() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [canceling, cancelMut.isPending, closeCancelDialog])
 
-  const mut = useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post<Reservation>('/reservations/', { book_id: Number(bookId) })
-      return data
-    },
-    onSuccess: () => {
-      announce('Reserva criada', 'polite')
-      setBookId('')
-      qc.invalidateQueries({ queryKey: ['reservations'] })
-    },
-    onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Erro ao reservar'
-      announce(msg, 'assertive')
-    },
-  })
+  if (canManage) {
+    const ready = readyQuery.data?.items ?? []
+    const active = activeQuery.data?.items ?? []
+    return <div className="flex flex-col gap-6"><header><h1 className="text-2xl font-bold sm:text-3xl">Reservas</h1><p className="mt-1 text-sm text-slate-500">Fila operacional de reservas da biblioteca.</p></header>{(readyQuery.isError || activeQuery.isError) && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">Não foi possível carregar as reservas. Atualize a página para tentar novamente.</div>}{(readyQuery.isLoading || activeQuery.isLoading) && <p role="status" className="text-sm text-slate-500">Carregando reservas…</p>}<ReservationSection title="Prontas para retirada" description="Reservas com um exemplar disponível para atendimento." empty="Não há reservas prontas para retirada." reservations={ready} kind="ready" onStart={(reservation) => navigate(`/emprestimos?reservation_id=${reservation.id}`)} onDetails={(reservation) => navigate(`/acervo/${reservation.book_id}`)} onCancel={(reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) }} /><ReservationSection title="Aguardando exemplar" description="Reservas em fila, aguardando a disponibilidade de um exemplar." empty="Não há reservas aguardando exemplar." reservations={active} kind="active" onDetails={(reservation) => navigate(`/acervo/${reservation.book_id}`)} onCancel={(reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) }} />{canceling && <CancelDialog reservation={canceling} pending={cancelMut.isPending} confirmRef={confirmCancelRef} onClose={closeCancelDialog} onConfirm={() => cancelMut.mutate(canceling.id)} />}</div>
+  }
+  return <div className="flex flex-col gap-6"><header><h1 className="text-2xl font-bold sm:text-3xl">Reservas</h1><p className="mt-1 text-sm text-slate-500">Reserve um título — fila por escola, útil quando exemplares estão emprestados.</p></header><Card><CardHeader><h2 className="font-semibold">Nova reserva</h2></CardHeader><CardBody><form onSubmit={(event) => { event.preventDefault(); if (!bookId) { announce('Informe o ID do livro', 'assertive'); return }; createMut.mutate() }} className="flex flex-col items-end gap-3 sm:flex-row"><div className="w-full flex-1"><Input label="ID do livro" type="number" value={bookId} onChange={(event) => setBookId(event.target.value)} required /></div><Button type="submit" disabled={createMut.isPending} className="w-full sm:w-auto">{createMut.isPending ? 'Reservando…' : 'Reservar'}</Button></form></CardBody></Card>{data && <><div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 md:block"><table className="w-full text-sm"><caption className="sr-only">Reservas por livro</caption><thead className="bg-slate-50 dark:bg-slate-700/50"><tr><th scope="col" className="px-4 py-3 text-left font-semibold">ID</th><th scope="col" className="px-4 py-3 text-left font-semibold">Livro</th><th scope="col" className="px-4 py-3 text-left font-semibold">Status</th><th scope="col" className="px-4 py-3 text-left font-semibold">Criada em</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-700">{data.items.map((reservation) => <tr key={reservation.id}><td className="px-4 py-3">#{reservation.id}</td><td className="px-4 py-3"><div className="flex items-center gap-3"><CoverImage src={reservation.book_cover_url} title={reservation.book_title ?? `Livro #${reservation.book_id}`} alt="" width={40} height={60} className="h-14 w-10 shrink-0 rounded-md border border-slate-200 dark:border-slate-600" sizes="40px" /><span>{reservation.book_title ?? `Livro #${reservation.book_id}`}</span></div></td><td className="px-4 py-3"><Badge tone={reservation.status === 'active' ? 'info' : reservation.status === 'fulfilled' ? 'success' : 'neutral'}>{reservation.status}</Badge></td><td className="px-4 py-3 text-xs">{formatDate(reservation.created_at)}</td></tr>)}</tbody></table></div><ul className="grid gap-3 md:hidden" role="list">{data.items.map((reservation) => <li key={reservation.id} className="rounded-xl border bg-white p-4 dark:bg-slate-800"><div className="flex items-start gap-3"><CoverImage src={reservation.book_cover_url} title={reservation.book_title ?? `Livro #${reservation.book_id}`} alt="" width={56} height={84} className="h-[84px] w-14 shrink-0 rounded-md border border-slate-200 dark:border-slate-600" sizes="56px" /><div className="min-w-0 flex-1"><div className="flex justify-between gap-2"><h3 className="font-semibold">Reserva #{reservation.id}</h3><Badge tone={reservation.status === 'active' ? 'info' : 'neutral'}>{reservation.status}</Badge></div><p className="text-sm text-slate-500">{reservation.book_title ?? `Livro #${reservation.book_id}`} — {formatDate(reservation.created_at)}</p></div></div></li>)}</ul><Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} /></>}</div>
+}
 
-  const cancelMut = useMutation({
-    mutationFn: async (id: number) => {
-      const { data } = await api.post<Reservation>(`/reservations/${id}/cancel`)
-      return data
-    },
-    onSuccess: () => {
-      announce('Reserva cancelada', 'polite')
-      qc.invalidateQueries({ queryKey: ['reservations'] })
-    },
-  })
+function ReservationSection({ title, description, empty, reservations, kind, onStart, onDetails, onCancel }: { title: string; description: string; empty: string; reservations: Reservation[]; kind: 'ready' | 'active'; onStart?: (reservation: Reservation) => void; onDetails: (reservation: Reservation) => void; onCancel: (reservation: Reservation, trigger: HTMLButtonElement) => void }) {
+  return <section aria-labelledby={`${kind}-reservations-title`} className="flex flex-col gap-3"><div><h2 id={`${kind}-reservations-title`} className="text-xl font-semibold">{title}</h2><p className="text-sm text-slate-600 dark:text-slate-300">{description}</p></div>{reservations.length === 0 ? <Card><CardBody><p className="text-sm text-slate-600 dark:text-slate-300">{empty}</p></CardBody></Card> : <ul className="grid gap-3" role="list">{reservations.map((reservation) => { const book = reservation.book_title ?? `Livro #${reservation.book_id}`; const reader = reservation.reserver_username ?? `Usuário #${reservation.user_id}`; const position = reservation.queue_position ?? 1; const total = reservation.queue_total ?? position; return <li key={reservation.id}><Card><CardBody className="!p-3 sm:!p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div className="flex min-w-0 flex-1 gap-3"><CoverImage src={reservation.book_cover_url} title={book} alt="" width={56} height={80} className="h-20 w-14 shrink-0 rounded-md border border-slate-200 dark:border-slate-600" sizes="56px" /><div className="min-w-0 space-y-1.5"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{book}</h3><Badge tone={kind === 'ready' ? 'success' : 'info'}>{kind === 'ready' ? 'Pronta para retirada' : 'Aguardando exemplar'}</Badge></div><p className="text-sm">Leitor: <span className="font-medium">{reader}</span></p>{kind === 'ready' && <p className="text-sm text-slate-600 dark:text-slate-300">Exemplar: <span className="font-mono">{reservation.internal_code ?? 'a identificar'}</span></p>}<p className="text-sm font-medium">{position}º de {total} na fila</p><p className="text-sm text-slate-600 dark:text-slate-300">Solicitada em: {formatDate(reservation.created_at) ?? 'data não informada'}{kind === 'ready' && reservation.ready_at && ` · disponível desde ${formatDate(reservation.ready_at)}`}</p></div></div><div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">{onStart && <Button size="sm" className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700" onClick={() => onStart(reservation)} aria-label={`Iniciar empréstimo de ${book} para ${reader}`}>Iniciar empréstimo</Button>}<Button size="sm" variant="secondary" onClick={() => onDetails(reservation)} aria-label={`Detalhes da reserva de ${book} para ${reader}`}>Detalhes</Button><Button size="sm" variant="danger-secondary" onClick={(event) => onCancel(reservation, event.currentTarget)} aria-label={`Cancelar reserva de ${book} para ${reader}`}>Cancelar</Button></div></div></CardBody></Card></li> })}</ul>}</section>
+}
 
-  return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl sm:text-3xl font-bold">Reservas</h1>
-        <p className="text-sm text-slate-500 mt-1">Reserve um título — fila por escola, útil quando exemplares estão emprestados.</p>
-      </header>
-
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold">Nova reserva</h2>
-        </CardHeader>
-        <CardBody>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!bookId) {
-                announce('Informe o ID do livro', 'assertive')
-                return
-              }
-              mut.mutate()
-            }}
-            className="flex flex-col sm:flex-row gap-3 items-end"
-          >
-            <div className="flex-1 w-full">
-              <Input label="ID do livro" type="number" value={bookId} onChange={(e) => setBookId(e.target.value)} required />
-            </div>
-            <Button type="submit" disabled={mut.isPending} className="w-full sm:w-auto">
-              {mut.isPending ? 'Reservando…' : 'Reservar'}
-            </Button>
-          </form>
-        </CardBody>
-      </Card>
-
-      {data && (
-        <>
-          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <table className="w-full text-sm">
-              <caption className="sr-only">Reservas por livro</caption>
-              <thead className="bg-slate-50 dark:bg-slate-700/50">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
-                    ID
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
-                    Livro
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
-                    Status
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
-                    Criada em
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {data.items.map((r) => (
-                  <tr key={r.id}>
-                    <td className="px-4 py-3">#{r.id}</td>
-                    <td className="px-4 py-3">#{r.book_id}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={r.status === 'active' ? 'info' : r.status === 'fulfilled' ? 'success' : 'neutral'}>{r.status}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-xs">{new Date(r.created_at).toLocaleDateString('pt-BR')}</td>
-                    <td className="px-4 py-3">
-                      {r.status === 'active' && (
-                        <Button size="sm" variant="secondary" onClick={() => cancelMut.mutate(r.id)}>
-                          Cancelar
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <ul className="md:hidden grid gap-3" role="list">
-            {data.items.map((r) => (
-              <li key={r.id} className="rounded-xl border p-4 bg-white dark:bg-slate-800">
-                <div className="flex justify-between">
-                  <h3 className="font-semibold">Reserva #{r.id}</h3>
-                  <Badge tone={r.status === 'active' ? 'info' : 'neutral'}>{r.status}</Badge>
-                </div>
-                <p className="text-sm text-slate-500">Livro #{r.book_id} — {new Date(r.created_at).toLocaleDateString('pt-BR')}</p>
-                {r.status === 'active' && (
-                  <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={() => cancelMut.mutate(r.id)}>
-                    Cancelar
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-
-          <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
-        </>
-      )}
-    </div>
-  )
+function CancelDialog({ reservation, pending, confirmRef, onClose, onConfirm }: { reservation: Reservation; pending: boolean; confirmRef: RefObject<HTMLButtonElement | null>; onClose: () => void; onConfirm: () => void }) {
+  const title = reservation.book_title ?? `livro ${reservation.book_id}`
+  const reader = reservation.reserver_username ?? 'este leitor'
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) onClose() }}><section role="dialog" aria-modal="true" aria-labelledby="cancel-reservation-title" aria-describedby="cancel-reservation-description" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800"><h2 id="cancel-reservation-title" className="text-lg font-semibold">Cancelar reserva?</h2><p id="cancel-reservation-description" className="mt-2 text-sm text-slate-600 dark:text-slate-300">Cancelar a reserva de {reader} para {title}?</p><div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={onClose} disabled={pending}>Manter reserva</Button><Button ref={confirmRef} type="button" variant="danger" onClick={onConfirm} disabled={pending} aria-busy={pending}>{pending ? 'Cancelando…' : 'Cancelar reserva'}</Button></div></section></div>
 }

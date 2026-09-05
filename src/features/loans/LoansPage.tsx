@@ -29,6 +29,7 @@ type ReturnLookup = { kind: 'copy' | 'user'; value: string }
 type ReturnSearchResult = { kind: 'copy'; loan: Loan } | { kind: 'user'; user: User; loans: Loan[] }
 type ReturnRequest = { id: number; source: 'table' | 'copy' | 'user' }
 type LoanSituation = '' | 'borrowed' | 'overdue' | 'due_soon' | 'returned'
+type PickupReservation = { id: number; book_id: number; user_id: number; school_id: number; status: string; book_title: string; reserver_username: string; reserver_role: string; reserver_is_active: boolean; reserver_turma_numero: number | null; reserver_turma_letra: string | null; copy_id: number | null; internal_code: string | null }
 
 const statusLabel = (status: string) => ({ active: 'Ativo', overdue: 'Atrasado', returned: 'Devolvido' }[status] ?? status)
 const statusTone = (status: string) => status === 'active' ? 'warning' : status === 'overdue' ? 'danger' : 'success' as const
@@ -62,6 +63,37 @@ function getErrorMessage(error: unknown, fallback: string) {
     ?? fallback
 }
 
+function getLoanCreationError(error: unknown) {
+  const rawDetail = getErrorMessage(error, 'Ocorreu um erro ao confirmar o empréstimo.')
+  const detail = typeof rawDetail === 'string'
+    ? rawDetail
+    : 'Ocorreu um erro ao confirmar o empréstimo.'
+  const normalizedDetail = detail.toLocaleLowerCase('pt-BR')
+  const copyError = /copy is not available|copy not found|internal code is ambiguous|exemplar|c[oó]digo/.test(normalizedDetail)
+  const userError = /borrower not found|borrower is inactive|borrower does not belong|cpf inv[aá]lido|leitor|usu[aá]rio|cpf/.test(normalizedDetail)
+  const accessibleDetail = /copy is not available/.test(normalizedDetail)
+    ? 'Este exemplar não está disponível para empréstimo.'
+    : /copy not found/.test(normalizedDetail)
+      ? 'Exemplar não encontrado. Verifique o código e tente novamente.'
+      : /internal code is ambiguous/.test(normalizedDetail)
+        ? 'O código interno do exemplar é ambíguo entre escolas. Selecione a escola do exemplar.'
+        : /borrower not found/.test(normalizedDetail)
+          ? 'Leitor não encontrado. Verifique os dados e tente novamente.'
+          : /borrower is inactive/.test(normalizedDetail)
+            ? 'Este leitor está inativo e não pode realizar empréstimos.'
+            : /borrower does not belong/.test(normalizedDetail)
+              ? 'O leitor não pertence à mesma escola do exemplar.'
+              : /cpf inv[aá]lido/.test(normalizedDetail)
+                ? 'Informe um CPF válido para o leitor.'
+                : 'O serviço não conseguiu confirmar a operação. Tente novamente.'
+
+  return {
+    detail: accessibleDetail,
+    field: copyError ? 'copy' : userError ? 'user' : undefined,
+    announcement: `Não foi possível realizar o empréstimo. ${accessibleDetail}`,
+  }
+}
+
 export function LoansPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => {
@@ -82,6 +114,7 @@ export function LoansPage() {
   const [returnSchoolId, setReturnSchoolId] = useState('')
   const [returnInputError, setReturnInputError] = useState<string | undefined>()
   const [loanConfirmationOpen, setLoanConfirmationOpen] = useState(false)
+  const [loanConfirmationError, setLoanConfirmationError] = useState<string | null>(null)
   const [loanSuccessMessage, setLoanSuccessMessage] = useState<string | null>(null)
   const focusCpfAfterLookup = useRef(false)
   const focusCodeAfterLookup = useRef(false)
@@ -99,9 +132,19 @@ export function LoansPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const bookIdParam = Number(searchParams.get('book_id'))
-  const preselectedBookId = Number.isSafeInteger(bookIdParam) && bookIdParam > 0
-    ? bookIdParam
-    : undefined
+  const reservationIdParam = Number(searchParams.get('reservation_id'))
+  const reservationId = Number.isSafeInteger(reservationIdParam) && reservationIdParam > 0
+    ? reservationIdParam : undefined
+  const reservationQuery = useQuery({
+    queryKey: ['loan-reservation', reservationId],
+    enabled: !!reservationId,
+    retry: false,
+    queryFn: async () => (await api.get<PickupReservation>(`/reservations/${reservationId}`)).data,
+  })
+  const pickupReservation = reservationQuery.data?.status === 'ready'
+    ? reservationQuery.data : undefined
+  const preselectedBookId = pickupReservation?.book_id
+    ?? (Number.isSafeInteger(bookIdParam) && bookIdParam > 0 ? bookIdParam : undefined)
   const announce = useAnnouncer()
   const qc = useQueryClient()
   const { user: currentUser } = useAuth()
@@ -184,14 +227,21 @@ export function LoansPage() {
 
   const user = userMatchesInput ? userQuery.data : undefined
   const sameSchool = !!copy && !!user && copy.school_id === user.school_id
-  const reader = sameSchool ? user : undefined
+  const reader = pickupReservation
+    ? { id: pickupReservation.user_id, username: pickupReservation.reserver_username, role: pickupReservation.reserver_role, school_id: pickupReservation.school_id, school_name: null, turma_numero: pickupReservation.reserver_turma_numero, turma_letra: pickupReservation.reserver_turma_letra, is_active: pickupReservation.reserver_is_active }
+    : sameSchool ? user : undefined
   const copyAvailable = copy?.state === 'available'
   const userEligible = !!reader?.is_active
   const copyBelongsToSelectedBook = !preselectedBookId || !copy || copy.book_id === preselectedBookId
-  const canCreate = !!copy && copyBelongsToSelectedBook && !!reader && copyAvailable && userEligible && !copyQuery.isFetching && !userQuery.isFetching
+  const copyMatchesPickupReservation = !pickupReservation || !copy || copy.id === pickupReservation.copy_id
+  const copyEligible = pickupReservation
+    ? copy?.state === 'reserved' && copyMatchesPickupReservation
+    : copyAvailable
+  const canCreate = !!copy && copyBelongsToSelectedBook && copyMatchesPickupReservation && !!reader && copyEligible && userEligible && !copyQuery.isFetching && !userQuery.isFetching
   const copyError = copyInputError
     ?? (!copyBelongsToSelectedBook ? 'O exemplar informado não pertence ao livro selecionado.' : undefined)
-    ?? (copyMatchesInput && copy && !copyAvailable ? 'Este exemplar não está disponível para empréstimo.' : undefined)
+    ?? (!copyMatchesPickupReservation ? 'Este exemplar está reservado para outro atendimento.' : undefined)
+    ?? (copyMatchesInput && copy && !copyAvailable && !pickupReservation ? 'Este exemplar não está disponível para empréstimo.' : undefined)
     ?? (copyMatchesInput && copyQuery.isError ? 'Exemplar não encontrado. Verifique o código e tente novamente.' : undefined)
   const userError = userInputError ?? (userMatchesInput && (userQuery.isError || (!!user && !reader)) ? 'Leitor não encontrado. Verifique o CPF e tente novamente.' : undefined)
 
@@ -236,13 +286,13 @@ export function LoansPage() {
   useEffect(() => {
     if (operation !== 'borrow' || copyQuery.isFetching || !copyMatchesInput) return
     const shouldRestoreFocus = focusCodeAfterLookup.current || focusCpfAfterLookup.current
-    const invalidCopy = copyQuery.isError || !copy || !copyBelongsToSelectedBook || !copyAvailable
+    const invalidCopy = copyQuery.isError || !copy || !copyBelongsToSelectedBook || !copyEligible
     if (!invalidCopy) return
     const message = !copyBelongsToSelectedBook
       ? 'O exemplar informado não pertence ao livro selecionado. Verifique o código e tente novamente.'
       : !copy || copyQuery.isError
         ? 'Exemplar não encontrado. Verifique o código e tente novamente.'
-        : `Exemplar ${copy.code} não está disponível para empréstimo. Verifique o código e tente novamente.`
+        : pickupReservation ? `Este não é o exemplar reservado para retirada. Identifique o exemplar correto.` : `Exemplar ${copy.code} não está disponível para empréstimo. Verifique o código e tente novamente.`
     const key = `error:${copyLookupCode}:${message}`
     if (announcedCopyKey.current !== key) {
       announcedCopyKey.current = key
@@ -253,19 +303,22 @@ export function LoansPage() {
       focusCpfAfterLookup.current = false
       window.setTimeout(() => codeRef.current?.focus(), 150)
     }
-  }, [announce, copy, copyAvailable, copyBelongsToSelectedBook, copyLookupCode, copyMatchesInput, copyQuery.isError, copyQuery.isFetching, operation])
+  }, [announce, copy, copyEligible, copyBelongsToSelectedBook, copyLookupCode, copyMatchesInput, copyQuery.isError, copyQuery.isFetching, operation, pickupReservation])
 
   useEffect(() => {
-    if (operation !== 'borrow' || !copy || copyQuery.isFetching || copyQuery.isError || !copyAvailable || !copyBelongsToSelectedBook) return
+    if (operation !== 'borrow' || !copy || copyQuery.isFetching || copyQuery.isError || !copyEligible || !copyBelongsToSelectedBook) return
     const key = `${copyLookupCode}:${copy.state}`
     if (announcedCopyKey.current === key) return
     announcedCopyKey.current = key
     announce(`Livro ${copy.book.title}, exemplar ${copy.code}, identificado.`, 'polite')
-    if (focusCpfAfterLookup.current) {
+    if (focusCpfAfterLookup.current && !pickupReservation) {
       focusCpfAfterLookup.current = false
       window.setTimeout(() => cpfRef.current?.focus(), 150)
+    } else if (focusCpfAfterLookup.current && pickupReservation && canCreate) {
+      focusCpfAfterLookup.current = false
+      window.setTimeout(() => confirmLoanRef.current?.focus(), 150)
     }
-  }, [announce, copy, copyAvailable, copyBelongsToSelectedBook, copyLookupCode, copyQuery.isError, copyQuery.isFetching, operation])
+  }, [announce, canCreate, copy, copyEligible, copyBelongsToSelectedBook, copyLookupCode, copyQuery.isError, copyQuery.isFetching, operation, pickupReservation])
 
   useEffect(() => {
     if (operation !== 'borrow' || userQuery.isFetching || !userMatchesInput) return
@@ -329,7 +382,7 @@ export function LoansPage() {
 
   const identifyUser = () => {
     setUserInputError(undefined)
-    if (!copy || !copyAvailable || !copyBelongsToSelectedBook) {
+    if (!copy || !copyEligible || !copyBelongsToSelectedBook) {
       const message = 'Identifique um exemplar disponível antes de informar o CPF do leitor.'
       setUserInputError(message)
       announce(message, 'assertive')
@@ -352,6 +405,7 @@ export function LoansPage() {
 
   const closeLoanConfirmation = () => {
     setLoanConfirmationOpen(false)
+    setLoanConfirmationError(null)
     window.requestAnimationFrame(() => confirmLoanRef.current?.focus())
   }
 
@@ -381,17 +435,45 @@ export function LoansPage() {
   }, [loanConfirmationOpen])
 
   const createMut = useMutation({
-    mutationFn: async () => (await api.post<Loan>('/loans/', { internal_code: internalCode.trim(), cpf, ...(borrowSchoolId ? { school_id: Number(borrowSchoolId) } : {}) })).data,
-    onSuccess: (loan) => {
-      const message = `Empréstimo concluído: ${loan.book_title}, exemplar ${loan.internal_code}, para ${loan.borrower_username}.`
+    mutationFn: async () => (await api.post<Loan>('/loans/', pickupReservation
+      ? { internal_code: internalCode.trim(), reservation_id: pickupReservation.id }
+      : { internal_code: internalCode.trim(), cpf, ...(borrowSchoolId ? { school_id: Number(borrowSchoolId) } : {}) })).data,
+    onSuccess: async (loan) => {
+      const message = `Empréstimo realizado com sucesso. Livro ${loan.book_title}, exemplar ${loan.internal_code}, emprestado para ${loan.borrower_username}.`
       setLoanConfirmationOpen(false)
+      setLoanConfirmationError(null)
       setLoanSuccessMessage(message)
-      announce(message, 'polite')
+      await announce(message, 'polite')
       setInternalCode(''); setCpf(''); setCopyLookupCode(''); setUserLookupCpf('')
+      setCopySchoolId(''); setCopyInputError(undefined); setUserInputError(undefined)
+      announcedCopyKey.current = null
+      announcedUserKey.current = null
       qc.invalidateQueries({ queryKey: ['loans'] }); qc.invalidateQueries({ queryKey: ['copies'] }); qc.invalidateQueries({ queryKey: ['books'] })
-      window.setTimeout(() => codeRef.current?.focus(), 0)
+      codeRef.current?.focus()
     },
-    onError: (error: unknown) => announce(getErrorMessage(error, 'Erro ao criar empréstimo.'), 'assertive'),
+    onError: async (error: unknown) => {
+      const loanError = getLoanCreationError(error)
+      if (loanError.field === 'copy') {
+        setLoanConfirmationOpen(false)
+        setLoanConfirmationError(null)
+        setCopyInputError(loanError.detail)
+        await announce(loanError.announcement, 'assertive')
+        codeRef.current?.focus()
+        return
+      }
+      if (loanError.field === 'user') {
+        setLoanConfirmationOpen(false)
+        setLoanConfirmationError(null)
+        setUserInputError(loanError.detail)
+        await announce(loanError.announcement, 'assertive')
+        cpfRef.current?.focus()
+        return
+      }
+
+      setLoanConfirmationError(loanError.detail)
+      await announce(loanError.announcement, 'assertive')
+      acceptLoanConfirmationRef.current?.focus()
+    },
   })
 
   const returnMut = useMutation({
@@ -483,28 +565,32 @@ export function LoansPage() {
     </CardHeader><CardBody>
       {operation === 'borrow' ? <form onSubmit={(event) => { event.preventDefault(); if (!copy) { identifyCopy(false); return }; if (!reader) { identifyUser(); return }; if (canCreate) setLoanConfirmationOpen(true) }} className="flex flex-col gap-4">
       <div className="flex flex-col sm:flex-row gap-3 items-start">
-          <div className="flex-1 w-full"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setCopyInputError(undefined); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint="Escaneie ou digite o código e pressione Enter para avançar ao CPF." aria-describedby="copy-identification" required autoComplete="off" autoFocus /></div>
-          <div className="flex-1 w-full"><Input ref={cpfRef} id="loan-cpf" label="CPF do leitor" type="password" inputMode="numeric" value={formatCpfInput(cpf)} onChange={(event) => { setCpf(onlyDigits(event.target.value)); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyUser() } }} error={userError} hint="O CPF permanece oculto. Digite e pressione Enter para identificar o leitor." aria-describedby="user-identification" required autoComplete="off" placeholder="000.000.000-00" /></div>
+          <div className="flex-1 w-full"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setCopyInputError(undefined); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para avançar ao CPF.'} aria-describedby="copy-identification" required autoComplete="off" autoFocus /></div>
+          <div className="flex-1 w-full">{pickupReservation ? <Input id="loan-reserved-reader" label="Leitor da reserva" value={pickupReservation.reserver_username} readOnly tabIndex={-1} hint={`${roleLabel(pickupReservation.reserver_role)}. Leitor já identificado pela reserva; o CPF não precisa ser informado novamente.`} /> : <Input ref={cpfRef} id="loan-cpf" label="CPF do leitor" type="password" inputMode="numeric" value={formatCpfInput(cpf)} onChange={(event) => { setCpf(onlyDigits(event.target.value)); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyUser() } }} error={userError} hint="O CPF permanece oculto. Digite e pressione Enter para identificar o leitor." aria-describedby="user-identification" required autoComplete="off" placeholder="000.000.000-00" />}</div>
           <div className="flex w-full flex-col gap-1.5 sm:w-auto">
             <span className="invisible text-sm font-medium leading-5" aria-hidden="true">Ação</span>
             <Button ref={confirmLoanRef} type="submit" variant={canCreate ? 'primary' : 'secondary'} disabled={!canCreate || createMut.isPending} className="loan-confirmation-button w-full sm:w-auto" aria-describedby="loan-confirmation-status">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
           </div>
         </div>
-        {preselectedBookId && <section aria-labelledby="selected-loan-book" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-100">
+        {reservationId && reservationQuery.isError && <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-300">A reserva não está disponível para retirada.</p>}
+        {preselectedBookId && <section aria-labelledby="selected-loan-book" className="rounded-lg border border-slate-200 bg-slate-100 p-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
           <h3 id="selected-loan-book" className="font-semibold">Livro selecionado</h3>
-          {selectedBookQuery.isFetching && <p className="mt-1 text-sm">Carregando livro…</p>}
+          {selectedBookQuery.isFetching && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Carregando livro…</p>}
           {selectedBookQuery.isError && <p className="mt-1 text-sm text-red-700 dark:text-red-300">Não foi possível carregar o livro selecionado.</p>}
           {selectedBookQuery.data && <>
             <p className="mt-1">{selectedBookQuery.data.title}</p>
-            <p className="mt-2 text-sm">Selecione um exemplar disponível ou informe seu código no campo acima.</p>
-            {selectedBookCopiesQuery.isFetching && <p className="mt-2 text-sm">Carregando exemplares…</p>}
-            {!selectedBookCopiesQuery.isFetching && selectedBookCopiesQuery.data?.items.length === 0 && <p className="mt-2 text-sm">Este livro não possui exemplares cadastrados.</p>}
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{pickupReservation ? `Exemplar reservado para retirada: ${pickupReservation.internal_code ?? 'código não informado'}. Confirme-o no campo acima.` : 'Selecione um exemplar disponível ou informe seu código no campo acima.'}</p>
+            {selectedBookCopiesQuery.isFetching && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Carregando exemplares…</p>}
+            {!selectedBookCopiesQuery.isFetching && selectedBookCopiesQuery.data?.items.length === 0 && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Este livro não possui exemplares cadastrados.</p>}
             {!selectedBookCopiesQuery.isFetching && selectedBookCopiesQuery.data && selectedBookCopiesQuery.data.items.length > 0 && <ul className="mt-3 grid gap-2 sm:grid-cols-2" aria-label={`Exemplares de ${selectedBookQuery.data.title}`}>
               {selectedBookCopiesQuery.data.items.map((item) => {
                 const available = item.state === 'available'
-                return <li key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-white p-2 text-sm dark:border-blue-800 dark:bg-slate-900">
-                  <div><p className="font-mono font-medium">{item.code}</p><p>{bookStateLabel(item.state)} · {bookConditionLabel(item.condition)}</p>{isSuperAdmin && <p className="text-xs opacity-80">Escola {item.school_id}</p>}</div>
-                  {available ? <Button type="button" size="sm" variant="secondary" className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700" onClick={() => selectCopyFromList(item)} aria-label={`Emprestar exemplar ${item.code}`}>Emprestar</Button> : <span className="text-xs font-medium">Indisponível</span>}
+                const itemStatus = item.state === 'reserved'
+                  ? pickupReservation?.copy_id === item.id ? 'Reservado para esta retirada' : 'Reservado'
+                  : bookStateLabel(item.state)
+                return <li key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                  <div><p className="font-mono font-medium">{item.code}</p><p className="text-slate-600 dark:text-slate-300">{itemStatus} · {bookConditionLabel(item.condition)}</p>{isSuperAdmin && <p className="text-xs text-slate-500 dark:text-slate-400">Escola {item.school_id}</p>}</div>
+                  {available ? <Button type="button" size="sm" variant="secondary" onClick={() => selectCopyFromList(item)} aria-label={`Emprestar exemplar ${item.code}`}>Emprestar</Button> : <span className="text-xs font-medium">{itemStatus === 'Reservado para esta retirada' || itemStatus === 'Reservado' ? itemStatus : 'Indisponível'}</span>}
                 </li>
               })}
             </ul>}
@@ -541,9 +627,10 @@ export function LoansPage() {
           <div><dt className="font-medium">Exemplar</dt><dd className="font-mono">{copy.code}</dd></div>
           <div><dt className="font-medium">Leitor</dt><dd>{reader.username}</dd></div>
         </dl>
+        {loanConfirmationError && <p aria-hidden="true" className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm font-medium text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">{loanConfirmationError}</p>}
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button ref={cancelLoanConfirmationRef} type="button" variant="secondary" className="hover:!bg-slate-200 hover:!text-slate-900 dark:hover:!bg-slate-600 dark:hover:!text-white" onClick={closeLoanConfirmation} aria-label="Cancelar confirmação do empréstimo">Cancelar</Button>
-          <Button ref={acceptLoanConfirmationRef} type="button" disabled={createMut.isPending} aria-busy={createMut.isPending} onClick={() => createMut.mutate()} aria-label="Confirmar empréstimo" className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
+          <Button ref={acceptLoanConfirmationRef} type="button" disabled={createMut.isPending} aria-busy={createMut.isPending} onClick={() => { setLoanConfirmationError(null); createMut.mutate() }} aria-label="Confirmar empréstimo" className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
         </div>
       </section>
     </div>}

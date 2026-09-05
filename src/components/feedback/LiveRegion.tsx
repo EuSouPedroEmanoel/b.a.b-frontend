@@ -1,31 +1,85 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { AnnouncerContext, type Announce } from './LiveRegionContext'
 
-export function LiveRegionProvider({ children }: { children: ReactNode }) {
-  const [polite, setPolite] = useState<{ text: string; key: number }>({ text: '', key: 0 })
-  const [assertive, setAssertive] = useState<{ text: string; key: number }>({ text: '', key: 0 })
+type LiveMessage = { text: string; id: number }
+type PendingAnnouncement = LiveMessage & { resolve: () => void }
+type Politeness = 'polite' | 'assertive'
 
-  const announce = useCallback<Announce>((msg, pol = 'polite') => {
-    // Limpa e recria o nó com key diferente — força releitura mesmo se msg repetir (WCAG: "só fala uma vez")
-    if (pol === 'assertive') {
-      setAssertive({ text: '', key: 0 })
-      // timeout > rAF garante que ATs (NVDA/VO) percebam a remoção antes da reinserção
-      setTimeout(() => setAssertive({ text: msg, key: Date.now() }), 50)
+export function LiveRegionProvider({ children }: { children: ReactNode }) {
+  const [polite, setPolite] = useState<LiveMessage>({ text: '', id: 0 })
+  const [assertive, setAssertive] = useState<LiveMessage>({ text: '', id: 0 })
+  const nextMessageId = useRef(0)
+  const pendingAnnouncements = useRef(new Map<number, PendingAnnouncement>())
+  const queues = useRef<Record<Politeness, PendingAnnouncement[]>>({
+    polite: [],
+    assertive: [],
+  })
+  const active = useRef<Record<Politeness, boolean>>({
+    polite: false,
+    assertive: false,
+  })
+
+  const showNext = useCallback((politeness: Politeness) => {
+    const next = queues.current[politeness].shift()
+    if (!next) {
+      active.current[politeness] = false
+      return
+    }
+
+    active.current[politeness] = true
+    if (politeness === 'assertive') {
+      setAssertive(next)
     } else {
-      setPolite({ text: '', key: 0 })
-      setTimeout(() => setPolite({ text: msg, key: Date.now() }), 50)
+      setPolite(next)
     }
   }, [])
+
+  useLayoutEffect(() => {
+    const announcement = pendingAnnouncements.current.get(polite.id)
+    if (announcement) {
+      pendingAnnouncements.current.delete(polite.id)
+      announcement.resolve()
+      showNext('polite')
+    }
+  }, [polite.id, showNext])
+
+  useLayoutEffect(() => {
+    const announcement = pendingAnnouncements.current.get(assertive.id)
+    if (announcement) {
+      pendingAnnouncements.current.delete(assertive.id)
+      announcement.resolve()
+      showNext('assertive')
+    }
+  }, [assertive.id, showNext])
+
+  const announce = useCallback<Announce>((msg, pol = 'polite') => {
+    const id = ++nextMessageId.current
+
+    return new Promise<void>((resolve) => {
+      const announcement = { text: msg, id, resolve }
+      pendingAnnouncements.current.set(id, announcement)
+      queues.current[pol].push(announcement)
+
+      if (!active.current[pol]) {
+        showNext(pol)
+      }
+    })
+  }, [showNext])
 
   return (
     <AnnouncerContext.Provider value={announce}>
       {children}
-      {/* Duas regiões vivas — WCAG 4.1.3. key força remontagem para mensagens idênticas */}
-      <div key={`polite-${polite.key}`} aria-live="polite" aria-atomic="true" className="sr-only">
-        {polite.text}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        <span key={polite.id}>{polite.text}</span>
       </div>
-      <div key={`assertive-${assertive.key}`} aria-live="assertive" aria-atomic="true" className="sr-only">
-        {assertive.text}
+      <div role="alert" aria-live="assertive" aria-atomic="true" className="sr-only">
+        <span key={assertive.id}>{assertive.text}</span>
       </div>
     </AnnouncerContext.Provider>
   )
