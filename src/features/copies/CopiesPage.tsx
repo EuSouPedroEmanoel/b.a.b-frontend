@@ -5,6 +5,7 @@ import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookSta
 import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
+import { PageDescription } from '@/components/ui/PageDescription'
 
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
 type BookLite = { id: number; title: string }
@@ -34,7 +35,7 @@ export function CopiesPage() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl sm:text-3xl font-bold">Exemplares</h1>
-        <p className="text-sm text-slate-500 mt-1">Exemplares físicos por escola — código único por unidade. Estado e conservação.</p>
+        <PageDescription>Exemplares físicos por escola — código único por unidade. Estado e conservação.</PageDescription>
       </header>
 
       {isLoading && <p aria-live="polite">Carregando exemplares…</p>}

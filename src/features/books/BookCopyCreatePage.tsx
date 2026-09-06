@@ -8,6 +8,7 @@ import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { PageDescription } from '@/components/ui/PageDescription'
 
 type Book = { id: number; title: string; isbn: string | null }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
@@ -100,11 +101,11 @@ export function BookCopyCreatePage() {
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold">Cadastrar exemplares</h1>
         {book && (
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+          <PageDescription>
             Livro: <span className="font-semibold">{book.title}</span>{' '}
             {book.isbn && <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{book.isbn}</span>}{' '}
             <span className="text-xs text-slate-500">— {count} unidade{count !== 1 ? 's' : ''} já cadastrada{count !== 1 ? 's' : ''}</span>
-          </p>
+          </PageDescription>
         )}
       </header>
 

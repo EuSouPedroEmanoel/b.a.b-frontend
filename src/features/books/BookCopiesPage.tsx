@@ -10,6 +10,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { PageDescription } from '@/components/ui/PageDescription'
 
 type Book = { id: number; title: string; isbn: string | null }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
@@ -110,9 +111,9 @@ export function BookCopiesPage() {
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold">Cadastrar exemplares</h1>
         {book && (
-          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+          <PageDescription>
             Livro: <span className="font-semibold">{book.title}</span> {book.isbn && <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{book.isbn}</span>}
-          </p>
+          </PageDescription>
         )}
       </header>
 

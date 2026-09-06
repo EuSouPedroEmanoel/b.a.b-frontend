@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
+import { PageDescription } from '@/components/ui/PageDescription'
 import { Select } from '@/components/ui/Select'
 import { OverflowTags } from '@/components/ui/OverflowTags'
 import { CoverImage } from '@/components/ui/CoverImage'
@@ -30,6 +31,8 @@ type SuggestItem =
   | { kind: 'genre'; id: number; name: string }
   | { kind: 'book'; id: number; title: string; isbn: string | null }
   | { kind: 'availability'; state: string; label: string }
+
+const PERSONAL_BOOK_ROLES = ['student', 'teacher']
 
 export function BooksPage() {
   const [page, setPage] = useState(1)
@@ -59,6 +62,7 @@ export function BooksPage() {
   const { resolved } = useTheme()
   const isDarkTheme = resolved === 'dark'
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
+  const isPersonalCatalog = !!user && PERSONAL_BOOK_ROLES.includes(user.role)
 
   const saveAcervoPosition = useCallback(() => {
     try {
@@ -93,8 +97,8 @@ export function BooksPage() {
       { value: 'reserved', label: 'Reservado' },
       { value: 'lost', label: 'Perdido' },
       { value: 'archived', label: 'Arquivado' },
-    ],
-    [],
+    ].filter((option) => !isPersonalCatalog || !['lost', 'archived'].includes(option.value)),
+    [isPersonalCatalog],
   )
 
   const hasActiveFilters = !!genreFilter || !!authorFilter || !!stateFilter || sortBy !== 'created_at'
@@ -115,13 +119,13 @@ export function BooksPage() {
     }
     if (genre) setGenreFilter(genre)
     if (author) setAuthorFilter(author)
-    if (state) setStateFilter(state)
+    if (state && (!isPersonalCatalog || !['lost', 'archived'].includes(state))) setStateFilter(state)
     if (!Number.isNaN(p) && p !== 1) setPage(p)
     if (!Number.isNaN(size) && [10, 20, 30, 50].includes(size)) setPageSize(size)
     if (sort && sort !== sortBy) setSortBy(sort)
     if (order && (order === 'asc' || order === 'desc') && order !== sortOrder) setSortOrder(order)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isPersonalCatalog])
 
   // Sincroniza estado com URL para link compartilhável
   useEffect(() => {
@@ -448,7 +452,7 @@ export function BooksPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl sm:text-3xl font-bold">Acervo</h1>
-          <p className="text-sm text-slate-500">Busca por título, ISBN, código interno, gênero, autor ou disponibilidade. ISBN não cadastrado abre o cadastro automaticamente.</p>
+          <PageDescription>Busca por título, ISBN, código interno, gênero, autor ou disponibilidade. ISBN não cadastrado abre o cadastro automaticamente.</PageDescription>
         </header>
         {canCreate && (
           <Link

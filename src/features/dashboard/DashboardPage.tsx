@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { useAuth } from '@/hooks/useAuth'
+import { PageDescription } from '@/components/ui/PageDescription'
 
 export function DashboardPage() {
   const { user } = useAuth()
@@ -8,9 +9,9 @@ export function DashboardPage() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Bem-vindo{user ? `, ${user.username}` : ''}</h1>
-        <p className="text-slate-500 mt-1 max-w-3xl">
+        <PageDescription className="max-w-3xl">
           Sistema de gestão da Biblioteca Ginásio — catálogo, exemplares, empréstimos e reservas. Interface responsiva e acessível (WCAG 2.2 AA, HTML semântico, navegação por teclado).
-        </p>
+        </PageDescription>
       </header>
 
       {/* Atalhos — ul/li para navegação por lista (tecla L no NVDA/JAWS, rotor no VO) não pular para footer */}

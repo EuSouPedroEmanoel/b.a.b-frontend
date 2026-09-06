@@ -9,6 +9,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { PageDescription } from '@/components/ui/PageDescription'
 
 type Student = {
   id: number
@@ -181,9 +182,9 @@ export function StudentsPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">Alunos</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <PageDescription>
             Cadastro de estudantes — identificados por CPF e turma (número e letra).
-          </p>
+          </PageDescription>
         </div>
         <Button onClick={() => { setCreateError(''); setShowCreate(true) }}>
           <Plus className="h-4 w-4 mr-2" aria-hidden="true" /> Cadastrar aluno

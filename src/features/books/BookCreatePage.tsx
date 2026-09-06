@@ -10,6 +10,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { PageDescription } from '@/components/ui/PageDescription'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
 
 type Book = { id: number; title: string; description: string | null; state: string; isbn: string | null; is_active: boolean; added_by: number }
@@ -258,7 +259,7 @@ export function BookCreatePage() {
           <ArrowLeft className="h-4 w-4 mr-1" aria-hidden="true" /> Voltar ao acervo
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold">Cadastrar livro</h1>
-        <p className="text-sm text-slate-500 mt-1">Passe o leitor no código de barras — cadastro só será efetivado ao confirmar.</p>
+        <PageDescription>Passe o leitor no código de barras — cadastro só será efetivado ao confirmar.</PageDescription>
       </header>
 
       {step === 'scan' && (

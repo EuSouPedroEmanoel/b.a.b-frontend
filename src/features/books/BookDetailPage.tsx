@@ -37,9 +37,9 @@ type Book = {
   derived_state: string
 }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
-type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number }
+type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code?: string; book_id?: number; book_title?: string }
 type User = { id: number; username: string; email: string; role: string; school_id: number | null; is_active: boolean }
-type Reservation = { id: number; book_id: number; status: string }
+type Reservation = { id: number; book_id: number; status: string; created_at?: string; ready_at?: string | null; internal_code?: string | null; copy_id?: number | null; queue_position?: number; queue_total?: number }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 
 const MANAGE_ROLES = ['librarian', 'school_admin', 'super_admin']
@@ -228,11 +228,12 @@ export function BookDetailPage() {
   const { data: activeLoans, isLoading: loansLoading } = useQuery({
     queryKey: ['book-loans', id],
     queryFn: async () => {
-      const { data } = await api.get<Paginated<Loan>>('/loans/?status=active&size=100')
+      const endpoint = canManage ? '/loans/?status=active&size=100' : '/loans/me?size=100'
+      const { data } = await api.get<Paginated<Loan>>(endpoint)
       const filtered = data.items.filter((l) => activeCopyIds.has(l.copy_id))
       return filtered
     },
-    enabled: Number.isFinite(id) && copiesPage !== undefined,
+    enabled: Number.isFinite(id) && copiesPage !== undefined && (canManage || canReserve),
   })
 
   const { data: usersPage } = useQuery({
@@ -767,26 +768,39 @@ export function BookDetailPage() {
         <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
         <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
           <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`} aria-live="polite">
-            <Undo2 className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> Devoluções — empréstimos ativos deste livro
+            <Undo2 className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> {canManage ? 'Devoluções — empréstimos ativos deste livro' : 'Histórico do livro'}
           </h2>
         </CardHeader>
         <CardBody className="relative">
-          {loansLoading && <p aria-live="polite" className={isDark ? 'text-white/80' : 'text-slate-500'}>Carregando empréstimos...</p>}
-          {!loansLoading && activeLoans && activeLoans.length === 0 && (
-            <p className={`text-sm py-4 text-center ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Nenhum empréstimo ativo para este livro.</p>
+          {(loansLoading || (canReserve && reservationsLoading)) && <p aria-live="polite" className={isDark ? 'text-white/80' : 'text-slate-500'}>Carregando histórico...</p>}
+          {!loansLoading && !reservationsLoading && activeLoans && activeLoans.length === 0 && !currentReservation && (
+            <p className={`text-sm py-4 text-center ${isDark ? 'text-white/70' : 'text-slate-500'}`}>{canManage ? 'Nenhum empréstimo ativo para este livro.' : 'Você ainda não possui empréstimos, devoluções ou reservas deste livro.'}</p>
           )}
-          {activeLoans && activeLoans.length > 0 && (
+          {((activeLoans && activeLoans.length > 0) || currentReservation) && (
             <ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
-              {activeLoans.map((l) => (
-                <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              {currentReservation && (
+                <li className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="text-sm">
                     <p className={isDark ? 'text-white/90' : 'text-slate-800'}>
-                      <span className="font-mono">#{l.id}</span> · Exemplar{' '}
-                      <span className="font-mono">{copyCode(l.copy_id)}</span> · {userLabel(l.user_id)}
+                      <Badge tone={currentReservation.status === 'ready' ? 'success' : 'info'}>
+                        {currentReservation.status === 'ready' ? 'Reserva pronta' : 'Reserva ativa'}
+                      </Badge>{' '}Reserva deste livro
                     </p>
                     <p className={`text-xs mt-0.5 ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
-                      Emprestado em {new Date(l.borrowed_at).toLocaleDateString('pt-BR')} · Devolução em{' '}
-                      {new Date(l.due_date).toLocaleDateString('pt-BR')}
+                      {currentReservation.queue_position != null && currentReservation.queue_total != null
+                        ? `${currentReservation.queue_position}º de ${currentReservation.queue_total} na fila`
+                        : currentReservation.status === 'ready' ? 'Pronta para retirada' : 'Aguardando exemplar'}
+                      {currentReservation.internal_code ? ` · Exemplar ${currentReservation.internal_code}` : ''}
+                    </p>
+                  </div>
+                </li>
+              )}
+              {(activeLoans ?? []).map((l) => (
+                <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div className="text-sm">
+                    <p className={isDark ? 'text-white/90' : 'text-slate-800'}>{canManage ? <><span className="font-mono">#{l.id}</span> · Exemplar{' '}<span className="font-mono">{copyCode(l.copy_id)}</span> · {userLabel(l.user_id)}</> : <><Badge tone={l.status === 'returned' ? 'neutral' : 'warning'}>{l.status === 'returned' ? 'Devolvido' : 'Em andamento'}</Badge>{' '}Exemplar <span className="font-mono">{l.internal_code ?? copyCode(l.copy_id)}</span></>}</p>
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
+                      Emprestado em {new Date(l.borrowed_at).toLocaleDateString('pt-BR')} · {l.status === 'returned' && l.returned_at ? `Devolvido em ${new Date(l.returned_at).toLocaleDateString('pt-BR')}` : `Devolução prevista em ${new Date(l.due_date).toLocaleDateString('pt-BR')}`}
                     </p>
                   </div>
                   {canManage && (

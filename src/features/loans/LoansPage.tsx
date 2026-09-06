@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
 import { Select } from '@/components/ui/Select'
 import { CoverImage } from '@/components/ui/CoverImage'
+import { PageDescription } from '@/components/ui/PageDescription'
 import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { useAuth } from '@/hooks/useAuth'
@@ -94,7 +95,97 @@ function getLoanCreationError(error: unknown) {
   }
 }
 
+const PERSONAL_LOAN_ROLES = ['student', 'teacher']
+
+const personalLoanStatusLabel = (status: string) => ({
+  active: 'Em andamento',
+  overdue: 'Atrasado',
+  returned: 'Devolvido',
+}[status] ?? 'Em andamento')
+
+function PersonalLoansView() {
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['loans', 'me', page, pageSize],
+    queryFn: async () => (await api.get<Paginated<Loan>>('/loans/me', {
+      params: { page, size: pageSize },
+    })).data,
+  })
+
+  if (isLoading) {
+    return <p role="status" className="text-sm text-slate-600 dark:text-slate-300">Carregando seus empréstimos…</p>
+  }
+
+  if (isError || !data) {
+    return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">Não foi possível carregar seus empréstimos. Atualize a página para tentar novamente.</div>
+  }
+
+  const activeLoans = data.items.filter((loan) => loan.status !== 'returned')
+  const historyLoans = data.items.filter((loan) => loan.status === 'returned')
+
+  return <div className="flex flex-col gap-6">
+    <header>
+      <h1 className="text-2xl font-bold sm:text-3xl">Meus empréstimos</h1>
+      <PageDescription>Acompanhe seus empréstimos atuais e o histórico de devoluções.</PageDescription>
+    </header>
+    {data.total === 0 ? <Card><CardBody><p className="text-sm text-slate-600 dark:text-slate-300">Você ainda não possui empréstimos.</p></CardBody></Card> : <>
+      <PersonalLoanSection title="Empréstimos atuais" empty="Você não possui empréstimos em andamento." loans={activeLoans} />
+      <PersonalLoanSection title="Histórico" empty="Seu histórico de empréstimos está vazio." loans={historyLoans} />
+      <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
+    </>}
+  </div>
+}
+
+function PersonalLoanSection({ title, empty, loans }: { title: string; empty: string; loans: Loan[] }) {
+  return <section aria-labelledby={`personal-${title === 'Histórico' ? 'history' : 'active'}-loans-heading`} className="flex flex-col gap-3">
+    <div>
+      <h2 id={`personal-${title === 'Histórico' ? 'history' : 'active'}-loans-heading`} className="text-xl font-semibold">{title}</h2>
+    </div>
+    {loans.length === 0 ? <Card><CardBody><p className="text-sm text-slate-600 dark:text-slate-300">{empty}</p></CardBody></Card> : <ul className="grid gap-3" role="list">{loans.map((loan) => <PersonalLoanCard key={loan.id} loan={loan} />)}</ul>}
+  </section>
+}
+
+function PersonalLoanCard({ loan }: { loan: Loan }) {
+  const displayStatus = loanDisplayStatus(loan)
+  const lateDays = loanDisplayLateDays(loan)
+  const returned = loan.status === 'returned'
+  const dateLabel = returned ? 'Devolvido em' : 'Vencimento'
+  const dateValue = returned && loan.returned_at ? formatDate(loan.returned_at) : formatDate(loan.due_date)
+
+  return <li>
+    <Card className="h-full">
+      <CardBody>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <CoverImage src={loan.book_cover_url} title={loan.book_title} alt="" width={80} height={120} className="h-28 w-[4.75rem] shrink-0 rounded-md border border-slate-200 dark:border-slate-600 sm:h-32 sm:w-[5.25rem]" sizes="84px" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h3 className="text-lg font-semibold">{loan.book_title}</h3>
+              <Badge tone={displayStatus === 'overdue' ? 'danger' : returned ? 'neutral' : 'warning'}>{personalLoanStatusLabel(displayStatus)}</Badge>
+            </div>
+            <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+              <div><dt className="text-slate-600 dark:text-slate-400">Exemplar</dt><dd className="font-mono font-medium">{loan.internal_code}</dd></div>
+              <div><dt className="text-slate-600 dark:text-slate-400">Retirada</dt><dd>{formatDate(loan.borrowed_at)}</dd></div>
+              <div><dt className="text-slate-600 dark:text-slate-400">{dateLabel}</dt><dd>{dateValue}</dd></div>
+              {!returned && lateDays > 0 && <div><dt className="text-slate-600 dark:text-slate-400">Atraso</dt><dd className="font-medium text-red-700 dark:text-red-300">{lateDays} {lateDays === 1 ? 'dia' : 'dias'}</dd></div>}
+              {returned && loan.late_days > 0 && <div><dt className="text-slate-600 dark:text-slate-400">Atraso registrado</dt><dd>{loan.late_days} {loan.late_days === 1 ? 'dia' : 'dias'}</dd></div>}
+            </dl>
+            <Link to={`/acervo/${loan.book_id}`} className="mt-4 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white">Ver livro</Link>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  </li>
+}
+
 export function LoansPage() {
+  const { user, loading } = useAuth()
+  if (loading) return <p role="status" className="text-sm text-slate-600 dark:text-slate-300">Carregando empréstimos…</p>
+  if (user && PERSONAL_LOAN_ROLES.includes(user.role)) return <PersonalLoansView />
+  return <OperationalLoansPage />
+}
+
+function OperationalLoansPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => {
     const saved = localStorage.getItem('emprestimos:pageSize')
@@ -553,7 +644,7 @@ export function LoansPage() {
   const handleReturn = (request: ReturnRequest) => returnMut.mutate(request)
 
   return <div className="flex flex-col gap-6">
-    <header><h1 className="text-2xl sm:text-3xl font-bold">Empréstimos</h1><p className="text-sm text-slate-500 mt-1">Empreste e devolva livros com atendimento rápido no balcão.</p></header>
+    <header><h1 className="text-2xl sm:text-3xl font-bold">Empréstimos</h1><PageDescription>Empreste e devolva livros com atendimento rápido no balcão.</PageDescription></header>
     {loanSuccessMessage && <div aria-hidden="true" className="fixed right-4 top-4 z-50 max-w-md rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-950 shadow-lg dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">{loanSuccessMessage}</div>}
 
     <Card><CardHeader>

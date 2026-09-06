@@ -6,6 +6,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Pagination } from '@/components/ui/Pagination'
+import { PageDescription } from '@/components/ui/PageDescription'
 
 type School = { id: number; name: string; code: string; is_active: boolean }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
@@ -46,7 +47,7 @@ export function SchoolsPage() {
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl sm:text-3xl font-bold">Escolas</h1>
-        <p className="text-sm text-slate-500 mt-1">Gestão multi-tenant — apenas SUPER_ADMIN. Código único por escola.</p>
+        <PageDescription>Gestão multi-tenant — apenas SUPER_ADMIN. Código único por escola.</PageDescription>
       </header>
 
       <Card>
