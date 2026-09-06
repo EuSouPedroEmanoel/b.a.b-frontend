@@ -14,7 +14,7 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button({ var
     lg: 'px-6 py-3 text-base',
   }
   const variants = {
-    primary: 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]',
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700',
     secondary: 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white',
     ghost: 'bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300',
     danger: 'bg-red-700 text-white hover:bg-red-800',

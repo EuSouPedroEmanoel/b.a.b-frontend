@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Carousel } from '@/components/ui/Carousel'
 import { GridCard } from '@/features/books/GridCard'
+import { ReservationConfirmDialog } from '@/features/books/ReservationConfirmDialog'
 
 type Book = {
   id: number
@@ -38,9 +39,11 @@ type Book = {
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
 type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number }
 type User = { id: number; username: string; email: string; role: string; school_id: number | null; is_active: boolean }
+type Reservation = { id: number; book_id: number; status: string }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 
 const MANAGE_ROLES = ['librarian', 'school_admin', 'super_admin']
+const RESERVATION_ROLES = ['student', 'teacher']
 
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()
@@ -51,6 +54,7 @@ export function BookDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const canManage = !!user && MANAGE_ROLES.includes(user.role)
+  const canReserve = !!user && RESERVATION_ROLES.includes(user.role)
 
   const handleBack = useCallback(() => {
     const fromState = (location.state as { from?: string } | null)?.from
@@ -76,6 +80,16 @@ export function BookDetailPage() {
   const loanTriggerRef = useRef<HTMLButtonElement>(null)
   const loanCancelRef = useRef<HTMLButtonElement>(null)
   const [loansError, setLoansError] = useState<string | null>(null)
+  const [reservationDialogOpen, setReservationDialogOpen] = useState(false)
+  const [reservationErrorMessage, setReservationErrorMessage] = useState<string | null>(null)
+  const [reservationFeedback, setReservationFeedback] = useState<{ type: 'success' | 'info'; message: string } | null>(null)
+  const reservationButtonRef = useRef<HTMLButtonElement>(null)
+  const reservationCancelRef = useRef<HTMLButtonElement>(null)
+  const reservationConfirmRef = useRef<HTMLButtonElement>(null)
+  const reservationLinkRef = useRef<HTMLAnchorElement>(null)
+  const availabilityNoticeRef = useRef<HTMLParagraphElement>(null)
+  const shouldFocusReservationLinkRef = useRef(false)
+  const shouldFocusAvailabilityRef = useRef(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(0) // 0:1.0, 1:1.5, 2:2.5
   const [origin, setOrigin] = useState({ x: '50%', y: '50%' })
@@ -193,6 +207,19 @@ export function BookDetailPage() {
     enabled: Number.isFinite(id),
   })
 
+  const reservationQueryKey = ['reservations', 'me', 'book', id] as const
+  const {
+    data: reservationsPage,
+    isLoading: reservationsLoading,
+  } = useQuery({
+    queryKey: reservationQueryKey,
+    queryFn: async () => {
+      const { data } = await api.get<Paginated<Reservation>>(`/reservations/me?book_id=${id}&size=100`)
+      return data
+    },
+    enabled: Number.isFinite(id) && canReserve,
+  })
+
   const activeCopyIds = useMemo(
     () => new Set((copiesPage?.items ?? []).map((c) => c.id)),
     [copiesPage],
@@ -236,6 +263,84 @@ export function BookDetailPage() {
   const copies = copiesPage?.items ?? []
   const available = availableCopies.length
   const borrowed = copies.filter((c) => c.state === 'borrowed').length
+  const currentReservation = useMemo(
+    () => reservationsPage?.items.find((reservation) => (
+      reservation.status === 'active' || reservation.status === 'ready'
+    )),
+    [reservationsPage],
+  )
+
+  const closeReservationConfirmation = useCallback(() => {
+    setReservationDialogOpen(false)
+    setReservationErrorMessage(null)
+    window.requestAnimationFrame(() => reservationButtonRef.current?.focus())
+  }, [])
+
+  useEffect(() => {
+    if (!shouldFocusReservationLinkRef.current || !currentReservation) return
+    window.requestAnimationFrame(() => reservationLinkRef.current?.focus())
+    shouldFocusReservationLinkRef.current = false
+  }, [currentReservation])
+
+  useEffect(() => {
+    if (!shouldFocusAvailabilityRef.current || available === 0) return
+    window.requestAnimationFrame(() => availabilityNoticeRef.current?.focus())
+    shouldFocusAvailabilityRef.current = false
+  }, [available])
+
+  const createReservation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/reservations/', { book_id: id })
+      return data
+    },
+    onSuccess: async () => {
+      const message = 'Reserva criada. Você entrou na fila de espera deste livro.'
+      setReservationDialogOpen(false)
+      setReservationErrorMessage(null)
+      setReservationFeedback({ type: 'success', message })
+      shouldFocusReservationLinkRef.current = true
+      await announce(message, 'polite')
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['reservations'] }),
+        qc.invalidateQueries({ queryKey: ['copies', id] }),
+        qc.invalidateQueries({ queryKey: ['book', id] }),
+        qc.refetchQueries({ queryKey: reservationQueryKey }),
+      ])
+    },
+    onError: async (e: unknown) => {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      if (detail === 'There are available copies; reservation not needed') {
+        const message = 'O livro agora está disponível para empréstimo.'
+        setReservationDialogOpen(false)
+        setReservationErrorMessage(null)
+        setReservationFeedback({ type: 'info', message })
+        shouldFocusAvailabilityRef.current = true
+        await announce(message, 'assertive')
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ['copies', id] }),
+          qc.invalidateQueries({ queryKey: ['book', id] }),
+          qc.refetchQueries({ queryKey: ['copies', id] }),
+          qc.refetchQueries({ queryKey: reservationQueryKey }),
+        ])
+        return
+      }
+
+      const message = detail === 'Active reservation already exists'
+        ? 'Você já possui uma reserva ativa para este livro.'
+        : 'Não foi possível criar a reserva. Tente novamente.'
+      setReservationErrorMessage(message)
+      await announce(message, 'assertive')
+
+      if (detail === 'Active reservation already exists') {
+        setReservationDialogOpen(false)
+        shouldFocusReservationLinkRef.current = true
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ['reservations'] }),
+          qc.refetchQueries({ queryKey: reservationQueryKey }),
+        ])
+      }
+    },
+  })
 
   const copyCode = useMemo(() => {
     const map = new Map((copiesPage?.items ?? []).map((c) => [c.id, c.code]))
@@ -437,20 +542,61 @@ export function BookDetailPage() {
           >
             <Plus className="h-4 w-4" aria-hidden="true" /> Cadastrar exemplar
           </Link>
-          <button
+          <Button
+            variant="primary"
             type="button"
             ref={loanTriggerRef}
             aria-label={`Emprestar livro ${book.title}`}
-            className="inline-flex items-center justify-center font-medium rounded-md transition-colors min-h-[44px] min-w-[44px] px-4 py-2 text-sm !bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
             onClick={() => {
               setLoanConfirmOpen(true)
             }}
           >
             <Hand className="h-4 w-4 mr-2" aria-hidden="true" /> Emprestar
-          </button>
+          </Button>
         </div>
       )}
+      {canReserve && !reservationsLoading && reservationsPage !== undefined && (
+        currentReservation ? (
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+            <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              {currentReservation.status === 'ready'
+                ? 'Sua reserva está pronta para retirada.'
+                : 'Sua reserva está na fila de espera.'}
+            </p>
+            <Link
+              ref={reservationLinkRef}
+              to="/reservas"
+              className="inline-flex items-center justify-center font-medium rounded-md transition-colors min-h-[44px] px-4 py-2 text-sm !bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+            >
+              Ver minha reserva
+            </Link>
+          </div>
+        ) : copiesPage !== undefined && available === 0 ? (
+          <Button
+            variant="primary"
+            ref={reservationButtonRef}
+            type="button"
+            aria-label={`Reservar livro ${book.title}`}
+            className="ml-auto"
+            onClick={() => {
+              setReservationFeedback(null)
+              setReservationErrorMessage(null)
+              setReservationDialogOpen(true)
+            }}
+          >
+            <Hand className="h-4 w-4 mr-2" aria-hidden="true" /> Reservar
+          </Button>
+        ) : null
+      )}
         </div>
+
+      {reservationFeedback && (
+        <p className={`rounded-md border px-3 py-2 text-sm ${reservationFeedback.type === 'success'
+          ? (isDark ? 'border-emerald-300/40 bg-emerald-400/10 text-emerald-100' : 'border-emerald-200 bg-emerald-50 text-emerald-800')
+          : (isDark ? 'border-sky-300/40 bg-sky-400/10 text-sky-100' : 'border-sky-200 bg-sky-50 text-sky-800')}`}>
+          {reservationFeedback.message}
+        </p>
+      )}
 
       <div className="grid gap-6 md:grid-cols-[220px_1fr] max-w-full overflow-visible py-6 px-2 -mx-2">
         {book.cover_url ? (
@@ -566,6 +712,11 @@ export function BookDetailPage() {
               <h2 className={`font-semibold ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>Exemplares</h2>
             </CardHeader>
             <CardBody className="relative">
+              {available > 0 && (
+                <p ref={availabilityNoticeRef} tabIndex={-1} className={`mb-4 rounded-md border px-3 py-2 text-sm font-medium outline-none focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 ${isDark ? 'border-emerald-300/40 bg-emerald-400/10 text-emerald-100' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                  Este livro está disponível para empréstimo.
+                </p>
+              )}
               {copies.length === 0 ? (
                 <p className={`text-sm ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Nenhum exemplar cadastrado para este livro nesta escola.</p>
               ) : (
@@ -714,7 +865,6 @@ export function BookDetailPage() {
                 </button>
                 <Button
                   type="button"
-                  className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700"
                   aria-label={`Continuar empréstimo do livro ${book.title}`}
                   onClick={() => navigate(`/emprestimos?book_id=${book.id}`)}
                 >
@@ -725,6 +875,21 @@ export function BookDetailPage() {
           </div>
         </div>
       )}
+
+      <ReservationConfirmDialog
+        open={reservationDialogOpen}
+        bookTitle={book.title}
+        pending={createReservation.isPending}
+        errorMessage={reservationErrorMessage}
+        onClose={closeReservationConfirmation}
+        onConfirm={() => {
+          if (createReservation.isPending) return
+          setReservationErrorMessage(null)
+          createReservation.mutate()
+        }}
+        cancelRef={reservationCancelRef}
+        confirmRef={reservationConfirmRef}
+      />
 
       <AnimatePresence>
         {lightboxOpen && (

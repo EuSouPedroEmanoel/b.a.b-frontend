@@ -484,7 +484,7 @@ export function BooksPage() {
                     aria-activedescendant={activeIndex >= 0 ? `${suggestListId}-${activeIndex}` : undefined}
                     hint="Busque por título, gênero, autor ou disponibilidade — autocomplete disponível"
                     rightElement={
-                      <Button type="submit" size="sm" className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700 px-3 py-1.5 min-h-0 h-8 transition-colors">
+                      <Button type="submit" size="sm" className="px-3 py-1.5 min-h-0 h-8 transition-colors">
                         Buscar
                       </Button>
                     }
@@ -549,7 +549,7 @@ export function BooksPage() {
                   aria-expanded={filterMenuOpen}
                   aria-controls="filter-menu"
                   aria-label="Filtros"
-                  className={`w-full sm:w-auto gap-2 transition-colors ${hasActiveFilters ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
+                  className={`w-full sm:w-auto gap-2 transition-colors ${hasActiveFilters ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
                 >
                   <Funnel className="h-4 w-4" aria-hidden="true" />
                   Filtros
@@ -626,7 +626,7 @@ export function BooksPage() {
                       >
                         Limpar filtros
                       </Button>
-                      <Button type="button" onClick={() => setFilterMenuOpen(false)} className="!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700">
+                      <Button type="button" onClick={() => setFilterMenuOpen(false)}>
                         Aplicar
                       </Button>
                     </div>
@@ -721,7 +721,7 @@ export function BooksPage() {
             aria-pressed={viewMode === 'table'}
             onClick={() => setViewMode('table')}
             aria-label="Visualização em tabela"
-            className={`gap-1.5 ${viewMode === 'table' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
+            className={`gap-1.5 ${viewMode === 'table' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
           >
             <Table className="h-4 w-4" aria-hidden="true" /> Tabela
           </Button>
@@ -731,7 +731,7 @@ export function BooksPage() {
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
             aria-label="Visualização em grade"
-            className={`gap-1.5 ${viewMode === 'grid' ? '!bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
+            className={`gap-1.5 ${viewMode === 'grid' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
           >
             <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Grade
           </Button>
