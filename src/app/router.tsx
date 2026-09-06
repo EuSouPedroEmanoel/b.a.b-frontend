@@ -13,14 +13,14 @@ import { SchoolsPage } from '@/features/schools/SchoolsPage'
 import { StudentsPage } from '@/features/students/StudentsPage'
 import { UsersPage } from '@/features/users/UsersPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
-import { Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
+import { AccountOnly, Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
 
 export const router = createBrowserRouter([
   {
     element: <Layout />,
     errorElement: <RouteErrorFallback />,
     children: [
-      { path: '/', element: <DashboardPage /> },
+      { path: '/', element: <AccountOnly><DashboardPage /></AccountOnly> },
       {
         path: '/entrar',
         element: (
@@ -28,6 +28,10 @@ export const router = createBrowserRouter([
             <LoginPage />
           </PublicOnly>
         ),
+      },
+      {
+        path: '/visitar/:schoolCode',
+        element: <LoginPage />,
       },
       // Português — rotas principais
       {
@@ -41,9 +45,9 @@ export const router = createBrowserRouter([
       {
         path: '/acervo/novo',
         element: (
-          <Protected>
+          <AccountOnly>
             <BookCreatePage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       {
@@ -57,9 +61,9 @@ export const router = createBrowserRouter([
       {
         path: '/acervo/:bookId/exemplares/novo',
         element: (
-          <Protected>
+          <AccountOnly>
             <BookCopyCreatePage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       {
@@ -69,49 +73,49 @@ export const router = createBrowserRouter([
       {
         path: '/exemplares',
         element: (
-          <Protected>
+          <AccountOnly>
             <CopiesPage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       {
         path: '/emprestimos',
         element: (
-          <Protected>
+          <AccountOnly>
             <LoansPage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       {
         path: '/reservas',
         element: (
-          <Protected>
+          <AccountOnly>
             <ReservationsPage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       {
         path: '/escolas',
         element: (
-          <Protected>
+          <AccountOnly>
             <SchoolsPage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       {
         path: '/alunos',
         element: (
-          <Protected>
+          <AccountOnly>
             <StudentsPage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       {
         path: '/usuarios',
         element: (
-          <Protected>
+          <AccountOnly>
             <UsersPage />
-          </Protected>
+          </AccountOnly>
         ),
       },
       // Redirects compatibilidade inglês → português

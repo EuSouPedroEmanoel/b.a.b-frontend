@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, Link, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { Eye, EyeOff } from 'lucide-react'
@@ -7,17 +7,41 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { getErrorMessage } from '@/lib/errors'
+import api from '@/lib/api'
 
 export function LoginPage() {
-  const { login } = useAuth()
+  const { login, loginGuest } = useAuth()
   const announce = useAnnouncer()
   const navigate = useNavigate()
+  const { schoolCode } = useParams<{ schoolCode: string }>()
+  const [mode, setMode] = useState<'account' | 'guest'>(schoolCode ? 'guest' : 'account')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [guestSchoolCode, setGuestSchoolCode] = useState('')
+  const [guestSchoolName, setGuestSchoolName] = useState('')
+  const [guestSchoolQuery, setGuestSchoolQuery] = useState('')
+  const [guestListOpen, setGuestListOpen] = useState(false)
+  const [guestActiveIndex, setGuestActiveIndex] = useState(-1)
+  const [guestLoading, setGuestLoading] = useState(false)
+  const [guestSchoolsLoading, setGuestSchoolsLoading] = useState(true)
+  const [guestError, setGuestError] = useState<string | null>(null)
+  const [guestSchools, setGuestSchools] = useState<{ code: string; name: string }[]>([])
+  const guestButtonRef = useRef<HTMLButtonElement>(null)
+  const guestInputRef = useRef<HTMLInputElement>(null)
+  const usernameRef = useRef<HTMLInputElement>(null)
+  const guestComboboxRef = useRef<HTMLDivElement>(null)
   const errorRef = useRef<HTMLDivElement>(null)
+
+  const switchMode = (nextMode: 'account' | 'guest') => {
+    setMode(nextMode)
+    window.requestAnimationFrame(() => {
+      if (nextMode === 'guest') guestInputRef.current?.focus()
+      else usernameRef.current?.focus()
+    })
+  }
 
   // Leitor em modo foco precisa receber foco no alerta (role=alert sozinho não basta).
   // Re-foca mesmo se erro repetir com mesmo texto (caso "só fala uma vez").
@@ -36,6 +60,101 @@ export function LoginPage() {
       setTimeout(() => el.focus(), 30)
     }
   }, [error])
+
+  useEffect(() => {
+    let active = true
+    setGuestSchoolsLoading(true)
+    void api.get<{ code: string; name: string }[]>('/auth/guest/schools')
+      .then(({ data }) => {
+        if (!active) return
+        setGuestSchools(data)
+        const linkedSchool = schoolCode ? data.find((school) => school.code === schoolCode) : undefined
+        if (linkedSchool) {
+          setGuestSchoolCode(linkedSchool.code)
+          setGuestSchoolName(linkedSchool.name)
+          setGuestSchoolQuery(linkedSchool.name)
+        }
+      })
+      .catch(() => {
+        if (active) setGuestError('Não foi possível carregar as escolas disponíveis.')
+      })
+      .finally(() => { if (active) setGuestSchoolsLoading(false) })
+    return () => { active = false }
+  }, [schoolCode])
+
+  useEffect(() => {
+    if (schoolCode) setMode('guest')
+  }, [schoolCode])
+
+  useEffect(() => {
+    if (mode === 'guest' && !guestSchoolsLoading) {
+      window.requestAnimationFrame(() => guestInputRef.current?.focus())
+    }
+  }, [mode, guestSchoolsLoading])
+
+  useEffect(() => {
+    if (!guestListOpen) return
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!guestComboboxRef.current?.contains(event.target as Node)) {
+        setGuestListOpen(false)
+        setGuestActiveIndex(-1)
+      }
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [guestListOpen])
+
+  const guestSuggestions = useMemo(() => {
+    const query = guestSchoolQuery.trim().toLocaleLowerCase('pt-BR')
+    if (query.length < 2) return []
+    return guestSchools
+      .filter((school) => `${school.name} ${school.code}`.toLocaleLowerCase('pt-BR').includes(query))
+      .slice(0, 8)
+  }, [guestSchoolQuery, guestSchools])
+
+  const selectGuestSchool = (school: { code: string; name: string }) => {
+    setGuestSchoolCode(school.code)
+    setGuestSchoolName(school.name)
+    setGuestSchoolQuery(school.name)
+    setGuestListOpen(false)
+    setGuestActiveIndex(-1)
+    announce(`Escola selecionada: ${school.name}`, 'polite')
+  }
+
+  const onGuestAccess = async () => {
+    if (!guestSchoolCode || guestLoading) return
+    setGuestError(null)
+    setGuestLoading(true)
+    try {
+      await loginGuest(guestSchoolCode, guestSchoolName)
+      announce('Acesso como visitante realizado. Acervo aberto.', 'polite')
+      navigate('/acervo')
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'Não foi possível iniciar o acesso como visitante.')
+      setGuestError(message)
+      announce(message, 'assertive')
+      window.requestAnimationFrame(() => guestButtonRef.current?.focus())
+    } finally {
+      setGuestLoading(false)
+    }
+  }
+
+  const onGuestSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    if (guestListOpen && guestSuggestions.length > 0) {
+      const suggestionIndex = guestActiveIndex >= 0 ? guestActiveIndex : 0
+      selectGuestSchool(guestSuggestions[suggestionIndex])
+      return
+    }
+    if (!guestSchoolCode) {
+      const message = 'Selecione uma escola para continuar.'
+      setGuestError(message)
+      announce(message, 'assertive')
+      guestInputRef.current?.focus()
+      return
+    }
+    void onGuestAccess()
+  }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,7 +207,28 @@ export function LoginPage() {
         Entre com seu usuário, e-mail ou CPF. Dica dev: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">superadmin / superadmin123</code>
       </p>
 
-      <Card>
+      <div role="tablist" aria-label="Tipo de acesso" className="mb-4 grid grid-cols-2 rounded-lg border border-slate-300 bg-slate-100 p-1 dark:border-slate-600 dark:bg-slate-800">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'account'}
+          onClick={() => switchMode('account')}
+          className={`min-h-[44px] rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] ${mode === 'account' ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}
+        >
+          Entrar com conta
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'guest'}
+          onClick={() => switchMode('guest')}
+          className={`min-h-[44px] rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] ${mode === 'guest' ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}
+        >
+          Acessar como visitante
+        </button>
+      </div>
+
+      {mode === 'account' ? <Card>
         <CardHeader>
           <h2 className="text-lg font-semibold">Acesso restrito</h2>
           <p className="text-sm text-slate-500">Todos os campos são obrigatórios.</p>
@@ -109,6 +249,7 @@ export function LoginPage() {
               </div>
             )}
             <Input
+              ref={usernameRef}
               label="Usuário, e-mail ou CPF"
               id="username"
               name="username"
@@ -167,6 +308,7 @@ export function LoginPage() {
             <Button
               type="submit"
               aria-busy={loading}
+              disabled={loading || !username.trim() || !password.trim()}
               onClick={(ev) => {
                 if (loading) ev.preventDefault()
               }}
@@ -189,7 +331,117 @@ export function LoginPage() {
             </p>
           </form>
         </CardBody>
-      </Card>
+      </Card> : <Card>
+      <section aria-labelledby="guest-heading">
+        <CardHeader>
+          <h2 id="guest-heading" className="text-lg font-semibold">Acessar como visitante</h2>
+          <p className="text-sm text-slate-500">Consulte o acervo público sem criar uma conta.</p>
+        </CardHeader>
+        <CardBody>
+        <form onSubmit={onGuestSubmit} noValidate className="flex flex-col gap-3" aria-describedby={guestError ? 'guest-error' : 'guest-status'}>
+            {guestError && (
+              <p id="guest-error" role="alert" tabIndex={-1} className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]">
+                {guestError}
+              </p>
+            )}
+            <div ref={guestComboboxRef} className="relative">
+              <label htmlFor="guest-school" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">Escola</label>
+              <input
+                ref={guestInputRef}
+                id="guest-school"
+                role="combobox"
+                type="text"
+                value={guestSchoolQuery}
+                placeholder="Digite o nome da escola"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                aria-expanded={guestListOpen}
+                aria-controls="guest-school-listbox"
+                aria-activedescendant={guestActiveIndex >= 0 ? `guest-school-option-${guestActiveIndex}` : undefined}
+                aria-describedby="guest-status"
+                disabled={guestSchoolsLoading}
+                onFocus={() => setGuestListOpen(true)}
+                onBlur={(event) => {
+                  // Tab (and other keyboard focus changes) should close the
+                  // popup, while allowing focus to remain inside the
+                  // combobox when an option is being activated by pointer.
+                  const next = event.relatedTarget as Node | null
+                  if (!next || !guestComboboxRef.current?.contains(next)) {
+                    window.setTimeout(() => {
+                      if (!guestComboboxRef.current?.contains(document.activeElement)) {
+                        setGuestListOpen(false)
+                        setGuestActiveIndex(-1)
+                      }
+                    }, 0)
+                  }
+                }}
+                onChange={(event) => {
+                  setGuestSchoolQuery(event.target.value)
+                  setGuestSchoolCode('')
+                  setGuestSchoolName('')
+                  setGuestActiveIndex(-1)
+                  setGuestListOpen(true)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    setGuestListOpen(true)
+                    setGuestActiveIndex((index) => Math.min(index + 1, guestSuggestions.length - 1))
+                  } else if (event.key === 'ArrowUp') {
+                    event.preventDefault()
+                    setGuestListOpen(true)
+                    setGuestActiveIndex((index) => Math.max(index - 1, 0))
+                  } else if (event.key === 'Enter' && guestListOpen && guestSuggestions.length > 0) {
+                    const suggestionIndex = guestActiveIndex >= 0 ? guestActiveIndex : 0
+                    event.preventDefault()
+                    selectGuestSchool(guestSuggestions[suggestionIndex])
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault()
+                    setGuestListOpen(false)
+                    setGuestActiveIndex(-1)
+                  } else if (event.key === 'Tab') {
+                    setGuestListOpen(false)
+                    setGuestActiveIndex(-1)
+                  }
+                }}
+                className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 text-base dark:border-slate-600 dark:bg-slate-800 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+              />
+              {guestListOpen && !guestSchoolsLoading && guestSchoolQuery.trim().length >= 2 && (
+                <ul id="guest-school-listbox" role="listbox" aria-label="Escolas disponíveis" className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-300 bg-white p-1 shadow-lg dark:border-slate-600 dark:bg-slate-800">
+                  {guestSuggestions.length > 0 ? guestSuggestions.map((school, index) => (
+                    <li
+                      id={`guest-school-option-${index}`}
+                      key={school.code}
+                      role="option"
+                      aria-selected={guestSchoolCode === school.code}
+                      className={`cursor-pointer rounded px-3 py-2 text-sm ${guestSchoolCode === school.code ? 'bg-[var(--color-primary)] text-[var(--color-primary-contrast)] hover:bg-[var(--color-primary-hover)]' : index === guestActiveIndex ? 'bg-sky-100 dark:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                      onMouseDown={(event) => { event.preventDefault(); selectGuestSchool(school) }}
+                    >
+                      <span className="font-medium">{school.name}</span>
+                      <span className="ml-2 text-xs text-slate-500">{school.code}</span>
+                    </li>
+                  )) : <li role="option" aria-disabled="true" className="px-3 py-2 text-sm text-slate-500">Nenhuma escola encontrada.</li>}
+                </ul>
+              )}
+            </div>
+            <p id="guest-status" role="status" aria-live="polite" className="text-xs text-slate-500">
+              {guestSchoolsLoading ? 'Carregando escolas…' : guestListOpen && guestSchoolQuery.trim().length < 2 ? 'Digite pelo menos 2 caracteres para buscar.' : guestListOpen ? guestSuggestions.length === 0 ? 'Nenhuma escola encontrada.' : `${guestSuggestions.length} ${guestSuggestions.length === 1 ? 'escola encontrada' : 'escolas encontradas'}. Use as setas para navegar.` : guestSchoolCode ? `Escola selecionada: ${guestSchoolName}` : 'Digite pelo menos 2 caracteres para buscar uma escola.'}
+            </p>
+            <Button
+              type="submit"
+              ref={guestButtonRef}
+              disabled={!guestSchoolCode || guestLoading}
+              aria-busy={guestLoading}
+              aria-label="Acessar o acervo como visitante"
+            >
+              {guestLoading ? 'Entrando como visitante…' : 'Acessar como visitante'}
+            </Button>
+            <p className="text-xs text-slate-500">O acesso é temporário e permite somente consultar o acervo.</p>
+        </form>
+        </CardBody>
+      </section>
+      </Card>}
     </div>
   )
 }

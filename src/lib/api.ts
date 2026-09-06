@@ -48,9 +48,12 @@ api.interceptors.response.use(
       original._retry = true
       isRefreshing = true
       const refresh = localStorage.getItem('refresh_token')
-      if (!refresh) {
+      const isGuest = localStorage.getItem('session_kind') === 'guest'
+      if (!refresh || isGuest) {
         isRefreshing = false
-        localStorage.clear()
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('session_kind')
         window.location.href = '/entrar'
         return Promise.reject(error)
       }

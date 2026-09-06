@@ -30,9 +30,15 @@ export function Header() {
     navigate('/entrar')
   }
 
+  const handleChangeSchool = async () => {
+    await logout()
+    navigate('/entrar')
+  }
+
   const isUsersManager =
     !!user && (user.role === 'super_admin' || user.role === 'school_admin')
   const isLibrarian = user?.role === 'librarian'
+  const isGuest = user?.role === 'guest'
 
   // Ações (Tema / Entrar / Sair) — mesmos tokens de estado que links, mas Sair mantém destaque outline/destrutivo suave
   const themeBtnCls =
@@ -58,17 +64,17 @@ export function Header() {
           </Link>
 
           {/* Desktop nav — links reais para navegação e leitura semântica. */}
-          <nav aria-label="Principal" className="hidden md:flex items-center">
+          {!isGuest && <nav aria-label="Principal" className="hidden md:flex items-center">
             <ul className="flex items-center gap-1 list-none m-0 p-0">
-              <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} className={navItemCls('/')}>Início</Link></li>
+              {!isGuest && <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} className={navItemCls('/')}>Início</Link></li>}
               <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
-              <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>
-              <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>
+              {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
+              {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
               {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
             </ul>
-          </nav>
+          </nav>}
 
           <div
             className="hidden md:flex items-center gap-2"
@@ -100,10 +106,18 @@ export function Header() {
             >
               {resolved === 'dark' ? <Sun className="h-5 w-5 transition-transform duration-300 rotate-0" aria-hidden="true" /> : <Moon className="h-5 w-5 transition-transform duration-300" aria-hidden="true" />}
             </button>
-            {isAuthenticated ? (
+            {isGuest ? (
+              <>
+                <span className="hidden lg:inline text-sm text-white/90 dark:text-slate-300" aria-live="polite">
+                  Visitante · {user?.school_name ?? user?.school_code ?? 'Escola selecionada'}
+                </span>
+                <button type="button" onClick={handleChangeSchool} className={secondaryActionCls}>Trocar escola</button>
+                <button type="button" onClick={handleLogout} className={logoutCls}>Sair</button>
+              </>
+            ) : isAuthenticated ? (
               <>
                 <span className="text-sm text-white/90 dark:text-slate-300 hidden lg:inline" aria-live="polite">
-                  {user?.username} <span className="text-xs bg-white/20 dark:bg-slate-700 px-2 py-0.5 rounded-full ml-1" aria-hidden="true">{user?.role}</span>
+                  {isGuest ? 'Visitante' : user?.username} <span className="text-xs bg-white/20 dark:bg-slate-700 px-2 py-0.5 rounded-full ml-1" aria-hidden="true">{isGuest ? 'acesso temporário' : user?.role}</span>
                 </span>
                 <button type="button" onClick={handleLogout} className={logoutCls}>
                   Sair
@@ -117,6 +131,7 @@ export function Header() {
           </div>
 
           <div className="md:hidden flex items-center gap-2" role="group" aria-label="Ações da conta">
+            {isGuest && <span className="max-w-[9rem] truncate text-xs text-white/90" aria-label={`Visitante na escola ${user?.school_name ?? user?.school_code ?? 'selecionada'}`}>Visitante · {user?.school_name ?? user?.school_code}</span>}
             <button
               type="button"
               onClick={handleToggle}
@@ -126,6 +141,7 @@ export function Header() {
             >
               {resolved === 'dark' ? <Sun className="h-5 w-5" aria-hidden="true" /> : <Moon className="h-5 w-5" aria-hidden="true" />}
             </button>
+            {!isGuest && <>
             <button
               type="button"
               aria-expanded={open}
@@ -136,23 +152,26 @@ export function Header() {
             >
               {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
             </button>
+            </>}
+            {isGuest && <button type="button" onClick={handleChangeSchool} className={`${secondaryActionCls} px-3`}>Trocar escola</button>}
+            {isGuest && <button type="button" onClick={handleLogout} className={`${logoutCls} px-3`}>Sair</button>}
           </div>
         </div>
 
-        {open && (
+        {open && !isGuest && (
           <nav id="mobile-nav" aria-label="Principal móvel" className="md:hidden pb-4 flex flex-col gap-1">
             <ul className="flex flex-col gap-1 list-none m-0 p-0">
-              <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/')}>Início</Link></li>
+              {!isGuest && <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/')}>Início</Link></li>}
               <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/acervo')}>Acervo</Link></li>
-              <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>
-              <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>
+              {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
+              {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>}
               {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/alunos')}>Alunos</Link></li>)}
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/escolas')}>Escolas</Link></li>)}
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">
               {isAuthenticated ? (
-                <button type="button" onClick={handleLogout} className={`w-full ${logoutCls} justify-center`}>Sair ({user?.username})</button>
+                <button type="button" onClick={handleLogout} className={`w-full ${logoutCls} justify-center`}>Sair ({isGuest ? 'Visitante' : user?.username})</button>
               ) : (
                 <Link to="/entrar" onClick={() => setOpen(false)} className={`w-full ${secondaryActionCls} justify-center`}>Entrar</Link>
               )}

@@ -1,4 +1,4 @@
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import type { ReactNode } from 'react'
 
@@ -9,10 +9,21 @@ export function Protected({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-export function PublicOnly({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useAuth()
+export function AccountOnly({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
   if (loading) return <p className="p-8 text-center" aria-live="polite">Carregando…</p>
-  if (isAuthenticated) return <Navigate to="/" replace />
+  if (!user) return <Navigate to="/entrar" replace />
+  if (user.role === 'guest') {
+    return <Navigate to="/acervo" replace state={{ accessDenied: true, from: location.pathname }} />
+  }
+  return <>{children}</>
+}
+
+export function PublicOnly({ children }: { children: ReactNode }) {
+  const { isAuthenticated, loading, user } = useAuth()
+  if (loading) return <p className="p-8 text-center" aria-live="polite">Carregando…</p>
+  if (isAuthenticated) return <Navigate to={user?.role === 'guest' ? '/acervo' : '/'} replace />
   return <>{children}</>
 }
 

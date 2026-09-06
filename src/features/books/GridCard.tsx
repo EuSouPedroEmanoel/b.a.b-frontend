@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
-import { bookStateLabel, bookStateTone } from '@/lib/bookStates'
+import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAverageColor } from '@/hooks/useAverageColor'
 import { OverflowTags } from '@/components/ui/OverflowTags'
+import { CoverImage } from '@/components/ui/CoverImage'
 import { generateCoverColor, getHoverGradientNoCover } from '@/lib/coverColor'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
-import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
+import { catalogRouteState, createCatalogOrigin, detailRouteState, getCatalogOrigin, saveCatalogSnapshot } from '@/lib/catalogNavigation'
 
 type Book = {
   id: number
@@ -31,36 +32,28 @@ function yearFromDate(dateStr: string | null): string | null {
   return String(d.getFullYear())
 }
 
-export function GridCard({ book, index = 0, disableHover = false, portalHover = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean }) {
-  return <GridCardContent key={book.cover_url ?? 'fallback'} book={book} index={index} disableHover={disableHover} portalHover={portalHover} />
+export function GridCard({ book, index = 0, disableHover = false, portalHover = false, isGuest = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean; isGuest?: boolean }) {
+  return <GridCardContent book={book} index={index} disableHover={disableHover} portalHover={portalHover} isGuest={isGuest} />
 }
 
-function GridCardContent({ book, index = 0, disableHover = false, portalHover = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean }) {
+function GridCardContent({ book, index = 0, disableHover = false, portalHover = false, isGuest = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean; isGuest?: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const catalogOrigin = getCatalogOrigin(location.state)
+    ?? (location.pathname === '/acervo' ? createCatalogOrigin(`${location.pathname}${location.search}`) : undefined)
   const savePosition = () => {
-    try {
-      sessionStorage.setItem('acervo:scrollY', String(window.scrollY))
-      sessionStorage.setItem('acervo:search', location.search)
-    } catch { /* ignore */ }
+    if (location.pathname === '/acervo' && catalogOrigin) saveCatalogSnapshot(catalogOrigin, window.scrollY)
   }
-  const [imgError, setImgError] = useState(false)
-  const [imgLoaded, setImgLoaded] = useState(false)
-  const [triedDirect, setTriedDirect] = useState(false)
-  const originalHasCover = !!book.cover_url
-  const hasCover = originalHasCover && !imgError
-  const isLoadingCover = hasCover && !imgLoaded
+  const openCatalogQuery = (url: string) => navigate(url, { state: catalogRouteState('new-catalog-navigation') })
+  const hasCover = !!book.cover_url
   const isPriority = index < 6
   const proxiedUrl = getCoverProxyUrl(book.cover_url, 400)
-  const displayUrl = triedDirect ? book.cover_url : proxiedUrl
   const { rgba, darkColor } = useAverageColor(proxiedUrl ?? null, !!proxiedUrl)
   const fallback = useMemo(() => generateCoverColor(book.title), [book.title])
   const hoverGradientNoCover = useMemo(() => getHoverGradientNoCover(book.title), [book.title])
   const bg = rgba ?? fallback.bg
   const darkBg = darkColor ?? fallback.darkBg
   const hoverBg = hasCover ? `linear-gradient(135deg, ${bg} 0%, ${darkBg} 100%)` : hoverGradientNoCover
-  const fallbackDataUrl = useMemo(() => generateFallbackCoverDataUrl(book.title, 320, 480), [book.title])
-  const fallbackSmallDataUrl = useMemo(() => generateFallbackCoverDataUrl(book.title, 64, 96), [book.title])
   const year = yearFromDate(book.published_date)
   const cardRef = useRef<HTMLDivElement>(null)
   const [portalHovered, setPortalHovered] = useState(false)
@@ -104,79 +97,42 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
       {/* Card base - tamanho fixo padrão no repouso: w-full + aspect-[2/3] garante mesma altura/largura */}
       <Link
         to={`/acervo/${book.id}`}
-        state={{ from: location.pathname + location.search }}
+        state={detailRouteState(catalogOrigin)}
         onClick={savePosition}
         aria-label={`${book.title} de ${book.authors[0]?.name ?? 'autor desconhecido'}`}
         className="flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-shadow duration-300 hover:shadow-lg focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
       >
         <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
-          {/* Fallback unificado – mesmo generateFallbackCoverDataUrl do details/CoverImage */}
-          {!hasCover && (
-            <img
-              src={fallbackDataUrl}
-              alt={`Capa de ${book.title}`}
-              width={320}
-              height={480}
-              loading={isPriority ? 'eager' : 'lazy'}
-              fetchPriority={isPriority ? 'high' : 'auto'}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          )}
-          {/* Imagem com fallback placeholder enquanto carrega – fade-in suave 200ms */}
-          {hasCover && proxiedUrl && (
-            <>
-              <img
-                src={fallbackDataUrl}
-                alt={`Capa de ${book.title}`}
-                width={320}
-                height={480}
-                aria-hidden={imgLoaded ? 'true' : undefined}
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out ${isLoadingCover ? 'opacity-100' : 'opacity-0'}`}
-              />
-              <img
-                src={displayUrl!}
-                alt={`Capa de ${book.title}`}
-                crossOrigin="anonymous"
-                decoding="async"
-                width={320}
-                height={480}
-                fetchPriority={isPriority ? 'high' : 'auto'}
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-                loading={isPriority ? 'eager' : 'lazy'}
-                onLoad={() => setImgLoaded(true)}
-                onError={() => {
-                  if (!triedDirect && book.cover_url && proxiedUrl !== book.cover_url) {
-                    setTriedDirect(true)
-                    setImgLoaded(false)
-                  } else {
-                    setImgError(true)
-                    setImgLoaded(false)
-                  }
-                }}
-              />
-            </>
-          )}
+          <CoverImage
+            src={book.cover_url}
+            title={book.title}
+            alt={`Capa de ${book.title}`}
+            width={320}
+            height={480}
+            priority={isPriority}
+            className="absolute inset-0 h-full w-full"
+          />
           <div className="absolute top-2 right-2 z-10">
             <Badge
-              tone={bookStateTone(book.derived_state)}
+              tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)}
               className="shadow text-[10px] px-2 py-0.5 backdrop-blur-sm cursor-pointer"
               role="button"
               tabIndex={0}
-              title={`Buscar por estado: ${bookStateLabel(book.derived_state)}`}
+              title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                navigate(`/acervo?state=${book.derived_state}`)
+                openCatalogQuery(`/acervo?state=${book.derived_state}`)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
                   e.stopPropagation()
-                  navigate(`/acervo?state=${book.derived_state}`)
+                  openCatalogQuery(`/acervo?state=${book.derived_state}`)
                 }
               }}
             >
-              {bookStateLabel(book.derived_state)}
+              {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
             </Badge>
           </div>
           {/* Rodapé da capa – igual para com imagem e fallback: Título + Autor sobre gradiente escuro */}
@@ -191,7 +147,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
       {!disableHover && !portalHover && (
         <Link
           to={`/acervo/${book.id}`}
-          state={{ from: location.pathname + location.search }}
+          state={detailRouteState(catalogOrigin)}
           onClick={savePosition}
           aria-hidden="true"
           tabIndex={-1}
@@ -213,48 +169,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
         {/* Conteúdo superior - capa no canto superior esquerdo (reduzida) */}
         <div className="relative flex shrink-0 gap-2 p-3">
           <div className="relative w-16 aspect-[2/3] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
-            {!hasCover ? (
-              <img
-                src={fallbackSmallDataUrl}
-                alt=""
-                width={64}
-                height={96}
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            ) : displayUrl ? (
-              <>
-                <img
-                  src={fallbackSmallDataUrl}
-                  alt=""
-                  width={64}
-                  height={96}
-                  aria-hidden={imgLoaded ? 'true' : undefined}
-                  className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out ${isLoadingCover ? 'opacity-100' : 'opacity-0'}`}
-                />
-                <img
-                  src={displayUrl!}
-                  alt=""
-                  crossOrigin="anonymous"
-                  decoding="async"
-                  width={160}
-                  height={240}
-                  fetchPriority={isPriority ? 'high' : 'auto'}
-                  className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-                  loading={isPriority ? 'eager' : 'lazy'}
-                  onLoad={() => setImgLoaded(true)}
-                  onError={() => {
-                    if (!triedDirect && book.cover_url && proxiedUrl !== book.cover_url) {
-                      setTriedDirect(true)
-                      setImgLoaded(false)
-                    } else {
-                      setImgError(true)
-                      setImgLoaded(false)
-                    }
-                  }}
-                />
-              </>
-            ) : null}
+            <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
             <div className="flex flex-col gap-1">
@@ -265,22 +180,22 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
               <span
                 role="button"
                 tabIndex={0}
-                title={`Buscar por estado: ${bookStateLabel(book.derived_state)}`}
+                title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}
                 className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white"
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  navigate(`/acervo?state=${book.derived_state}`)
+                  openCatalogQuery(`/acervo?state=${book.derived_state}`)
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     e.stopPropagation()
-                    navigate(`/acervo?state=${book.derived_state}`)
+                    openCatalogQuery(`/acervo?state=${book.derived_state}`)
                   }
                 }}
               >
-                {bookStateLabel(book.derived_state)}
+                {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
               </span>
             </div>
           </div>
@@ -297,7 +212,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 items={book.genres}
                 variant="dark"
                 onItemClick={(item) => {
-                  navigate(`/acervo?genre_id=${item.id}`)
+                  openCatalogQuery(`/acervo?genre_id=${item.id}`)
                 }}
               />
             ) : (
@@ -357,7 +272,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             >
               <Link
                 to={`/acervo/${book.id}`}
-                state={{ from: location.pathname + location.search }}
+                state={detailRouteState(catalogOrigin)}
                 onClick={savePosition}
                 aria-hidden="true"
                 tabIndex={-1}
@@ -371,14 +286,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60" style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.55))' }} aria-hidden="true" />
           <div className="relative flex shrink-0 gap-2 p-3">
             <div className="relative w-16 aspect-[2/3] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
-              {!hasCover ? (
-                <img src={fallbackSmallDataUrl} alt="" width={64} height={96} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-              ) : displayUrl ? (
-                <>
-                  <img src={fallbackSmallDataUrl} alt="" width={64} height={96} aria-hidden={imgLoaded ? 'true' : undefined} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out ${isLoadingCover ? 'opacity-100' : 'opacity-0'}`} />
-                  <img src={displayUrl!} alt="" crossOrigin="anonymous" decoding="async" width={160} height={240} fetchPriority={isPriority ? 'high' : 'auto'} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out ${imgLoaded ? 'opacity-100' : 'opacity-0'}`} loading={isPriority ? 'eager' : 'lazy'} onLoad={() => setImgLoaded(true)} onError={() => { if (!triedDirect && book.cover_url && proxiedUrl !== book.cover_url) { setTriedDirect(true); setImgLoaded(false) } else { setImgError(true); setImgLoaded(false) } }} />
-                </>
-              ) : null}
+              <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
               <div className="flex flex-col gap-1">
@@ -386,14 +294,14 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
               </div>
               <div className="flex flex-wrap gap-1">
-                <span role="button" tabIndex={0} title={`Buscar por estado: ${bookStateLabel(book.derived_state)}`} className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white">{bookStateLabel(book.derived_state)}</span>
+                <span role="button" tabIndex={0} title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`} className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white">{isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}</span>
               </div>
             </div>
           </div>
           <div className="relative shrink-0 overflow-hidden px-3.5 pb-3">
             <div className="mb-1 flex items-center gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Gêneros</span></div>
             <div className="flex flex-nowrap overflow-hidden">
-              {book.genres.length > 0 ? <OverflowTags items={book.genres} variant="dark" onItemClick={(item) => { navigate(`/acervo?genre_id=${item.id}`) }} /> : <span className="text-xs text-white/60">—</span>}
+              {book.genres.length > 0 ? <OverflowTags items={book.genres} variant="dark" onItemClick={(item) => { openCatalogQuery(`/acervo?genre_id=${item.id}`) }} /> : <span className="text-xs text-white/60">—</span>}
             </div>
           </div>
           {book.description ? (

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BookOpen, Plus, Hand, Undo2, X } from 'lucide-react'
 import api from '@/lib/api'
-import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
+import { bookConditionLabel, bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Carousel } from '@/components/ui/Carousel'
 import { GridCard } from '@/features/books/GridCard'
 import { ReservationConfirmDialog } from '@/features/books/ReservationConfirmDialog'
+import { catalogRouteState, getCatalogOrigin } from '@/lib/catalogNavigation'
 
 type Book = {
   id: number
@@ -35,6 +36,8 @@ type Book = {
   added_by: number
   edited_by: number | null
   derived_state: string
+  total_copies?: number
+  available_copies?: number
 }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
 type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code?: string; book_id?: number; book_title?: string }
@@ -55,26 +58,20 @@ export function BookDetailPage() {
   const location = useLocation()
   const canManage = !!user && MANAGE_ROLES.includes(user.role)
   const canReserve = !!user && RESERVATION_ROLES.includes(user.role)
+  const isGuest = user?.role === 'guest'
+  const catalogOrigin = getCatalogOrigin(location.state)
 
   const handleBack = useCallback(() => {
-    const fromState = (location.state as { from?: string } | null)?.from
-    if (fromState && typeof fromState === 'string' && fromState.startsWith('/acervo')) {
-      navigate(fromState)
+    if (catalogOrigin) {
+      navigate(catalogOrigin.url, { state: catalogRouteState('return-to-catalog') })
       return
     }
-    try {
-      const savedSearch = sessionStorage.getItem('acervo:search')
-      if (savedSearch) {
-        navigate(`/acervo${savedSearch}`)
-        return
-      }
-    } catch { /* ignore */ }
-    if (window.history.length > 1) {
-      navigate(-1)
-    } else {
-      navigate('/acervo')
-    }
-  }, [location.state, navigate])
+    navigate('/acervo', { state: catalogRouteState('new-catalog-navigation') })
+  }, [catalogOrigin, navigate])
+
+  const openCatalogQuery = useCallback((url: string) => {
+    navigate(url, { state: catalogRouteState('new-catalog-navigation') })
+  }, [navigate])
 
   const [loanConfirmOpen, setLoanConfirmOpen] = useState(false)
   const loanTriggerRef = useRef<HTMLButtonElement>(null)
@@ -204,7 +201,7 @@ export function BookDetailPage() {
       const { data } = await api.get<Paginated<Copy>>(`/copies/?size=100&book_id=${id}`)
       return data
     },
-    enabled: Number.isFinite(id),
+    enabled: Number.isFinite(id) && !isGuest,
   })
 
   const reservationQueryKey = ['reservations', 'me', 'book', id] as const
@@ -356,6 +353,15 @@ export function BookDetailPage() {
   // otimizado: proxy 40px + cache FastAverageColor + hash memoizado; sem placeholder neutro (transição suave)
   const proxiedForAvg = useMemo(() => getCoverProxyUrl(book?.cover_url ?? null, 40), [book?.cover_url])
   const { color: avgHex } = useAverageColor(proxiedForAvg ?? null, !!book?.cover_url)
+  const [coverThemeReady, setCoverThemeReady] = useState(false)
+
+  useEffect(() => {
+    setCoverThemeReady(false)
+    if (!avgHex) return undefined
+    const timer = window.setTimeout(() => setCoverThemeReady(true), 300)
+    return () => window.clearTimeout(timer)
+  }, [avgHex, book?.id])
+
   const baseHue = useMemo(() => {
     if (avgHex) {
       const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(avgHex)
@@ -372,14 +378,16 @@ export function BookDetailPage() {
         return 0
       }
     }
-    const key = book?.title ?? 'fallback'
-    let hash = 0
-    const s = (key ?? '').trim() || 'fallback'
-    for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash)
-    return Math.abs(hash) % 360
-  }, [avgHex, book?.title])
-  const cardBg = useMemo(() => (resolved === 'dark' ? `hsl(${baseHue}, 65%, 20%)` : `hsl(${baseHue}, 35%, 96%)`), [baseHue, resolved])
-  const pageBg = useMemo(() => (resolved === 'dark' ? `hsl(${baseHue}, 65%, 14%)` : `hsl(${baseHue}, 35%, 90%)`), [baseHue, resolved])
+    return 220
+  }, [avgHex])
+  const cardBg = useMemo(() => {
+    if (!coverThemeReady) return resolved === 'dark' ? '#1e293b' : '#ffffff'
+    return resolved === 'dark' ? `hsl(${baseHue}, 65%, 20%)` : `hsl(${baseHue}, 35%, 96%)`
+  }, [baseHue, coverThemeReady, resolved])
+  const pageBg = useMemo(() => {
+    if (!coverThemeReady) return resolved === 'dark' ? '#0f172a' : '#f1f5f9'
+    return resolved === 'dark' ? `hsl(${baseHue}, 65%, 14%)` : `hsl(${baseHue}, 35%, 90%)`
+  }, [baseHue, coverThemeReady, resolved])
 
   const isDark = resolved === 'dark'
 
@@ -482,15 +490,6 @@ export function BookDetailPage() {
     return (
       <div className="mx-auto max-w-4xl flex flex-col gap-6" aria-busy="true" aria-live="polite">
         <div className="h-8 w-48 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
-        <div className="h-56 rounded-xl border border-slate-200 dark:border-slate-700 animate-pulse bg-slate-50 dark:bg-slate-800" />
-      </div>
-    )
-  }
-
-  if (book?.cover_url && !avgHex) {
-    return (
-      <div className="mx-auto max-w-4xl flex flex-col gap-6" aria-busy="true" aria-live="polite">
-        <div className="h-12 w-40 rounded-lg bg-slate-100 dark:bg-slate-800 animate-pulse" />
         <div className="h-56 rounded-xl border border-slate-200 dark:border-slate-700 animate-pulse bg-slate-50 dark:bg-slate-800" />
       </div>
     )
@@ -661,8 +660,8 @@ export function BookDetailPage() {
               </h2>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <h1 className={`text-xl sm:text-2xl font-bold leading-tight ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-900'}`}>{book.title}</h1>
-                <Badge tone={bookStateTone(book.derived_state)} className="cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?state=${book.derived_state}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?state=${book.derived_state}`) } }} title={`Buscar por ${bookStateLabel(book.derived_state)}`}>
-                  {bookStateLabel(book.derived_state)}
+                <Badge tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)} className={isGuest ? undefined : 'cursor-pointer'} role={isGuest ? undefined : 'button'} tabIndex={isGuest ? undefined : 0} onClick={() => { if (!isGuest) openCatalogQuery(`/acervo?state=${book.derived_state}`) }} onKeyDown={(e) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCatalogQuery(`/acervo?state=${book.derived_state}`) } }} title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por ${bookStateLabel(book.derived_state)}`}>
+                  {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
                 </Badge>
               </div>
               <p className={`text-sm leading-relaxed mt-3 ${isDark ? 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]' : 'text-slate-600'}`}>
@@ -690,7 +689,7 @@ export function BookDetailPage() {
                       const bg = isDark ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
                       const color = isDark ? '#fff' : stringToHsl(a.name, 65, 22)
                       const border = isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
-                      return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?author_id=${a.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?author_id=${a.id}`) } }}>{a.name}</span>
+                      return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?author_id=${a.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?author_id=${a.id}`) } }}>{a.name}</span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
@@ -699,7 +698,7 @@ export function BookDetailPage() {
                   <dd className="col-span-2 flex flex-wrap items-center gap-1.5">
                     {book.genres?.length ? book.genres.map((g) => {
                       const bg = isDark ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
-                      return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?genre_id=${g.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?genre_id=${g.id}`) } }}>{g.name}</span>
+                      return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?genre_id=${g.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?genre_id=${g.id}`) } }}>{g.name}</span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
@@ -710,14 +709,18 @@ export function BookDetailPage() {
           <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
             <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
             <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
-              <h2 className={`font-semibold ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>Exemplares</h2>
+              <h2 className={`font-semibold ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>{isGuest ? 'Disponibilidade' : 'Exemplares'}</h2>
             </CardHeader>
             <CardBody className="relative">
-              {available > 0 && (
+              {isGuest ? (
+                <p className={`text-sm ${isDark ? 'text-white/80' : 'text-slate-600'}`}>
+                  {book.available_copies ?? 0} de {book.total_copies ?? 0} exemplares estão disponíveis nesta escola.
+                </p>
+              ) : <>{available > 0 && (
                 <p ref={availabilityNoticeRef} tabIndex={-1} className={`mb-4 rounded-md border px-3 py-2 text-sm font-medium outline-none focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 ${isDark ? 'border-emerald-300/40 bg-emerald-400/10 text-emerald-100' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
                   Este livro está disponível para empréstimo.
                 </p>
-              )}
+              )}</>}
               {copies.length === 0 ? (
                 <p className={`text-sm ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Nenhum exemplar cadastrado para este livro nesta escola.</p>
               ) : (
@@ -741,10 +744,10 @@ export function BookDetailPage() {
                       <li key={c.id} className="flex items-center justify-between py-2.5 text-sm">
                         <span className={`font-mono ${isDark ? 'text-white/90' : 'text-slate-700'}`}>{c.code}</span>
                         <span className="flex items-center gap-2">
-                          <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'} className="cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`) } }} title={`Buscar por ${bookConditionLabel(c.condition)}`}>
+                          <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'} className="cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`) } }} title={`Buscar por ${bookConditionLabel(c.condition)}`}>
                             {bookConditionLabel(c.condition)}
                           </Badge>
-                          <Badge tone={bookStateTone(c.state)} className="cursor-pointer" role="button" tabIndex={0} onClick={() => navigate(`/acervo?state=${c.state}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/acervo?state=${c.state}`) } }} title={`Buscar por ${bookStateLabel(c.state)}`}>
+                          <Badge tone={bookStateTone(c.state)} className="cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?state=${c.state}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?state=${c.state}`) } }} title={`Buscar por ${bookStateLabel(c.state)}`}>
                             {bookStateLabel(c.state)}
                           </Badge>
                         </span>
@@ -768,14 +771,15 @@ export function BookDetailPage() {
         <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
         <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
           <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`} aria-live="polite">
-            <Undo2 className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> {canManage ? 'Devoluções — empréstimos ativos deste livro' : 'Histórico do livro'}
+            <Undo2 className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> {isGuest ? 'Acesso visitante' : canManage ? 'Devoluções — empréstimos ativos deste livro' : 'Histórico do livro'}
           </h2>
         </CardHeader>
         <CardBody className="relative">
+          {isGuest ? <p className={isDark ? 'text-white/80' : 'text-slate-500'}>Entre com sua conta para consultar empréstimos e reservas.</p> : <>
           {(loansLoading || (canReserve && reservationsLoading)) && <p aria-live="polite" className={isDark ? 'text-white/80' : 'text-slate-500'}>Carregando histórico...</p>}
           {!loansLoading && !reservationsLoading && activeLoans && activeLoans.length === 0 && !currentReservation && (
             <p className={`text-sm py-4 text-center ${isDark ? 'text-white/70' : 'text-slate-500'}`}>{canManage ? 'Nenhum empréstimo ativo para este livro.' : 'Você ainda não possui empréstimos, devoluções ou reservas deste livro.'}</p>
-          )}
+          )}</>}
           {((activeLoans && activeLoans.length > 0) || currentReservation) && (
             <ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
               {currentReservation && (
@@ -840,7 +844,7 @@ export function BookDetailPage() {
               circular
               renderItem={(b, idx) => (
                 <div className="w-[160px] sm:w-[180px] lg:w-[200px] shrink-0">
-                  <GridCard book={b as any} index={idx} portalHover />
+                  <GridCard book={b as any} index={idx} portalHover isGuest={isGuest} />
                 </div>
               )}
             />

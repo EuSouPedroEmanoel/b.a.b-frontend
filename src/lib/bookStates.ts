@@ -10,6 +10,14 @@ export function bookStateLabel(state: string): string {
   return BOOK_STATE_LABELS[state] ?? state
 }
 
+export function publicBookStateLabel(state: string): 'Disponível' | 'Indisponível' {
+  return state === 'available' ? 'Disponível' : 'Indisponível'
+}
+
+export function publicBookStateTone(state: string): 'success' | 'neutral' {
+  return state === 'available' ? 'success' : 'neutral'
+}
+
 export function bookStateTone(state: string): 'success' | 'warning' | 'info' | 'danger' | 'neutral' {
   switch (state) {
     case 'available':

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
+import { getCoverProxyUrl } from '@/lib/imageProxy'
 
 type Props = {
   src: string | null | undefined
@@ -14,42 +14,61 @@ type Props = {
   sizes?: string
 }
 
-export function CoverImage({ src, title, alt, width = 320, height = 480, priority = false, className = '', fallbackVariant: _fallbackVariant = 'gradient', sizes }: Props) {
-  return <CoverImageContent key={src ?? 'fallback'} src={src} title={title} alt={alt} width={width} height={height} priority={priority} className={className} fallbackVariant={_fallbackVariant} sizes={sizes} />
+type LoadState = 'loading' | 'loaded' | 'error'
+
+export function CoverImage({
+  src,
+  title,
+  alt,
+  width = 320,
+  height = 480,
+  priority = false,
+  className = '',
+  fallbackVariant: _fallbackVariant = 'gradient',
+  sizes,
+}: Props) {
+  // A chave só muda quando a origem real muda, evitando resetar uma capa já em cache em re-renders comuns.
+  return <CoverImageContent key={src ?? 'no-cover'} src={src} title={title} alt={alt} width={width} height={height} priority={priority} className={className} fallbackVariant={_fallbackVariant} sizes={sizes} />
 }
 
-function CoverImageContent({ src, title, alt, width = 320, height = 480, priority = false, className = '', fallbackVariant: _fallbackVariant = 'gradient', sizes }: Props) {
-  const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState(false)
+function CoverImageContent({
+  src,
+  title,
+  alt,
+  width = 320,
+  height = 480,
+  priority = false,
+  className = '',
+  fallbackVariant: _fallbackVariant = 'gradient',
+  sizes,
+}: Props) {
+  const [loadState, setLoadState] = useState<LoadState>(() => (src ? 'loading' : 'error'))
   const [triedDirect, setTriedDirect] = useState(false)
-  const hasCover = !!src && !error
-  const isLoading = hasCover && !loaded
-  const proxied = useMemo(() => getCoverProxyUrl(src, width), [src, width])
-  const displaySrc = triedDirect ? src : proxied
+  const proxiedSrc = useMemo(() => getCoverProxyUrl(src, width), [src, width])
+  const displaySrc = triedDirect ? src : proxiedSrc
   const fallbackDataUrl = useMemo(() => generateFallbackCoverDataUrl(title, width, Math.round((width * 3) / 2)), [title, width])
+  const hasSource = Boolean(src && displaySrc)
+  const isLoading = hasSource && loadState === 'loading'
+  const showFallback = !hasSource || loadState === 'error'
 
-  const showFallback = !hasCover || isLoading
+  const handleError = () => {
+    if (!triedDirect && src && proxiedSrc && proxiedSrc !== src) {
+      setTriedDirect(true)
+      setLoadState('loading')
+      return
+    }
+    setLoadState('error')
+  }
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
-      {/* fallback como <img> Data URL – mesmas classes w-full h-full object-cover e aspect do pai */}
-      {showFallback && (
+    <div className={`relative overflow-hidden ${className}`} data-cover-state={isLoading ? 'loading' : showFallback ? 'fallback' : 'loaded'} style={{ aspectRatio: `${width} / ${height}` }}>
+      {isLoading && <div aria-hidden="true" data-cover-placeholder="true" className="absolute inset-0 bg-slate-200 dark:bg-slate-700" />}
+
+      {hasSource && (
         <img
-          src={fallbackDataUrl}
-          alt={alt}
-          width={width}
-          height={height}
-          sizes={sizes}
-          fetchPriority={priority ? 'high' : 'auto'}
-          loading={priority ? 'eager' : 'lazy'}
-          className="absolute inset-0 h-full w-full object-cover"
-          aria-hidden={loaded ? 'true' : undefined}
-        />
-      )}
-      {hasCover && displaySrc && (
-        <img
-          src={displaySrc}
-          alt={alt}
+          src={displaySrc ?? undefined}
+          alt={loadState === 'loaded' ? alt : ''}
+          aria-hidden={loadState === 'loaded' ? undefined : true}
           crossOrigin="anonymous"
           decoding="async"
           width={width}
@@ -57,17 +76,20 @@ function CoverImageContent({ src, title, alt, width = 320, height = 480, priorit
           sizes={sizes}
           fetchPriority={priority ? 'high' : 'auto'}
           loading={priority ? 'eager' : 'lazy'}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out ${loaded ? 'opacity-100' : 'opacity-0'}`}
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            if (!triedDirect && src && proxied !== src) {
-              setTriedDirect(true)
-              setLoaded(false)
-            } else {
-              setError(true)
-              setLoaded(false)
-            }
-          }}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ease-out motion-reduce:transition-none ${loadState === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setLoadState('loaded')}
+          onError={handleError}
+        />
+      )}
+
+      {showFallback && (
+        <img
+          src={fallbackDataUrl}
+          alt={alt}
+          width={width}
+          height={height}
+          sizes={sizes}
+          className="absolute inset-0 h-full w-full object-cover opacity-100 transition-opacity duration-200 ease-out motion-reduce:transition-none"
         />
       )}
     </div>

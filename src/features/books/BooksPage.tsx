@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Loader2, Plus, Table } from 'lucide-react'
 import api from '@/lib/api'
-import { bookStateLabel, bookStateTone } from '@/lib/bookStates'
+import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
@@ -18,6 +18,7 @@ import { Select } from '@/components/ui/Select'
 import { OverflowTags } from '@/components/ui/OverflowTags'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { getBookCoverGradient } from '@/lib/coverColor'
+import { clearCatalogSnapshot, createCatalogOrigin, detailRouteState, readCatalogSnapshot, saveCatalogSnapshot } from '@/lib/catalogNavigation'
 import { GridCard } from './GridCard'
 
 type Book = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; is_active: boolean; added_by: number; cover_url: string | null; published_date: string | null; created_at: string | null; updated_at: string | null; total_copies?: number; available_copies?: number; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
@@ -63,15 +64,13 @@ export function BooksPage() {
   const isDarkTheme = resolved === 'dark'
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
   const isPersonalCatalog = !!user && PERSONAL_BOOK_ROLES.includes(user.role)
+  const isGuest = user?.role === 'guest'
+  const deniedNoticeRef = useRef<HTMLParagraphElement>(null)
 
-  const saveAcervoPosition = useCallback(() => {
-    try {
-      sessionStorage.setItem('acervo:scrollY', String(window.scrollY))
-      sessionStorage.setItem('acervo:search', location.search)
-    } catch {
-      /* storage indisponível */
-    }
-  }, [location.search])
+  useEffect(() => {
+    if (!(location.state as { accessDenied?: boolean } | null)?.accessDenied) return
+    window.requestAnimationFrame(() => deniedNoticeRef.current?.focus())
+  }, [location.state])
 
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
     if (typeof window !== 'undefined') {
@@ -89,6 +88,12 @@ export function BooksPage() {
     localStorage.setItem('acervo:pageSize', String(pageSize))
   }, [pageSize])
 
+  const openBook = useCallback((bookId: number) => {
+    const origin = createCatalogOrigin(`${location.pathname}${location.search}`, viewMode)
+    if (origin) saveCatalogSnapshot(origin, window.scrollY)
+    navigate(`/acervo/${bookId}`, { state: detailRouteState(origin) })
+  }, [location.pathname, location.search, navigate, viewMode])
+
   const availabilityOptions = useMemo(
     () => [
       { value: '', label: 'Todas' },
@@ -97,8 +102,11 @@ export function BooksPage() {
       { value: 'reserved', label: 'Reservado' },
       { value: 'lost', label: 'Perdido' },
       { value: 'archived', label: 'Arquivado' },
-    ].filter((option) => !isPersonalCatalog || !['lost', 'archived'].includes(option.value)),
-    [isPersonalCatalog],
+    ].filter((option) => {
+      if (isGuest) return ['','available'].includes(option.value)
+      return !isPersonalCatalog || !['lost', 'archived'].includes(option.value)
+    }),
+    [isGuest, isPersonalCatalog],
   )
 
   const hasActiveFilters = !!genreFilter || !!authorFilter || !!stateFilter || sortBy !== 'created_at'
@@ -240,37 +248,39 @@ export function BooksPage() {
     return () => obs.disconnect()
   }, [viewMode, onIntersect, gridItems.length])
 
-  // Restaura scroll ao voltar do detalhe (preserva altura da página)
+  // A restauração só acontece para a intenção explícita de retorno do detalhe.
   useEffect(() => {
-    let cancelled = false
-    const tryRestore = () => {
-      if (cancelled) return
-      try {
-        const raw = sessionStorage.getItem('acervo:scrollY')
-        if (raw === null) return
-        const y = parseInt(raw, 10)
-        if (!Number.isFinite(y) || y <= 0) return
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (cancelled) return
-            window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
-          }, 50)
-        })
-      } catch { /* ignore */ }
+    const intent = (location.state as { catalogNavigationIntent?: string } | null)?.catalogNavigationIntent
+    const url = `${location.pathname}${location.search}`
+    if (intent === 'new-catalog-navigation') {
+      clearCatalogSnapshot()
+      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+      return undefined
     }
-    tryRestore()
-    const t = setTimeout(tryRestore, 300)
-    const clearTimer = setTimeout(() => {
-      try {
-        if (sessionStorage.getItem('acervo:scrollY')) sessionStorage.removeItem('acervo:scrollY')
-      } catch { /* ignore */ }
-    }, 2000)
+    if (intent !== 'return-to-catalog') return undefined
+
+    const snapshot = readCatalogSnapshot(url)
+    if (!snapshot) return undefined
+    if (snapshot.viewMode && snapshot.viewMode !== viewMode) setViewMode(snapshot.viewMode)
+
+    let cancelled = false
+    const restore = () => {
+      if (cancelled) return
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (!cancelled) window.scrollTo({ top: snapshot.scrollY, behavior: 'instant' as ScrollBehavior })
+        }, 50)
+      })
+    }
+    restore()
+    const retry = window.setTimeout(restore, 300)
+    const clear = window.setTimeout(clearCatalogSnapshot, 2000)
     return () => {
       cancelled = true
-      clearTimeout(t)
-      clearTimeout(clearTimer)
+      window.clearTimeout(retry)
+      window.clearTimeout(clear)
     }
-  }, [isLoading, isGridLoading])
+  }, [isGridLoading, isLoading, location.pathname, location.search, location.state, viewMode])
 
   const hasSearchQuery = searchParams.has('q')
 
@@ -373,10 +383,9 @@ export function BooksPage() {
     closeSuggestions()
     searchInputRef.current?.blur()
     if (s.kind === 'book') {
-      saveAcervoPosition()
       setQuery('')
       setQueryQ('')
-      navigate(`/acervo/${s.id}`, { state: { from: location.pathname + location.search } })
+      openBook(s.id)
     } else if (s.kind === 'availability') {
       setQuery('')
       setQueryQ('')
@@ -429,13 +438,11 @@ export function BooksPage() {
     }
 
     if (res.kind === 'isbn' && res.book_id) {
-      saveAcervoPosition()
-      navigate(`/acervo/${res.book_id}`, { state: { from: location.pathname + location.search } })
+      openBook(res.book_id)
       return
     }
     if (res.kind === 'internal_code' && res.book_id) {
-      saveAcervoPosition()
-      navigate(`/acervo/${res.book_id}`, { state: { from: location.pathname + location.search } })
+      openBook(res.book_id)
       return
     }
     if (isIsbn && res.kind === 'none') {
@@ -452,7 +459,12 @@ export function BooksPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl sm:text-3xl font-bold">Acervo</h1>
-          <PageDescription>Busca por título, ISBN, código interno, gênero, autor ou disponibilidade. ISBN não cadastrado abre o cadastro automaticamente.</PageDescription>
+          {(location.state as { accessDenied?: boolean } | null)?.accessDenied && (
+            <p ref={deniedNoticeRef} role="alert" tabIndex={-1} className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 outline-none dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100">
+              Entre com sua conta para continuar.
+            </p>
+          )}
+          <PageDescription>{isGuest ? 'Busca por título, ISBN, gênero, autor ou disponibilidade.' : 'Busca por título, ISBN, código interno, gênero, autor ou disponibilidade. ISBN não cadastrado abre o cadastro automaticamente.'}</PageDescription>
         </header>
         {canCreate && (
           <Link
@@ -478,7 +490,7 @@ export function BooksPage() {
                     label="Buscar"
                     id="book-search"
                     ref={searchInputRef}
-                    placeholder="Título, ISBN, código interno, gênero, autor ou disponibilidade"
+                    placeholder={isGuest ? 'Título, ISBN, gênero, autor ou disponibilidade' : 'Título, ISBN, código interno, gênero, autor ou disponibilidade'}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={onKeyDown}
@@ -811,12 +823,11 @@ export function BooksPage() {
                   {data.items.map((b) => (
                     <tr
                       key={b.id}
-                      onClick={() => { saveAcervoPosition(); navigate(`/acervo/${b.id}`, { state: { from: location.pathname + location.search } }) }}
+                      onClick={() => openBook(b.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          saveAcervoPosition()
-                          navigate(`/acervo/${b.id}`, { state: { from: location.pathname + location.search } })
+                          openBook(b.id)
                         }
                       }}
                       tabIndex={0}
@@ -859,7 +870,7 @@ export function BooksPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3 text-center">
-                        <Badge tone={bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1) } }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>{bookStateLabel(b.derived_state)}</Badge>
+                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); if (!isGuest) { setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') } }} onKeyDown={(e: any) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1) } }} role={!isGuest ? 'button' : undefined} tabIndex={!isGuest ? 0 : undefined} title={isGuest ? publicBookStateLabel(b.derived_state) : `Filtrar por ${bookStateLabel(b.derived_state)}`}>{isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}</Badge>
                       </td>
                       <td className="px-5 py-3 text-center">
                         {typeof b.total_copies === 'number' ? (
@@ -892,8 +903,11 @@ export function BooksPage() {
                 >
                   <Link
                     to={`/acervo/${b.id}`}
-                    state={{ from: location.pathname + location.search }}
-                    onClick={saveAcervoPosition}
+                    state={detailRouteState(createCatalogOrigin(`${location.pathname}${location.search}`, viewMode))}
+                    onClick={() => {
+                      const origin = createCatalogOrigin(`${location.pathname}${location.search}`, viewMode)
+                      if (origin) saveCatalogSnapshot(origin, window.scrollY)
+                    }}
                     className="flex gap-4 p-4 focus-visible:outline-none"
                     aria-label={`Ver detalhes de ${b.title}`}
                   >
@@ -911,8 +925,8 @@ export function BooksPage() {
                         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
                           {b.title}
                         </h3>
-                        <Badge tone={bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5 cursor-pointer" onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') }} role="button" tabIndex={0} title={`Filtrar por ${bookStateLabel(b.derived_state)}`}>
-                          {bookStateLabel(b.derived_state)}
+                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5" onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); if (!isGuest) { setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') } }} role={!isGuest ? 'button' : undefined} tabIndex={!isGuest ? 0 : undefined} title={isGuest ? publicBookStateLabel(b.derived_state) : `Filtrar por ${bookStateLabel(b.derived_state)}`}>
+                          {isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}
                         </Badge>
                       </div>
                       <p className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
@@ -1010,7 +1024,7 @@ export function BooksPage() {
           <>
             <div role="grid" aria-label="Grade de livros" className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {gridItems.map((b, index) => (
-                <GridCard key={b.id} book={b as any} index={index} />
+                <GridCard key={b.id} book={b as any} index={index} isGuest={isGuest} />
               ))}
             </div>
             {gridItems.length === 0 && !isGridLoading && <p className="text-sm text-slate-500 py-8 text-center">Nenhum livro encontrado.</p>}
