@@ -149,18 +149,11 @@ export function UsersPage() {
     },
     enabled: isSuperAdmin,
   })
-  const schoolOptions: AutocompleteOption<School>[] = [
-    {
-      value: '',
-      label: 'Todas as escolas',
-      data: { id: 0, name: 'Todas as escolas', code: '', is_active: true },
-    },
-    ...(schoolsData?.items ?? []).map((school) => ({
-      value: String(school.id),
-      label: school.name,
-      data: school,
-    })),
-  ]
+  const schoolOptions: AutocompleteOption<School>[] = (schoolsData?.items ?? []).map((school) => ({
+    value: String(school.id),
+    label: school.name,
+    data: school,
+  }))
 
   const queryKey = ['users', role, schoolFilter]
   const { data, isLoading, isError, error } = useQuery({
@@ -405,8 +398,9 @@ export function UsersPage() {
               value={schoolFilter}
               onChange={setSchoolFilter}
               options={schoolOptions}
-              placeholder="Busque uma escola"
-              renderOption={(option) => option.value ? <SchoolSuggestion option={option} /> : option.label}
+              placeholder="Todas as escolas"
+              hint="Deixe vazio para exibir usuários de todas as escolas."
+              renderOption={(option) => <SchoolSuggestion option={option} />}
             />
           )}
         </CardBody>

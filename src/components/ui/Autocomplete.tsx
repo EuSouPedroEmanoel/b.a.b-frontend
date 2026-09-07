@@ -50,9 +50,10 @@ type Props<T> = {
   label: string
   value: string
   options: AutocompleteOption<T>[]
-  onChange: (value: string, option: AutocompleteOption<T>) => void
+  onChange: (value: string, option?: AutocompleteOption<T>) => void
   id?: string
   placeholder?: string
+  hint?: string
   disabled?: boolean
   autoFocus?: boolean
   emptyMessage?: string
@@ -69,6 +70,7 @@ export function Autocomplete<T>({
   onChange,
   id,
   placeholder,
+  hint,
   disabled = false,
   autoFocus = false,
   emptyMessage = 'Nenhum resultado encontrado.',
@@ -121,8 +123,9 @@ export function Autocomplete<T>({
       <Input
         id={inputId}
         label={label}
-        value={query || selectedOption?.label || ''}
+        value={query || (value ? selectedOption?.label : '')}
         placeholder={placeholder}
+        hint={hint}
         disabled={disabled}
         autoFocus={autoFocus}
         autoComplete="off"
@@ -137,7 +140,9 @@ export function Autocomplete<T>({
           if (!wrapperRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false)
         }}
         onChange={(event) => {
-          setQuery(event.target.value)
+          const nextQuery = event.target.value
+          if (!nextQuery && value) onChange('')
+          setQuery(nextQuery)
           setActiveIndex(-1)
           setOpen(true)
         }}
