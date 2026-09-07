@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, Pencil, Plus, AlertTriangle } from 'lucide-react'
 import api from '@/lib/api'
-import { formatCpf, formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
+import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { getErrorMessage } from '@/lib/errors'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -15,7 +15,7 @@ type Student = {
   id: number
   username: string
   email: string | null
-  cpf: string | null
+  cpf_masked: string | null
   birthdate: string | null
   turma_numero: number | null
   turma_letra: string | null
@@ -248,7 +248,7 @@ export function StudentsPage() {
                       return (
                         <tr key={s.id}>
                           <td className="px-4 py-3 font-medium capitalize">{s.username.replace(/\./g, ' ')}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{formatCpf(s.cpf)}</td>
+                          <td className="px-4 py-3 font-mono text-xs">{s.cpf_masked ?? '—'}</td>
                           <td className="px-4 py-3">
                             {s.birthdate ? (
                               new Date(`${s.birthdate}T00:00:00`).toLocaleDateString('pt-BR')

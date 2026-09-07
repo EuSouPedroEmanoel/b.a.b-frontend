@@ -15,6 +15,7 @@ import { PageDescription } from '@/components/ui/PageDescription'
 import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { useAuth } from '@/hooks/useAuth'
+import { hasPersonalReaderCapability } from '@/lib/permissions'
 
 type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code: string; book_id: number; book_title: string; book_cover_url: string | null; borrower_username: string; borrower_cpf_masked: string | null }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
@@ -94,8 +95,6 @@ function getLoanCreationError(error: unknown) {
     announcement: `Não foi possível realizar o empréstimo. ${accessibleDetail}`,
   }
 }
-
-const PERSONAL_LOAN_ROLES = ['student', 'teacher']
 
 const personalLoanStatusLabel = (status: string) => ({
   active: 'Em andamento',
@@ -181,7 +180,7 @@ function PersonalLoanCard({ loan }: { loan: Loan }) {
 export function LoansPage() {
   const { user, loading } = useAuth()
   if (loading) return <p role="status" className="text-sm text-slate-600 dark:text-slate-300">Carregando empréstimos…</p>
-  if (user && PERSONAL_LOAN_ROLES.includes(user.role)) return <PersonalLoansView />
+  if (user && hasPersonalReaderCapability(user.role)) return <PersonalLoansView />
   return <OperationalLoansPage />
 }
 
@@ -599,7 +598,7 @@ function OperationalLoansPage() {
     const value = returnLookup.trim()
     const kind = returnLookupKind(value)
     setReturnInputError(undefined)
-    if (!kind) { setReturnInputError('Informe o código interno do exemplar ou o CPF do aluno.'); return }
+    if (!kind) { setReturnInputError('Informe o código interno do exemplar ou o CPF do leitor.'); return }
     if (kind === 'user' && !validateCpfDigits(onlyDigits(value))) { setReturnInputError('Informe um CPF válido com 11 dígitos.'); return }
     setReturnSearch({ kind, value: kind === 'user' ? onlyDigits(value) : value })
   }
@@ -694,7 +693,7 @@ function OperationalLoansPage() {
         <p id="loan-confirmation-status" className={`text-sm ${canCreate ? 'font-medium text-emerald-800 dark:text-emerald-200' : 'text-slate-600 dark:text-slate-300'}`}>{canCreate ? 'Formulário pronto para confirmar o empréstimo.' : 'A confirmação ficará disponível após identificar um exemplar disponível e um leitor elegível.'}</p>
       </form> : <form onSubmit={(event) => { event.preventDefault(); if (returnKind === 'copy' && returnCopyResult) handleReturn({ id: returnCopyResult.loan.id, source: 'copy' }); else identifyReturn() }} className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-          <div className="flex-1"><Input ref={returnLookupRef} id="return-lookup" label="Código interno do exemplar ou CPF do aluno" type={returnKind === 'user' ? 'password' : 'text'} inputMode={returnKind === 'user' ? 'numeric' : 'text'} value={returnKind === 'user' ? formatCpfInput(onlyDigits(returnLookup)) : returnLookup} onChange={(event) => { const value = event.target.value; setReturnLookup(/^\d/.test(value.trim()) ? onlyDigits(value) : value); setReturnSearch(null); setReturnSchoolId(''); setReturnInputError(undefined) }} onBlur={() => { if (returnKind === 'copy' && returnLookup.trim()) identifyReturn() }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyReturn() } }} error={returnError} hint="Escaneie um exemplar ou informe um CPF. Pressione Enter para localizar." aria-describedby="return-identification" required autoComplete="off" placeholder="EX-001 ou 000.000.000-00" /></div>
+          <div className="flex-1"><Input ref={returnLookupRef} id="return-lookup" label="Código interno do exemplar ou CPF do leitor" type={returnKind === 'user' ? 'password' : 'text'} inputMode={returnKind === 'user' ? 'numeric' : 'text'} value={returnKind === 'user' ? formatCpfInput(onlyDigits(returnLookup)) : returnLookup} onChange={(event) => { const value = event.target.value; setReturnLookup(/^\d/.test(value.trim()) ? onlyDigits(value) : value); setReturnSearch(null); setReturnSchoolId(''); setReturnInputError(undefined) }} onBlur={() => { if (returnKind === 'copy' && returnLookup.trim()) identifyReturn() }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyReturn() } }} error={returnError} hint="Escaneie um exemplar ou informe um CPF. Pressione Enter para localizar." aria-describedby="return-identification" required autoComplete="off" placeholder="EX-001 ou 000.000.000-00" /></div>
           {returnKind !== 'user' && <div className="flex w-full flex-col gap-1.5 sm:w-auto"><span className="invisible text-sm font-medium leading-5" aria-hidden="true">Ação</span><Button type="submit" disabled={returnMut.isPending || !returnResult} className="loan-confirmation-button w-full sm:w-auto" aria-busy={returnMut.isPending} aria-describedby="return-action-status" aria-label={returnCopyResult ? `${returnMut.isPending ? 'Processando devolução de' : 'Devolver'} ${returnCopyResult.loan.book_title}, exemplar ${returnCopyResult.loan.internal_code}` : 'Devolver empréstimo identificado'}>{returnMut.isPending ? 'Devolvendo…' : 'Devolver'}</Button></div>}
         </div>
         <section id="return-identification" aria-busy={returnQuery.isFetching} className="rounded-lg border border-slate-200 bg-slate-100 p-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
@@ -703,7 +702,7 @@ function OperationalLoansPage() {
           {!returnQuery.isFetching && returnKind === 'copy' && returnCopyResult && <ReturnLoanSummary loan={returnCopyResult.loan} />}
           {!returnQuery.isFetching && returnKind === 'copy' && returnCopyAmbiguous && isSuperAdmin && <div className="mt-2"><p className="text-sm text-amber-800 dark:text-amber-200">Este código existe em mais de uma escola. Escolha uma para continuar.</p><div className="mt-3"><Select label="Escola do exemplar" id="return-copy-school" value={returnSchoolId} onChange={setReturnSchoolId} options={schoolOptions} placeholder="Selecione a escola" /></div></div>}
           {!returnQuery.isFetching && returnKind === 'user' && returnUserQuery.data?.kind === 'user' && <div className="mt-1"><p className="font-medium">{returnUserQuery.data.user.username}</p><p className="text-sm text-slate-600 dark:text-slate-300">{roleLabel(returnUserQuery.data.user.role)}{returnUserQuery.data.user.turma_numero && returnUserQuery.data.user.turma_letra ? ` — ${returnUserQuery.data.user.turma_numero}º ${returnUserQuery.data.user.turma_letra}` : ''}</p><p className="mt-2 text-sm font-medium">{returnUserQuery.data.loans.length ? `${returnUserQuery.data.loans.length} empréstimo(s) ativo(s)` : 'Este leitor não possui empréstimos ativos.'}</p>{returnUserQuery.data.loans.length > 0 && <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-700" role="list">{returnUserQuery.data.loans.map((loan) => { const isReturning = returningLoanId === loan.id; return <li key={loan.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"><div className="text-sm"><p className="font-medium">{loan.book_title}</p><p className="font-mono text-slate-600 dark:text-slate-300">{loan.internal_code}</p><p className={loanLateDays(loan.due_date) > 0 ? 'text-red-700 dark:text-red-300' : 'text-slate-600 dark:text-slate-300'}>{loanLateDays(loan.due_date) > 0 ? `Atrasado ${loanLateDays(loan.due_date)} dia(s)` : `Vence em ${formatDate(loan.due_date)}`}</p></div><Button type="button" size="sm" variant="secondary" onClick={() => handleReturn({ id: loan.id, source: 'user' })} disabled={returnMut.isPending} aria-busy={isReturning} aria-label={`${isReturning ? 'Processando devolução de' : 'Devolver'} ${loan.book_title}, exemplar ${loan.internal_code}`} data-return-loan-id={loan.id}>{isReturning ? 'Processando…' : 'Devolver'}</Button></li>})}</ul>}</div>}
-          {!returnQuery.isFetching && !returnError && !returnResult && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Aguardando código do exemplar ou CPF do aluno.</p>}
+          {!returnQuery.isFetching && !returnError && !returnResult && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Aguardando código do exemplar ou CPF do leitor.</p>}
         </section>
         <p id="return-action-status" className="sr-only">{returnKind === 'copy' && returnCopyResult ? 'Empréstimo localizado. A devolução pode ser confirmada.' : returnKind === 'user' && returnUserResult?.loans.length ? 'Selecione o livro que será devolvido.' : 'A devolução ficará disponível após localizar um empréstimo ativo.'}</p>
       </form>}

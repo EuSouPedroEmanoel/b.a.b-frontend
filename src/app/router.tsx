@@ -12,6 +12,7 @@ import { ReservationsPage } from '@/features/reservations/ReservationsPage'
 import { SchoolsPage } from '@/features/schools/SchoolsPage'
 import { StudentsPage } from '@/features/students/StudentsPage'
 import { UsersPage } from '@/features/users/UsersPage'
+import { ManageSchoolPage } from '@/features/schools/ManageSchoolPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
 import { AccountOnly, Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
 
@@ -117,6 +118,20 @@ export const router = createBrowserRouter([
             <UsersPage />
           </AccountOnly>
         ),
+      },
+      {
+        path: '/gerenciar-escola',
+        element: (
+          <AccountOnly>
+            <ManageSchoolPage />
+          </AccountOnly>
+        ),
+      },
+      {
+        path: '/regras-de-circulacao', element: <Navigate to="/gerenciar-escola?tab=rules" replace />,
+      },
+      {
+        path: '/calendario-da-biblioteca', element: <Navigate to="/gerenciar-escola?tab=calendar" replace />,
       },
       // Redirects compatibilidade inglês → português
       { path: '/login', element: <Navigate to="/entrar" replace /> },

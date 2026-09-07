@@ -20,6 +20,7 @@ import { Carousel } from '@/components/ui/Carousel'
 import { GridCard } from '@/features/books/GridCard'
 import { ReservationConfirmDialog } from '@/features/books/ReservationConfirmDialog'
 import { catalogRouteState, getCatalogOrigin } from '@/lib/catalogNavigation'
+import { hasPersonalReaderCapability } from '@/lib/permissions'
 
 type Book = {
   id: number
@@ -46,8 +47,6 @@ type Reservation = { id: number; book_id: number; status: string; created_at?: s
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 
 const MANAGE_ROLES = ['librarian', 'school_admin', 'super_admin']
-const RESERVATION_ROLES = ['student', 'teacher']
-
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const id = Number(bookId)
@@ -57,7 +56,7 @@ export function BookDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const canManage = !!user && MANAGE_ROLES.includes(user.role)
-  const canReserve = !!user && RESERVATION_ROLES.includes(user.role)
+  const canReserve = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
   const catalogOrigin = getCatalogOrigin(location.state)
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
@@ -94,6 +95,9 @@ export function SchoolsPage() {
                   <th scope="col" className="px-4 py-3 text-left font-semibold">
                     Ativa
                   </th>
+                  <th scope="col" className="px-4 py-3 text-left font-semibold">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -103,6 +107,14 @@ export function SchoolsPage() {
                     <td className="px-4 py-3 font-medium">{s.name}</td>
                     <td className="px-4 py-3 font-mono text-xs">{s.code}</td>
                     <td className="px-4 py-3">{s.is_active ? 'Sim' : 'Não'}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/gerenciar-escola?tab=rules&school=${s.id}`}
+                        className="inline-flex min-h-[40px] items-center rounded-md px-3 py-2 text-sm font-medium text-[#0f4c75] underline-offset-2 hover:underline focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 dark:text-sky-300"
+                      >
+                        Regras de circulação
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -20,6 +20,7 @@ import { CoverImage } from '@/components/ui/CoverImage'
 import { getBookCoverGradient } from '@/lib/coverColor'
 import { clearCatalogSnapshot, createCatalogOrigin, detailRouteState, readCatalogSnapshot, saveCatalogSnapshot } from '@/lib/catalogNavigation'
 import { GridCard } from './GridCard'
+import { hasPersonalReaderCapability } from '@/lib/permissions'
 
 type Book = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; is_active: boolean; added_by: number; cover_url: string | null; published_date: string | null; created_at: string | null; updated_at: string | null; total_copies?: number; available_copies?: number; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
@@ -32,8 +33,6 @@ type SuggestItem =
   | { kind: 'genre'; id: number; name: string }
   | { kind: 'book'; id: number; title: string; isbn: string | null }
   | { kind: 'availability'; state: string; label: string }
-
-const PERSONAL_BOOK_ROLES = ['student', 'teacher']
 
 export function BooksPage() {
   const [page, setPage] = useState(1)
@@ -63,7 +62,7 @@ export function BooksPage() {
   const { resolved } = useTheme()
   const isDarkTheme = resolved === 'dark'
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
-  const isPersonalCatalog = !!user && PERSONAL_BOOK_ROLES.includes(user.role)
+  const isPersonalCatalog = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
   const deniedNoticeRef = useRef<HTMLParagraphElement>(null)
 

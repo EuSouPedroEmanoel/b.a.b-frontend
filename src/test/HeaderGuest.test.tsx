@@ -10,7 +10,7 @@ vi.mock('@/hooks/useAuth', () => ({
       id: 0,
       username: 'Visitante',
       email: null,
-      cpf: null,
+      cpf_masked: null,
       birthdate: null,
       turma_numero: null,
       turma_letra: null,

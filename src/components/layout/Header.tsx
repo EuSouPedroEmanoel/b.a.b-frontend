@@ -72,6 +72,7 @@ export function Header() {
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
               {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
+              {(isUsersManager || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
             </ul>
           </nav>}
@@ -167,6 +168,7 @@ export function Header() {
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>}
               {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/alunos')}>Alunos</Link></li>)}
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
+              {(isUsersManager || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/escolas')}>Escolas</Link></li>)}
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">

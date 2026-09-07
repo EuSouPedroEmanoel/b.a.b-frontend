@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, Pencil, Plus, AlertTriangle } from 'lucide-react'
 import api from '@/lib/api'
-import { formatCpf, formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
+import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { getErrorMessage } from '@/lib/errors'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -17,7 +17,7 @@ type AppUser = {
   id: number
   username: string
   email: string | null
-  cpf: string | null
+  cpf_masked: string | null
   birthdate: string | null
   turma_numero: number | null
   turma_letra: string | null
@@ -28,6 +28,7 @@ type AppUser = {
   is_active: boolean
   created_at: string | null
   updated_at: string | null
+  administrative_capabilities?: string[]
 }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 type School = { id: number; name: string; code: string; is_active: boolean }
@@ -131,11 +132,12 @@ export function UsersPage() {
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate)
   const [createError, setCreateError] = useState('')
   const [editing, setEditing] = useState<AppUser | null>(null)
-  const [editForm, setEditForm] = useState({ email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '' })
+  const [editForm, setEditForm] = useState({ email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
 
   const { user: currentUser } = useAuth()
 
   const isSuperAdmin = currentUser?.role === 'super_admin'
+  const canManageStaffCapabilities = isSuperAdmin || currentUser?.role === 'school_admin'
 
   const { data: schoolsData } = useQuery({
     queryKey: ['schools', 'options'],
@@ -215,6 +217,14 @@ export function UsersPage() {
       }
       if (editForm.password.trim()) payload.password = editForm.password
       const { data } = await api.put<AppUser>(`/users/${editing?.id}`, payload)
+      if (editing?.role === 'librarian' && canManageStaffCapabilities) {
+        await api.put(`/users/${editing.id}/administrative-capabilities`, {
+          capabilities: [
+            ...(editForm.manageLibraryCalendar ? ['manage_library_calendar'] : []),
+            ...(editForm.manageCirculationRules ? ['manage_circulation_rules'] : []),
+          ],
+        })
+      }
       return data
     },
     onSuccess: () => {
@@ -269,12 +279,14 @@ export function UsersPage() {
       turmaNumero: u.turma_numero === null ? '' : String(u.turma_numero),
       turmaLetra: u.turma_letra ?? '',
       password: '',
+      manageLibraryCalendar: (u.administrative_capabilities ?? []).includes('manage_library_calendar'),
+      manageCirculationRules: (u.administrative_capabilities ?? []).includes('manage_circulation_rules'),
     })
   }
 
   const closeEdit = () => {
     setEditing(null)
-    setEditForm({ email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '' })
+    setEditForm({ email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
   }
 
   const availableCreateTypes = useMemo(() => {
@@ -449,7 +461,7 @@ export function UsersPage() {
                             <tr key={u.id}>
                               <td className="px-4 py-3 font-medium">{u.username}</td>
                               <td className="px-4 py-3">{u.email ?? '—'}</td>
-                              {sec.showCpf && <td className="px-4 py-3 font-mono text-xs">{formatCpf(u.cpf)}</td>}
+                              {sec.showCpf && <td className="px-4 py-3 font-mono text-xs">{u.cpf_masked ?? '—'}</td>}
                               {sec.showSchool && (
                                 <td className="px-4 py-3">{schoolLabel(u.school_name, u.school_code)}</td>
                               )}
@@ -570,6 +582,25 @@ export function UsersPage() {
                 </div>
                 <Input label="Nascimento" type="date" value={editForm.birthdate} onChange={(e) => setEditForm((f) => ({ ...f, birthdate: e.target.value }))} required autoComplete="off" />
               </>
+            )}
+            {editing.role === 'librarian' && (
+              <fieldset className="grid gap-2 rounded-md border border-slate-200 dark:border-slate-700 p-4">
+                <legend className="px-1 text-sm font-semibold">Permissões administrativas</legend>
+                {canManageStaffCapabilities ? (
+                  <>
+                    <label className="flex min-h-[44px] items-center gap-3 text-sm">
+                      <input type="checkbox" checked={editForm.manageLibraryCalendar} onChange={(event) => setEditForm((f) => ({ ...f, manageLibraryCalendar: event.target.checked }))} className="h-5 w-5 rounded text-blue-600 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]" />
+                      Gerenciar calendário da biblioteca
+                    </label>
+                    <label className="flex min-h-[44px] items-center gap-3 text-sm">
+                      <input type="checkbox" checked={editForm.manageCirculationRules} onChange={(event) => setEditForm((f) => ({ ...f, manageCirculationRules: event.target.checked }))} className="h-5 w-5 rounded text-blue-600 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]" />
+                      Gerenciar regras de circulação
+                    </label>
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-600 dark:text-slate-300">Somente School Admin ou Super Admin podem alterar estas permissões.</p>
+                )}
+              </fieldset>
             )}
             <Input label="Nova senha (opcional)" type="password" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} autoComplete="new-password" />
             <div className="flex justify-end gap-3 pt-2">

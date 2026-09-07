@@ -4,7 +4,7 @@ export type User = {
   id: number
   username: string
   email: string | null
-  cpf: string | null
+  cpf_masked: string | null
   birthdate: string | null
   turma_numero: number | null
   turma_letra: string | null
@@ -13,6 +13,7 @@ export type User = {
   school_code?: string | null
   school_name?: string | null
   is_active: boolean
+  administrative_capabilities?: string[]
 }
 
 export type AuthContextType = {
