@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { PageDescription } from '@/components/ui/PageDescription'
-import { Select } from '@/components/ui/Select'
+import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
+import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { calendarMarkedOutlineClasses, dangerSubtleClasses } from '@/components/ui/Badge'
 
@@ -80,6 +81,11 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
     queryFn: async () => (await api.get<Paginated<School>>('/schools/?size=100')).data.items,
     enabled: isSuperAdmin,
   })
+  const schoolOptions: AutocompleteOption<School>[] = (schoolsQuery.data ?? []).map((school) => ({
+    value: String(school.id),
+    label: school.name,
+    data: school,
+  }))
   const daysQuery = useQuery({
     queryKey: ['library-calendar', effectiveSchoolId, year],
     queryFn: async () => (await api.get<{ days?: NonWorkingDay[]; items?: NonWorkingDay[] }>(`/library-calendar/${effectiveSchoolId}?year=${year}`)).data,
@@ -209,7 +215,19 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
         <Button variant="secondary" size="sm" onClick={() => focusSection(calendarHeadingRef)}>Ir para o calendário</Button>
         {days.length > 0 && <Button variant="secondary" size="sm" onClick={() => focusSection(nonWorkingHeadingRef)}>Ir para dias não úteis cadastrados</Button>}
       </nav>
-      {isSuperAdmin && showSchoolSelector && <div className="max-w-xl"><Select label="Escola" value={schoolId} onChange={setSchoolId} placeholder="Selecione a escola" options={(schoolsQuery.data ?? []).map((school) => ({ value: String(school.id), label: school.name }))} /></div>}
+      {isSuperAdmin && showSchoolSelector && (
+        <div className="max-w-xl">
+          <Autocomplete
+            id="library-calendar-school"
+            label="Escola"
+            value={schoolId}
+            onChange={setSchoolId}
+            options={schoolOptions}
+            placeholder="Busque uma escola"
+            renderOption={(option) => <SchoolSuggestion option={option} />}
+          />
+        </div>
+      )}
       {!effectiveSchoolId && <p aria-live="polite" className="text-slate-600 dark:text-slate-300">Selecione uma escola para consultar o calendário.</p>}
       {effectiveSchoolId && <p aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">{isManager ? 'Você pode gerenciar os dias não úteis.' : 'Modo de consulta: somente leitura.'}</p>}
       {effectiveSchoolId && <div className="flex flex-wrap gap-3 text-sm" aria-label="Legenda do calendário"><span className="rounded-md border border-slate-300 px-2 py-1 dark:border-slate-600">Dia útil</span><span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300">Fim de semana</span><span className={`inline-flex items-center gap-1 rounded-md border-2 px-2 py-1 font-semibold ${calendarMarkedOutlineClasses}`}><X className="h-4 w-4" aria-hidden="true" /><span>Dia não útil</span></span></div>}

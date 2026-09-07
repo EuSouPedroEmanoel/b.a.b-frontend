@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { PageDescription } from '@/components/ui/PageDescription'
+import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
+import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 type ReaderRole = 'student' | 'teacher'
@@ -120,7 +122,6 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
   const firstInputRef = useRef<HTMLInputElement>(null)
   const tabRefs = useRef<Record<ReaderRole, HTMLButtonElement | null>>({ student: null, teacher: null })
   const [schoolId, setSchoolId] = useState(() => searchParams.get('school') ?? '')
-  const [schoolSearch, setSchoolSearch] = useState('')
   const [policies, setPolicies] = useState<Policy[]>([])
   const [activeRole, setActiveRole] = useState<ReaderRole>('student')
   const isSuperAdmin = user?.role === 'super_admin'
@@ -135,8 +136,11 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
     queryFn: async () => (await api.get<Paginated<School>>('/schools/?size=100')).data.items,
     enabled: isSuperAdmin,
   })
-  const schoolOptions = useMemo(() => (schools ?? []).filter((school) => school.name.toLowerCase().includes(schoolSearch.toLowerCase())), [schools, schoolSearch])
-  const selectedSchoolName = schools?.find((school) => String(school.id) === schoolId)?.name ?? ''
+  const schoolOptions: AutocompleteOption<School>[] = (schools ?? []).map((school) => ({
+    value: String(school.id),
+    label: school.name,
+    data: school,
+  }))
 
   const policyQuery = useQuery({
     queryKey: ['circulation-policies', effectiveSchoolId],
@@ -203,11 +207,15 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
 
       {isSuperAdmin && showSchoolSelector && (
         <div className="max-w-xl">
-          <label htmlFor="circulation-school-search" className="mb-1 block text-sm font-medium">Escola</label>
-          <div className="relative">
-            <input id="circulation-school-search" role="combobox" aria-autocomplete="list" aria-controls="circulation-school-listbox" aria-expanded={schoolSearch.length > 0 && schoolOptions.length > 0} value={schoolSearch || selectedSchoolName} onChange={(event) => setSchoolSearch(event.target.value)} onFocus={() => { if (!schoolSearch) setSchoolSearch(selectedSchoolName) }} className="min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-800" placeholder="Busque uma escola" />
-            {schoolSearch && schoolOptions.length > 0 && <ul id="circulation-school-listbox" role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-300 bg-white p-1 shadow-lg dark:border-slate-600 dark:bg-slate-800">{schoolOptions.map((school) => <li key={school.id} role="option" aria-selected={String(school.id) === schoolId} onMouseDown={(event) => event.preventDefault()}><button type="button" className="w-full cursor-pointer rounded px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { setSchoolId(String(school.id)); setSchoolSearch('') }}>{school.name}</button></li>)}</ul>}
-          </div>
+          <Autocomplete
+            id="circulation-school-search"
+            label="Escola"
+            value={schoolId}
+            options={schoolOptions}
+            placeholder="Busque uma escola"
+            onChange={(nextSchoolId) => setSchoolId(nextSchoolId)}
+            renderOption={(option) => <SchoolSuggestion option={option} />}
+          />
         </div>
       )}
 

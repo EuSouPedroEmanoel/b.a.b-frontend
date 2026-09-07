@@ -11,7 +11,9 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Select } from '@/components/ui/Select'
+import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
 import { PageDescription } from '@/components/ui/PageDescription'
+import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 
 type AppUser = {
   id: number
@@ -147,6 +149,18 @@ export function UsersPage() {
     },
     enabled: isSuperAdmin,
   })
+  const schoolOptions: AutocompleteOption<School>[] = [
+    {
+      value: '',
+      label: 'Todas as escolas',
+      data: { id: 0, name: 'Todas as escolas', code: '', is_active: true },
+    },
+    ...(schoolsData?.items ?? []).map((school) => ({
+      value: String(school.id),
+      label: school.name,
+      data: school,
+    })),
+  ]
 
   const queryKey = ['users', role, schoolFilter]
   const { data, isLoading, isError, error } = useQuery({
@@ -385,12 +399,14 @@ export function UsersPage() {
             options={filterRoleOptions.map((o) => ({ value: o.value, label: o.label }))}
           />
           {isSuperAdmin && (
-            <Select
+            <Autocomplete
               label="Escola"
               id="user-school"
               value={schoolFilter}
               onChange={setSchoolFilter}
-              options={[{ value: '', label: 'Todas as escolas' }, ...((schoolsData?.items ?? []).map((s) => ({ value: String(s.id), label: s.name })))]}
+              options={schoolOptions}
+              placeholder="Busque uma escola"
+              renderOption={(option) => option.value ? <SchoolSuggestion option={option} /> : option.label}
             />
           )}
         </CardBody>

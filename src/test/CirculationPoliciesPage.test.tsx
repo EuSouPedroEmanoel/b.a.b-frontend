@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -27,6 +27,7 @@ function renderPage() {
 
 describe('CirculationPoliciesPage', () => {
   afterEach(() => {
+    cleanup()
     fixtures.get.mockReset()
     fixtures.put.mockReset()
     fixtures.announce.mockReset()
@@ -38,10 +39,10 @@ describe('CirculationPoliciesPage', () => {
     fixtures.put.mockResolvedValue({ data: { policies } })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Aluno' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Professor' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Aluno' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Professor' })).toBeInTheDocument()
     fireEvent.change(screen.getAllByLabelText('Empréstimos simultâneos')[0], { target: { value: '2' } })
-    fireEvent.click(screen.getAllByLabelText('Contar apenas dias úteis no prazo do empréstimo')[0])
+    fireEvent.click(screen.getAllByLabelText(/Contar apenas dias úteis no prazo do empréstimo/)[0])
     fireEvent.click(screen.getByRole('button', { name: 'Salvar regras' }))
 
     await waitFor(() => expect(fixtures.put).toHaveBeenCalledWith(
@@ -64,10 +65,10 @@ describe('CirculationPoliciesPage', () => {
     fixtures.get.mockResolvedValue({ data: { policies } })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Aluno' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Aluno' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('somente leitura')
     expect(screen.queryByRole('button', { name: 'Salvar regras' })).not.toBeInTheDocument()
-    expect(screen.getAllByLabelText('Contar apenas dias úteis no prazo do empréstimo')[0]).toBeDisabled()
+    expect(screen.getAllByLabelText(/Contar apenas dias úteis no prazo do empréstimo/)[0]).toBeDisabled()
     expect(fixtures.put).not.toHaveBeenCalled()
   })
 
@@ -77,8 +78,28 @@ describe('CirculationPoliciesPage', () => {
     fixtures.put.mockResolvedValue({ data: { policies } })
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Aluno' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Aluno' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Salvar regras' })).toBeEnabled()
-    expect(screen.getAllByLabelText('Contar apenas dias úteis no prazo do empréstimo')[0]).toBeEnabled()
+    expect(screen.getAllByLabelText(/Contar apenas dias úteis no prazo do empréstimo/)[0]).toBeEnabled()
+  })
+
+  it('lets a super admin choose a school with the shared autocomplete', async () => {
+    fixtures.user = { role: 'super_admin', school_id: 0, administrative_capabilities: [] }
+    fixtures.get.mockImplementation((url: string) => {
+      if (url.startsWith('/schools/')) {
+        return Promise.resolve({ data: { items: [{ id: 8, name: 'Escola Central' }, { id: 9, name: 'Escola Norte' }] } })
+      }
+      return Promise.resolve({ data: { policies } })
+    })
+    renderPage()
+
+    const input = await screen.findByRole('combobox', { name: 'Escola' })
+    fireEvent.change(input, { target: { value: 'Norte' } })
+    await screen.findByRole('option', { name: 'Escola Norte' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(fixtures.get).toHaveBeenCalledWith('/circulation-policies/9'))
+    expect(input).toHaveValue('Escola Norte')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 })
