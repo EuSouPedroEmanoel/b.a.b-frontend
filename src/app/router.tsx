@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
-import { HomePage } from '@/features/home/HomePage'
+import { DiscoveryHome, HomePage } from '@/features/home/HomePage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { AccountPage } from '@/features/account/AccountPage'
 import { AccountManagementPage } from '@/features/account/AccountManagementPage'
@@ -24,6 +24,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorFallback />,
     children: [
       { path: '/', element: <Protected><HomePage /></Protected> },
+      { path: '/inicio', element: <Protected><DiscoveryHome /></Protected> },
       {
         path: '/entrar',
         element: (

@@ -128,7 +128,7 @@ export function LoginPage() {
     try {
       await loginGuest(guestSchoolCode, guestSchoolName)
       announce('Acesso como visitante realizado. Início aberto.', 'polite')
-      navigate('/')
+      navigate('/inicio')
     } catch (err: unknown) {
       const message = getErrorMessage(err, 'Não foi possível iniciar o acesso como visitante.')
       setGuestError(message)
@@ -185,7 +185,7 @@ export function LoginPage() {
     try {
       await login(username.trim(), password)
       announce('Login realizado com sucesso', 'polite')
-      navigate('/')
+      navigate('/inicio')
     } catch (err: unknown) {
       const final = getErrorMessage(err, 'Usuário ou senha incorretos')
       // Força mudança de estado mesmo se mensagem repetir: limpa antes

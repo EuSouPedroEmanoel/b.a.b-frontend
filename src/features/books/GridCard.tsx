@@ -32,11 +32,11 @@ function yearFromDate(dateStr: string | null): string | null {
   return String(d.getFullYear())
 }
 
-export function GridCard({ book, index = 0, disableHover = false, portalHover = false, isGuest = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean; isGuest?: boolean }) {
-  return <GridCardContent book={book} index={index} disableHover={disableHover} portalHover={portalHover} isGuest={isGuest} />
+export function GridCard({ book, index = 0, disableHover = false, portalHover = false, isGuest = false, rankingPosition }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean; isGuest?: boolean; rankingPosition?: number }) {
+  return <GridCardContent book={book} index={index} disableHover={disableHover} portalHover={portalHover} isGuest={isGuest} rankingPosition={rankingPosition} />
 }
 
-function GridCardContent({ book, index = 0, disableHover = false, portalHover = false, isGuest = false }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean; isGuest?: boolean }) {
+function GridCardContent({ book, index = 0, disableHover = false, portalHover = false, isGuest = false, rankingPosition }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean; isGuest?: boolean; rankingPosition?: number }) {
   const navigate = useNavigate()
   const location = useLocation()
   const catalogOrigin = getCatalogOrigin(location.state)
@@ -99,7 +99,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
         to={`/acervo/${book.id}`}
         state={detailRouteState(catalogOrigin)}
         onClick={savePosition}
-        aria-label={`${book.title} de ${book.authors[0]?.name ?? 'autor desconhecido'}`}
+        aria-label={`${rankingPosition ? `Posição ${rankingPosition} do ranking. ` : ''}Abrir detalhes de ${book.title}, autor ${book.authors[0]?.name ?? 'desconhecido'}, status ${book.derived_state}`}
         className="flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-shadow duration-300 hover:shadow-lg focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
       >
         <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
@@ -112,6 +112,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             priority={isPriority}
             className="absolute inset-0 h-full w-full"
           />
+          {rankingPosition !== undefined && <span aria-hidden="true" className="absolute left-2 top-2 z-10 text-2xl font-black text-white/85 drop-shadow">{rankingPosition}º</span>}
           <div className="absolute top-2 right-2 z-10">
             <Badge
               tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)}

@@ -20,6 +20,14 @@ export function AccountOnly({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+export function StudentOnly({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <p className="p-8 text-center" aria-live="polite">Carregando…</p>
+  if (!user) return <Navigate to="/entrar" replace />
+  if (!['student', 'teacher'].includes(user.role)) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 export function PublicOnly({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
   if (loading) return <p className="p-8 text-center" aria-live="polite">Carregando…</p>

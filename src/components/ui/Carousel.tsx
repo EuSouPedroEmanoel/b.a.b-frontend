@@ -26,7 +26,9 @@ function visibleItemsThatFit(widths: number[], available: number, gap: number) {
 
   // A maior largura garante que qualquer grupo modular caiba inteiro.
   const cardWidth = Math.max(...widths)
-  return Math.max(1, Math.min(widths.length, Math.floor((available + gap + TOLERANCE) / (cardWidth + gap))))
+  // Não usar tolerância positiva aqui: ela pode fazer caber um card a mais
+  // por poucos pixels e deixar uma faixa parcial visível no lado direito.
+  return Math.max(1, Math.min(widths.length, Math.floor((available + gap) / (cardWidth + gap))))
 }
 
 export function Carousel<T>({
@@ -142,6 +144,11 @@ export function Carousel<T>({
   const scroll = (direction: 'prev' | 'next') => {
     if (layout.active) {
       if (animating) return
+      if (reducedMotion) {
+        const offset = direction === 'next' ? layout.visibleCount : -layout.visibleCount
+        setActiveIndex((current) => normalize(current + offset, items.length))
+        return
+      }
       setSlideOffset(direction === 'next' ? -1 : 1)
       setAnimating(true)
       setMotionPhase('prepare')
@@ -171,7 +178,7 @@ export function Carousel<T>({
 
   const titleId = id ?? `carousel-${title.replace(/\s+/g, '-').toLowerCase()}`
   if (!items.length) {
-    return <section aria-labelledby={titleId} className="w-full"><h2 id={titleId} className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">{title}</h2><p className="text-sm text-slate-500 dark:text-slate-400">{emptyText ?? 'Nenhum item disponível.'}</p></section>
+    return <section role="region" aria-roledescription="carrossel" aria-labelledby={titleId} className="w-full"><h2 id={titleId} className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">{title}</h2><div className="flex min-h-[320px] items-center justify-center rounded-xl bg-slate-50/70 px-4 py-6 dark:bg-slate-900/30"><p className="max-w-md text-center text-sm text-slate-500 dark:text-slate-400">{emptyText ?? 'Nenhum item disponível.'}</p></div></section>
   }
 
   const circularActive = layout.active
@@ -198,8 +205,8 @@ export function Carousel<T>({
       : 'none'
 
     return (
-    <div aria-hidden={hidden ? 'true' : undefined} inert={hidden || undefined} className="shrink-0" style={{ width: `${viewportWidth}px` }}>
-      <div className="flex items-start gap-3 py-6" style={{ width: `${viewportWidth}px` }}>
+    <div aria-hidden={hidden ? 'true' : undefined} inert={hidden || undefined} className="shrink-0 overflow-hidden" style={{ width: `${viewportWidth}px`, maxWidth: `${viewportWidth}px` }}>
+      <div className="flex items-start gap-3 overflow-hidden py-3" style={{ width: `${viewportWidth}px`, maxWidth: `${viewportWidth}px` }}>
         {group(start).map(({ item, index }) => {
           const itemId = (item as { id?: string | number })?.id ?? index
           return <div key={`carousel-item-${itemId}`} data-carousel-card="true" className="shrink-0" style={{ transform: `scale(${cardScale})`, opacity: cardOpacity, transformOrigin: 'center center', transition: cardTransition, willChange: animating ? 'transform, opacity' : undefined }}>{renderItem(item, index)}</div>
@@ -229,10 +236,10 @@ export function Carousel<T>({
   }
 
   return <section aria-labelledby={titleId} aria-label={ariaLabel ?? title} className="w-full">
-    <div className="mb-3 flex items-center justify-between gap-3"><h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2><div className="hidden items-center gap-2 sm:flex"><button type="button" aria-label="Anterior" onClick={() => scroll('prev')} disabled={!canPrev || animating} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button><button type="button" aria-label="Próximo" onClick={() => scroll('next')} disabled={!canNext || animating} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button></div></div>
-    <div ref={viewportRef} className="relative overflow-hidden">
+    <div className="mb-3 flex items-center justify-between gap-3"><h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2><div className="hidden items-center gap-2 sm:flex"><button type="button" aria-label="Anterior" onClick={() => scroll('prev')} disabled={!canPrev || animating} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button><button type="button" aria-label="Próximo" onClick={() => scroll('next')} disabled={!canNext || animating} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronRight className="h-4 w-4" aria-hidden="true" /></button></div></div>
+    <div ref={viewportRef} className="relative overflow-hidden" style={{ clipPath: 'inset(0 4px 0 0)' }}>
       {circular && <div ref={measurementRef} aria-hidden="true" inert={true} className="pointer-events-none absolute left-0 top-0 flex w-max gap-3 opacity-0" style={{ visibility: 'hidden' }}>{items.map((item, index) => <div key={`measure-${index}`} className="shrink-0">{renderItem(item, index)}</div>)}</div>}
-      {circularActive ? <div role="region" aria-roledescription="carrossel" tabIndex={0} onKeyDown={handleKeyboard} className="overflow-hidden focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]" data-carousel-circular="true"><div onTransitionEnd={handleTransitionEnd} data-carousel-track="true" className="flex" style={{ width: `${viewportWidth * 3}px`, transform: `translateX(${(-viewportWidth) + (slideOffset * viewportWidth)}px)`, transition: !reducedMotion && motionPhase !== 'idle' ? `transform ${NAVIGATION_DURATION}ms cubic-bezier(0.22, 0.61, 0.36, 1)` : 'none' }}>{renderPane(normalize(activeIndex - layout.visibleCount, items.length), true, slideOffset > 0 ? 'entering' : 'idle')}{renderPane(activeIndex, false, animating ? 'outgoing' : 'current')}{renderPane(normalize(activeIndex + layout.visibleCount, items.length), true, slideOffset < 0 ? 'entering' : 'idle')}</div></div> : <div ref={scrollerRef} role="region" aria-roledescription="carrossel" tabIndex={0} onKeyDown={handleKeyboard} className="flex gap-3 overflow-x-auto overflow-y-visible scroll-smooth snap-x snap-mandatory px-1 py-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]" style={{ WebkitOverflowScrolling: 'touch' }}>{group(0).map(({ item, index }) => <div key={(item as { id?: string | number })?.id ?? index} className="shrink-0 snap-start">{renderItem(item, index)}</div>)}</div>}
+      {circularActive ? <div role="region" aria-roledescription="carrossel" tabIndex={0} onKeyDown={handleKeyboard} className="overflow-hidden focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]" data-carousel-circular="true"><div onTransitionEnd={handleTransitionEnd} data-carousel-track="true" className="flex overflow-hidden" style={{ width: `${viewportWidth * 3}px`, transform: `translateX(${(-viewportWidth) + (slideOffset * viewportWidth)}px)`, transition: !reducedMotion && motionPhase !== 'idle' ? `transform ${NAVIGATION_DURATION}ms cubic-bezier(0.22, 0.61, 0.36, 1)` : 'none' }}>{renderPane(normalize(activeIndex - layout.visibleCount, items.length), true, slideOffset > 0 ? 'entering' : 'idle')}{renderPane(activeIndex, false, animating ? 'outgoing' : 'current')}{renderPane(normalize(activeIndex + layout.visibleCount, items.length), true, slideOffset < 0 ? 'entering' : 'idle')}</div></div> : <div ref={scrollerRef} role="region" aria-roledescription="carrossel" tabIndex={0} onKeyDown={handleKeyboard} className="flex gap-3 overflow-x-auto overflow-y-visible scroll-smooth snap-x snap-mandatory px-1 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]" style={{ WebkitOverflowScrolling: 'touch' }}>{group(0).map(({ item, index }) => <div key={(item as { id?: string | number })?.id ?? index} className="shrink-0 snap-start">{renderItem(item, index)}</div>)}</div>}
       <button type="button" aria-label="Anterior" onClick={() => scroll('prev')} className="absolute left-0 top-1/2 z-10 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/90 shadow focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] dark:border-slate-600 dark:bg-slate-800/90 sm:hidden" style={{ opacity: canPrev && !animating ? 1 : 0, pointerEvents: canPrev && !animating ? 'auto' : 'none' }}><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button><button type="button" aria-label="Próximo" onClick={() => scroll('next')} className="absolute right-0 top-1/2 z-10 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/90 shadow focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] dark:border-slate-600 dark:bg-slate-800/90 sm:hidden" style={{ opacity: canNext && !animating ? 1 : 0, pointerEvents: canNext && !animating ? 'auto' : 'none' }}><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
     </div>
   </section>

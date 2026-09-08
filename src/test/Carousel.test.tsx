@@ -63,6 +63,15 @@ describe('Carousel circular sem peeks', () => {
   })
   afterEach(() => { cleanup(); resizeCallbacks = []; vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
+  it('mantém a estrutura do carrossel no estado vazio sem controles', () => {
+    renderCarousel(0)
+
+    expect(region()).toHaveAttribute('aria-roledescription', 'carrossel')
+    expect(screen.getByText('Nenhum item disponível.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Próximo' })).not.toBeInTheDocument()
+  })
+
   it.each([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13])('suporta qualquer quantidade de itens (%i)', (count) => {
     renderCarousel(count)
     configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
@@ -154,6 +163,10 @@ describe('Carousel circular sem peeks', () => {
     expect(carouselTrack.style.transition).toBe('none')
     expect(currentCard.style.transform).toBe('scale(1)')
     expect(currentCard.style.opacity).toBe('1')
+    expect(nextButton()).not.toBeDisabled()
+    expect(labels()).toEqual(['Livro 5', 'Livro 6', 'Livro 7', 'Livro 8'])
+    fireEvent.click(nextButton())
+    expect(labels()).toEqual(['Livro 9', 'Livro 1', 'Livro 2', 'Livro 3'])
   })
 
   it('circula modularmente e alcança todos os itens como principais', () => {

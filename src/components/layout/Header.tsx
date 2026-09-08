@@ -128,7 +128,7 @@ export function Header() {
             <nav ref={desktopNavRef} aria-label="Principal" className="relative hidden md:flex items-center">
               <ActiveNavIndicator navRef={desktopNavRef} activeKey={location.pathname} />
               <ul className="flex items-center gap-1 list-none m-0 p-0">
-                <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} className={navItemCls('/')}>Início</Link></li>
+                <li><Link to="/inicio" aria-current={isActivePath('/inicio') ? 'page' : undefined} className={navItemCls('/inicio')}>Início</Link></li>
                 <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
                 {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
                 {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
@@ -232,7 +232,7 @@ export function Header() {
           <nav ref={mobileNavRef} id="mobile-nav" aria-label="Principal móvel" className="relative md:hidden pb-4 flex flex-col gap-1">
             <ActiveNavIndicator navRef={mobileNavRef} activeKey={location.pathname} />
             <ul className="flex flex-col gap-1 list-none m-0 p-0">
-              <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/')}>Início</Link></li>
+              <li><Link to="/inicio" aria-current={isActivePath('/inicio') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/inicio')}>Início</Link></li>
               <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/acervo')}>Acervo</Link></li>
               {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>}
