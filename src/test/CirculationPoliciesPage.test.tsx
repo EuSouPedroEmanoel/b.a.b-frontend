@@ -16,8 +16,8 @@ vi.mock('@/components/feedback/LiveRegionContext', () => ({ useAnnouncer: () => 
 vi.mock('@/lib/api', () => ({ default: { get: fixtures.get, put: fixtures.put } }))
 
 const policies = [
-  { reader_role: 'student', max_active_loans: 3, loan_duration_days: 14, max_renewals: 0, can_reserve: true, max_active_reservations: 3, block_new_loans_when_overdue: true, post_overdue_suspension_days: 0 },
-  { reader_role: 'teacher', max_active_loans: 5, loan_duration_days: 21, max_renewals: 0, can_reserve: true, max_active_reservations: 5, block_new_loans_when_overdue: true, post_overdue_suspension_days: 0 },
+  { reader_role: 'student', max_active_loans: 3, loan_duration_days: 14, max_renewals: 0, can_reserve: true, max_active_reservations: 3, block_new_loans_when_overdue: true, post_overdue_suspension_days: 0, count_only_business_days: false, move_due_date_to_next_business_day: false },
+  { reader_role: 'teacher', max_active_loans: 5, loan_duration_days: 21, max_renewals: 0, can_reserve: true, max_active_reservations: 5, block_new_loans_when_overdue: true, post_overdue_suspension_days: 0, count_only_business_days: false, move_due_date_to_next_business_day: false },
 ]
 
 function renderPage() {
@@ -81,6 +81,31 @@ describe('CirculationPoliciesPage', () => {
     expect(await screen.findByRole('tab', { name: 'Aluno' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Salvar regras' })).toBeEnabled()
     expect(screen.getAllByLabelText(/Contar apenas dias úteis no prazo do empréstimo/)[0]).toBeEnabled()
+  })
+
+  it('disables the next-business-day option while business-day counting is active', async () => {
+    fixtures.get.mockResolvedValue({ data: { policies } })
+    fixtures.put.mockResolvedValue({ data: { policies } })
+    renderPage()
+
+    await screen.findByRole('tab', { name: 'Aluno' })
+    const countBusinessDays = screen.getAllByLabelText(/Contar apenas dias úteis no prazo do empréstimo/)[0]
+    const moveDueDate = screen.getAllByLabelText(/Se a data de entrega cair em dia não útil/)[0]
+
+    expect(moveDueDate).toBeEnabled()
+    fireEvent.click(countBusinessDays)
+    expect(countBusinessDays).toBeChecked()
+    expect(moveDueDate).toBeDisabled()
+    expect(moveDueDate).not.toBeChecked()
+
+    fireEvent.click(moveDueDate)
+    expect(moveDueDate).not.toBeChecked()
+
+    fireEvent.click(countBusinessDays)
+    expect(countBusinessDays).not.toBeChecked()
+    expect(moveDueDate).toBeEnabled()
+    fireEvent.click(moveDueDate)
+    expect(moveDueDate).toBeChecked()
   })
 
   it('lets a super admin choose a school with the shared autocomplete', async () => {
