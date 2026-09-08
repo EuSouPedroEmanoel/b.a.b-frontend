@@ -127,8 +127,8 @@ export function LoginPage() {
     setGuestLoading(true)
     try {
       await loginGuest(guestSchoolCode, guestSchoolName)
-      announce('Acesso como visitante realizado. Acervo aberto.', 'polite')
-      navigate('/acervo')
+      announce('Acesso como visitante realizado. Início aberto.', 'polite')
+      navigate('/')
     } catch (err: unknown) {
       const message = getErrorMessage(err, 'Não foi possível iniciar o acesso como visitante.')
       setGuestError(message)

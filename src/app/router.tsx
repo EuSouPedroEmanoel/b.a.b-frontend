@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
-import { DashboardPage } from '@/features/dashboard/DashboardPage'
+import { HomePage } from '@/features/home/HomePage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { AccountPage } from '@/features/account/AccountPage'
 import { AccountManagementPage } from '@/features/account/AccountManagementPage'
@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
     element: <Layout />,
     errorElement: <RouteErrorFallback />,
     children: [
-      { path: '/', element: <AccountOnly><DashboardPage /></AccountOnly> },
+      { path: '/', element: <Protected><HomePage /></Protected> },
       {
         path: '/entrar',
         element: (

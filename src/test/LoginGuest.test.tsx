@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LoginPage } from '@/features/auth/LoginPage'
 
@@ -34,9 +34,15 @@ describe('Guest school autocomplete', () => {
       <Routes>
         <Route path="/entrar" element={<LoginPage />} />
         <Route path="/visitar/:schoolCode" element={<LoginPage />} />
+        <Route path="/" element={<LocationText />} />
       </Routes>
     </MemoryRouter>,
   )
+
+  function LocationText() {
+    const location = useLocation()
+    return <output data-testid="location">{location.pathname}</output>
+  }
 
   const openGuestMode = async () => {
     const toggle = await screen.findByRole('tab', { name: 'Acessar como visitante' })
@@ -158,5 +164,17 @@ describe('Guest school autocomplete', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     fireEvent.submit(input.closest('form')!)
     await waitFor(() => expect(fixtures.loginGuest).toHaveBeenCalledWith('S2', 'Escola Norte'))
+  })
+
+  it('opens the public Home after Guest authentication', async () => {
+    renderLogin()
+    const input = await openGuestMode()
+
+    fireEvent.change(input, { target: { value: 'Central' } })
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.submit(input.closest('form')!)
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/'))
   })
 })

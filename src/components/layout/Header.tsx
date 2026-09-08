@@ -1,9 +1,66 @@
 import { Moon, Sun, Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
+
+function ActiveNavIndicator({ navRef, activeKey }: { navRef: RefObject<HTMLElement | null>; activeKey: string }) {
+  const [position, setPosition] = useState({ left: 0, top: 0, width: 0, height: 0 })
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    if (!nav) return undefined
+    const update = () => {
+      const active = nav.querySelector<HTMLElement>('a[aria-current="page"]')
+      if (!active) {
+        setPosition((current) => ({ ...current, width: 0 }))
+        return
+      }
+      const navRect = nav.getBoundingClientRect()
+      const activeRect = active.getBoundingClientRect()
+      setPosition({
+        left: activeRect.left - navRect.left,
+        top: activeRect.top - navRect.top,
+        width: activeRect.width,
+        height: activeRect.height,
+      })
+    }
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update)
+    observer?.observe(nav)
+    window.addEventListener('resize', update)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [activeKey, navRef])
+
+  useLayoutEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReducedMotion(media.matches)
+    update()
+    media.addEventListener?.('change', update)
+    return () => media.removeEventListener?.('change', update)
+  }, [])
+
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute rounded-sm bg-white/80 dark:bg-slate-200"
+      style={{
+        left: 0,
+        top: `${position.top + position.height - 2}px`,
+        width: `${position.width}px`,
+        height: '2px',
+        transform: `translateX(${position.left}px)`,
+        transition: reducedMotion ? 'none' : 'transform 250ms ease-out, width 250ms ease-out',
+      }}
+    />
+  )
+}
 
 export function Header() {
   const { isAuthenticated, user, logout } = useAuth()
@@ -15,8 +72,8 @@ export function Header() {
 
   const isActivePath = (to: string) => (to === '/' ? location.pathname === '/' : location.pathname === to || location.pathname.startsWith(to + '/'))
   const navItemCls = (to: string) =>
-    `px-3 py-2 rounded-md text-sm font-medium min-h-[44px] inline-flex items-center transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 active:bg-white/20 ${
-      isActivePath(to) ? 'bg-white text-[#0f4c75] dark:bg-white dark:text-slate-900' : 'text-white/90 hover:bg-white/15 hover:text-white dark:text-slate-200 dark:hover:bg-slate-800'
+    `inline-flex min-h-[44px] items-center border-b-2 border-transparent px-3 py-2 text-sm font-medium text-white/85 transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 active:bg-white/15 dark:text-slate-200 ${
+      isActivePath(to) ? 'border-white/80 bg-white/10 font-semibold text-white dark:border-slate-200 dark:bg-slate-800/80 dark:text-white' : 'hover:bg-white/10 hover:text-white dark:hover:bg-slate-800/70 dark:hover:text-white'
     }`
 
   const handleToggle = () => {
@@ -48,35 +105,40 @@ export function Header() {
   const logoutCls =
     'px-4 py-2 text-sm font-medium rounded-md border border-white/30 text-white hover:bg-white/15 active:bg-white/25 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:active:bg-slate-700 min-h-[44px] inline-flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2'
   const profileLabel = user?.name ?? user?.username ?? 'Meu perfil'
+  const desktopNavRef = useRef<HTMLElement>(null)
+  const mobileNavRef = useRef<HTMLElement>(null)
 
   return (
     <header className="sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="Biblioteca Ginásio — página inicial">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#0f4c75] dark:bg-white dark:text-slate-900 font-bold text-lg shadow-sm" aria-hidden="true">
-              BG
-            </span>
-            <span className="hidden sm:block font-semibold text-white dark:text-white leading-none">
-              Biblioteca
-              <br />
-              <span className="text-xs font-normal text-white/80 dark:text-slate-400">Ginásio</span>
-            </span>
-          </Link>
+          <div className="flex min-w-0 items-center gap-6">
+            <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="Biblioteca Ginásio — página inicial">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#0f4c75] dark:bg-white dark:text-slate-900 font-bold text-lg shadow-sm" aria-hidden="true">
+                BG
+              </span>
+              <span className="hidden sm:block font-semibold text-white dark:text-white leading-none">
+                Biblioteca
+                <br />
+                <span className="text-xs font-normal text-white/80 dark:text-slate-400">Ginásio</span>
+              </span>
+            </Link>
 
-          {/* Desktop nav — links reais para navegação e leitura semântica. */}
-          {!isGuest && <nav aria-label="Principal" className="hidden md:flex items-center">
-            <ul className="flex items-center gap-1 list-none m-0 p-0">
-              {!isGuest && <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} className={navItemCls('/')}>Início</Link></li>}
-              <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
-              {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
-              {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
-              {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
-              {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
-              {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
-              {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
-            </ul>
-          </nav>}
+            {/* Desktop nav — links reais para navegação e leitura semântica. */}
+            <nav ref={desktopNavRef} aria-label="Principal" className="relative hidden md:flex items-center">
+              <ActiveNavIndicator navRef={desktopNavRef} activeKey={location.pathname} />
+              <ul className="flex items-center gap-1 list-none m-0 p-0">
+                <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} className={navItemCls('/')}>Início</Link></li>
+                <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
+                {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
+                {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
+                {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
+                {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
+                {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
+                {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
+              </ul>
+            </nav>
+          </div>
 
           <div
             className="hidden md:flex items-center gap-2"
@@ -151,7 +213,6 @@ export function Header() {
             >
               {resolved === 'dark' ? <Sun className="h-5 w-5" aria-hidden="true" /> : <Moon className="h-5 w-5" aria-hidden="true" />}
             </button>
-            {!isGuest && <>
             <button
               type="button"
               aria-expanded={open}
@@ -162,16 +223,16 @@ export function Header() {
             >
               {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
             </button>
-            </>}
             {isGuest && <button type="button" onClick={handleChangeSchool} className={`${secondaryActionCls} px-3`}>Trocar escola</button>}
             {isGuest && <button type="button" onClick={handleLogout} className={`${logoutCls} px-3`}>Sair</button>}
           </div>
         </div>
 
-        {open && !isGuest && (
-          <nav id="mobile-nav" aria-label="Principal móvel" className="md:hidden pb-4 flex flex-col gap-1">
+        {open && (
+          <nav ref={mobileNavRef} id="mobile-nav" aria-label="Principal móvel" className="relative md:hidden pb-4 flex flex-col gap-1">
+            <ActiveNavIndicator navRef={mobileNavRef} activeKey={location.pathname} />
             <ul className="flex flex-col gap-1 list-none m-0 p-0">
-              {!isGuest && <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/')}>Início</Link></li>}
+              <li><Link to="/" aria-current={isActivePath('/') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/')}>Início</Link></li>
               <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/acervo')}>Acervo</Link></li>
               {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>}
@@ -179,7 +240,7 @@ export function Header() {
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
               {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/escolas')}>Escolas</Link></li>)}
-              <li><Link to="/minha-conta" aria-current={isActivePath('/minha-conta') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/minha-conta')}>Ver perfil</Link></li>
+              {!isGuest && <li><Link to="/minha-conta" aria-current={isActivePath('/minha-conta') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/minha-conta')}>Ver perfil</Link></li>}
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">
               {isAuthenticated ? (
