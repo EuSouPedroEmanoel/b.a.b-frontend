@@ -3,6 +3,7 @@ import { createContext } from 'react'
 export type User = {
   id: number
   username: string
+  name: string
   email: string | null
   cpf_masked: string | null
   birthdate: string | null

@@ -47,6 +47,7 @@ export function Header() {
     'px-4 py-2 text-sm font-medium rounded-md bg-white text-[#0f4c75] hover:bg-white/90 active:bg-white/80 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:active:bg-slate-200 min-h-[44px] inline-flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2'
   const logoutCls =
     'px-4 py-2 text-sm font-medium rounded-md border border-white/30 text-white hover:bg-white/15 active:bg-white/25 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:active:bg-slate-700 min-h-[44px] inline-flex items-center justify-center transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2'
+  const profileLabel = user?.name ?? user?.username ?? 'Meu perfil'
 
   return (
     <header className="sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-sm">
@@ -72,7 +73,7 @@ export function Header() {
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
               {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
-              {(isUsersManager || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
+              {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
             </ul>
           </nav>}
@@ -117,9 +118,17 @@ export function Header() {
               </>
             ) : isAuthenticated ? (
               <>
-                <span className="text-sm text-white/90 dark:text-slate-300 hidden lg:inline" aria-live="polite">
-                  {isGuest ? 'Visitante' : user?.username} <span className="text-xs bg-white/20 dark:bg-slate-700 px-2 py-0.5 rounded-full ml-1" aria-hidden="true">{isGuest ? 'acesso temporário' : user?.role}</span>
-                </span>
+                <Link
+                  to="/minha-conta"
+                  aria-label={`Ver perfil de ${profileLabel}`}
+                  aria-current={isActivePath('/minha-conta') ? 'page' : undefined}
+                  className="hidden lg:inline-flex min-h-[44px] items-center rounded-md px-3 py-2 text-sm text-left text-white/90 hover:bg-white/15 hover:text-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+                >
+                  <span aria-live="polite">
+                    {isGuest ? 'Visitante' : profileLabel}{' '}
+                    <span className="text-xs bg-white/20 dark:bg-slate-700 px-2 py-0.5 rounded-full ml-1">{isGuest ? 'acesso temporário' : user?.role}</span>
+                  </span>
+                </Link>
                 <button type="button" onClick={handleLogout} className={logoutCls}>
                   Sair
                 </button>
@@ -168,12 +177,13 @@ export function Header() {
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>}
               {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/alunos')}>Alunos</Link></li>)}
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
-              {(isUsersManager || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
+              {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/escolas')}>Escolas</Link></li>)}
+              <li><Link to="/minha-conta" aria-current={isActivePath('/minha-conta') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/minha-conta')}>Ver perfil</Link></li>
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">
               {isAuthenticated ? (
-                <button type="button" onClick={handleLogout} className={`w-full ${logoutCls} justify-center`}>Sair ({isGuest ? 'Visitante' : user?.username})</button>
+                <button type="button" onClick={handleLogout} className={`w-full ${logoutCls} justify-center`}>Sair ({isGuest ? 'Visitante' : user?.name ?? user?.username})</button>
               ) : (
                 <Link to="/entrar" onClick={() => setOpen(false)} className={`w-full ${secondaryActionCls} justify-center`}>Entrar</Link>
               )}

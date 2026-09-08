@@ -28,6 +28,7 @@ function guestUser(token: string): User | null {
   return {
     id: 0,
     username: 'Visitante',
+    name: 'Visitante',
     email: null,
     cpf_masked: null,
     birthdate: null,
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser({
           id: 0,
           username,
+          name: username,
           email: null,
           cpf_masked: null,
           birthdate: null,
@@ -87,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // se falhar listagem (permissão), mantém minimal user para não deslogar
       const sub = decodeSub(token)
       if (sub)
-        setUser({ id: 0, username: sub, email: null, cpf_masked: null, birthdate: null, turma_numero: null, turma_letra: null, role: 'unknown', school_id: null, is_active: true })
+        setUser({ id: 0, username: sub, name: sub, email: null, cpf_masked: null, birthdate: null, turma_numero: null, turma_letra: null, role: 'unknown', school_id: null, is_active: true })
     } finally {
       setLoading(false)
     }

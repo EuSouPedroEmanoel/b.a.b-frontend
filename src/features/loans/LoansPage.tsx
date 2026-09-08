@@ -241,16 +241,17 @@ function OperationalLoansPage() {
   const qc = useQueryClient()
   const { user: currentUser } = useAuth()
   const isSuperAdmin = currentUser?.role === 'super_admin'
+  const canManageLoans = !isSuperAdmin
 
   const selectedBookQuery = useQuery({
     queryKey: ['loan-selected-book', preselectedBookId],
-    enabled: operation === 'borrow' && !!preselectedBookId,
+    enabled: canManageLoans && operation === 'borrow' && !!preselectedBookId,
     retry: false,
     queryFn: async () => (await api.get<Book>(`/books/${preselectedBookId}`)).data,
   })
   const selectedBookCopiesQuery = useQuery({
     queryKey: ['loan-selected-book-copies', preselectedBookId],
-    enabled: operation === 'borrow' && !!preselectedBookId,
+    enabled: canManageLoans && operation === 'borrow' && !!preselectedBookId,
     retry: false,
     queryFn: async () => (await api.get<Paginated<Copy>>('/copies/', { params: { book_id: preselectedBookId, size: 100 } })).data,
   })
@@ -272,7 +273,7 @@ function OperationalLoansPage() {
       input?.focus()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [operation])
+  }, [canManageLoans, operation])
 
   useEffect(() => { localStorage.setItem('emprestimos:pageSize', String(pageSize)) }, [pageSize])
 
@@ -648,8 +649,9 @@ function OperationalLoansPage() {
   return <div className="flex flex-col gap-6">
     <header><h1 className="text-2xl sm:text-3xl font-bold">Empréstimos</h1><PageDescription>Empreste e devolva livros com atendimento rápido no balcão.</PageDescription></header>
     {loanSuccessMessage && <div aria-hidden="true" className="fixed right-4 top-4 z-50 max-w-md rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-950 shadow-lg dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">{loanSuccessMessage}</div>}
+    {isSuperAdmin && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">Você está consultando os empréstimos em modo somente leitura. Apenas bibliotecários e administradores escolares podem emprestar ou devolver livros.</p>}
 
-    <Card><CardHeader>
+    {!isSuperAdmin && <Card><CardHeader>
       <h2 className="sr-only">Atendimento de empréstimos</h2>
       <div role="group" aria-label="Operação do atendimento" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
         <Button type="button" size="sm" variant={operation === 'borrow' ? 'primary' : 'secondary'} aria-pressed={operation === 'borrow'} onClick={() => setOperation('borrow')} aria-label="Operação emprestar" className={`gap-1.5 ${operation === 'borrow' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}>Emprestar</Button>
@@ -709,7 +711,7 @@ function OperationalLoansPage() {
         </section>
         <p id="return-action-status" className="sr-only">{returnKind === 'copy' && returnCopyResult ? 'Empréstimo localizado. A devolução pode ser confirmada.' : returnKind === 'user' && returnUserResult?.loans.length ? 'Selecione o livro que será devolvido.' : 'A devolução ficará disponível após localizar um empréstimo ativo.'}</p>
       </form>}
-    </CardBody></Card>
+    </CardBody></Card>}
 
     {loanConfirmationOpen && copy && reader && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={closeLoanConfirmation}>
       <section role="dialog" aria-modal="true" aria-labelledby="loan-final-confirmation-title" aria-describedby="loan-final-confirmation-description" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800" onMouseDown={(event) => event.stopPropagation()}>
@@ -728,7 +730,7 @@ function OperationalLoansPage() {
       </section>
     </div>}
 
-    {loans && <LoansList loans={loans} pageSize={pageSize} setPageSize={setPageSize} setPage={setPage} situation={situation} setSituation={(value) => { setSituation(value); setPage(1) }} navigate={navigate} onReturn={handleReturn} returnPending={returnMut.isPending} returningLoanId={returningLoanId} />}
+    {loans && <LoansList loans={loans} pageSize={pageSize} setPageSize={setPageSize} setPage={setPage} situation={situation} setSituation={(value) => { setSituation(value); setPage(1) }} navigate={navigate} onReturn={handleReturn} returnPending={returnMut.isPending} returningLoanId={returningLoanId} readOnly={isSuperAdmin} />}
   </div>
 }
 
@@ -737,7 +739,7 @@ function ReturnLoanSummary({ loan }: { loan: Loan }) {
   return <div className="mt-1 text-sm"><p className="font-medium">{loan.book_title}</p><p className="font-mono text-slate-600 dark:text-slate-300">Exemplar: {loan.internal_code}</p><p className="mt-2">Leitor: <span className="font-medium">{loan.borrower_username}</span></p><p className="text-slate-600 dark:text-slate-300">Retirada: {formatDate(loan.borrowed_at)} · Vencimento: {formatDate(loan.due_date)}</p><p className={`mt-2 font-medium ${lateDays > 0 ? 'text-red-700 dark:text-red-300' : 'text-emerald-800 dark:text-emerald-200'}`}>{lateDays > 0 ? `Atrasado ${lateDays} dia(s)` : 'No prazo'}</p></div>
 }
 
-function LoansList({ loans, pageSize, setPageSize, setPage, situation, setSituation, navigate, onReturn, returnPending, returningLoanId }: { loans: Paginated<Loan>; pageSize: number; setPageSize: (size: number) => void; setPage: (page: number) => void; situation: LoanSituation; setSituation: (value: LoanSituation) => void; navigate: ReturnType<typeof useNavigate>; onReturn: (request: ReturnRequest) => void; returnPending: boolean; returningLoanId?: number }) {
+function LoansList({ loans, pageSize, setPageSize, setPage, situation, setSituation, navigate, onReturn, returnPending, returningLoanId, readOnly = false }: { loans: Paginated<Loan>; pageSize: number; setPageSize: (size: number) => void; setPage: (page: number) => void; situation: LoanSituation; setSituation: (value: LoanSituation) => void; navigate: ReturnType<typeof useNavigate>; onReturn: (request: ReturnRequest) => void; returnPending: boolean; returningLoanId?: number; readOnly?: boolean }) {
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const filterWrapperRef = useRef<HTMLDivElement>(null)
   const hasActiveFilter = situation !== ''
@@ -760,7 +762,7 @@ function LoansList({ loans, pageSize, setPageSize, setPage, situation, setSituat
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [filterMenuOpen])
 
-  return <section aria-labelledby="loans-list-heading" className="flex flex-col gap-6">
+  return <section aria-labelledby="loans-list-heading" className={`flex flex-col gap-6 ${readOnly ? 'opacity-60' : ''}`}>
     <h2 id="loans-list-heading" className="sr-only">Lista de empréstimos</h2>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">{loans.total} {loans.total === 1 ? 'empréstimo encontrado' : 'empréstimos encontrados'}</p>
@@ -776,22 +778,22 @@ function LoansList({ loans, pageSize, setPageSize, setPage, situation, setSituat
       </div>
     </div>
     {hasActiveFilter && <div className="flex flex-wrap gap-2"><Badge tone="neutral">Situação: {situationOptions.find((option) => option.value === situation)?.label}</Badge><Button type="button" variant="secondary" size="sm" onClick={() => { setSituation(''); setPage(1) }} className="hover:!bg-slate-100 dark:hover:!bg-slate-700">Limpar filtro</Button></div>}
-    <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 md:block"><table className="w-full text-sm"><caption className="sr-only">Empréstimos ativos e histórico</caption><thead className="bg-slate-50 dark:bg-slate-700/50"><tr><th scope="col" className="px-4 py-3 text-left font-semibold">Livro</th><th scope="col" className="px-4 py-3 text-left font-semibold">Código interno</th><th scope="col" className="px-4 py-3 text-left font-semibold">Leitor</th><th scope="col" className="px-4 py-3 text-left font-semibold">Status</th><th scope="col" className="px-4 py-3 text-left font-semibold">Retirada</th><th scope="col" className="px-4 py-3 text-left font-semibold">Vencimento / devolução</th><th scope="col" className="px-4 py-3 text-left font-semibold">Ações</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-700">{loans.items.map((loan) => <LoanRow key={loan.id} loan={loan} navigate={navigate} onReturn={onReturn} returnPending={returnPending} returningLoanId={returningLoanId} />)}</tbody></table></div>
-    <ul className="grid gap-3 md:hidden" role="list">{loans.items.map((loan) => <LoanCard key={loan.id} loan={loan} navigate={navigate} onReturn={onReturn} returnPending={returnPending} returningLoanId={returningLoanId} />)}</ul>
+    <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 md:block"><table className="w-full text-sm"><caption className="sr-only">Empréstimos ativos e histórico</caption><thead className="bg-slate-50 dark:bg-slate-700/50"><tr><th scope="col" className="px-4 py-3 text-left font-semibold">Livro</th><th scope="col" className="px-4 py-3 text-left font-semibold">Código interno</th><th scope="col" className="px-4 py-3 text-left font-semibold">Leitor</th><th scope="col" className="px-4 py-3 text-left font-semibold">Status</th><th scope="col" className="px-4 py-3 text-left font-semibold">Retirada</th><th scope="col" className="px-4 py-3 text-left font-semibold">Vencimento / devolução</th>{!readOnly && <th scope="col" className="px-4 py-3 text-left font-semibold">Ações</th>}</tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-700">{loans.items.map((loan) => <LoanRow key={loan.id} loan={loan} navigate={navigate} onReturn={onReturn} returnPending={returnPending} returningLoanId={returningLoanId} readOnly={readOnly} />)}</tbody></table></div>
+    <ul className="grid gap-3 md:hidden" role="list">{loans.items.map((loan) => <LoanCard key={loan.id} loan={loan} navigate={navigate} onReturn={onReturn} returnPending={returnPending} returningLoanId={returningLoanId} readOnly={readOnly} />)}</ul>
     <Pagination page={loans.page} pages={loans.pages} total={loans.total} onChange={setPage} />
   </section>
 }
 
-function LoanRow({ loan, navigate, onReturn, returnPending, returningLoanId }: { loan: Loan; navigate: ReturnType<typeof useNavigate>; onReturn: (request: ReturnRequest) => void; returnPending: boolean; returningLoanId?: number }) {
+function LoanRow({ loan, navigate, onReturn, returnPending, returningLoanId, readOnly = false }: { loan: Loan; navigate: ReturnType<typeof useNavigate>; onReturn: (request: ReturnRequest) => void; returnPending: boolean; returningLoanId?: number; readOnly?: boolean }) {
   const displayStatus = loanDisplayStatus(loan)
   const lateDays = loanDisplayLateDays(loan)
   const isReturning = returningLoanId === loan.id
-  return <tr onClick={() => navigate(`/acervo/${loan.book_id}`)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30"><td className="px-4 py-3"><Link to={`/acervo/${loan.book_id}`} onClick={(event) => event.stopPropagation()} aria-label={`Abrir detalhes de ${loan.book_title}`} className="flex min-w-[220px] items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"><CoverImage src={loan.book_cover_url} title={loan.book_title} alt="" width={48} height={72} className="h-14 w-10 shrink-0 rounded-md border border-slate-200 dark:border-slate-600" sizes="40px" /><span className="font-medium">{loan.book_title}</span></Link></td><td className="px-4 py-3 font-mono">{loan.internal_code}</td><td className="px-4 py-3"><div>{loan.borrower_username}</div><div className="text-xs text-slate-500">{loan.borrower_cpf_masked ?? 'CPF não informado'}</div></td><td className="px-4 py-3"><Badge tone={statusTone(displayStatus)}>{statusLabel(displayStatus)}</Badge>{lateDays > 0 && <span className="ml-2 text-xs text-red-600">+{lateDays}d</span>}</td><td className="px-4 py-3 text-xs">{formatDate(loan.borrowed_at)}</td><td className="px-4 py-3 text-xs"><div>{formatDate(loan.due_date)}</div>{loan.returned_at && <div className="text-slate-500">Devolvido: {formatDate(loan.returned_at)}</div>}</td><td className="px-4 py-3">{loan.status !== 'returned' && <Button size="sm" variant="secondary" onClick={(event) => { event.stopPropagation(); onReturn({ id: loan.id, source: 'table' }) }} disabled={returnPending} aria-busy={isReturning} aria-label={`${isReturning ? 'Processando devolução de' : 'Devolver'} ${loan.book_title}, exemplar ${loan.internal_code}`}>{isReturning ? 'Processando…' : 'Devolver'}</Button>}</td></tr>
+  return <tr onClick={() => navigate(`/acervo/${loan.book_id}`)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30"><td className="px-4 py-3"><Link to={`/acervo/${loan.book_id}`} onClick={(event) => event.stopPropagation()} aria-label={`Abrir detalhes de ${loan.book_title}`} className="flex min-w-[220px] items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"><CoverImage src={loan.book_cover_url} title={loan.book_title} alt="" width={48} height={72} className="h-14 w-10 shrink-0 rounded-md border border-slate-200 dark:border-slate-600" sizes="40px" /><span className="font-medium">{loan.book_title}</span></Link></td><td className="px-4 py-3 font-mono">{loan.internal_code}</td><td className="px-4 py-3"><div>{loan.borrower_username}</div><div className="text-xs text-slate-500">{loan.borrower_cpf_masked ?? 'CPF não informado'}</div></td><td className="px-4 py-3"><Badge tone={statusTone(displayStatus)}>{statusLabel(displayStatus)}</Badge>{lateDays > 0 && <span className="ml-2 text-xs text-red-600">+{lateDays}d</span>}</td><td className="px-4 py-3 text-xs">{formatDate(loan.borrowed_at)}</td><td className="px-4 py-3 text-xs"><div>{formatDate(loan.due_date)}</div>{loan.returned_at && <div className="text-slate-500">Devolvido: {formatDate(loan.returned_at)}</div>}</td>{!readOnly && <td className="px-4 py-3">{loan.status !== 'returned' && <Button size="sm" variant="secondary" onClick={(event) => { event.stopPropagation(); onReturn({ id: loan.id, source: 'table' }) }} disabled={returnPending} aria-busy={isReturning} aria-label={`${isReturning ? 'Processando devolução de' : 'Devolver'} ${loan.book_title}, exemplar ${loan.internal_code}`}>{isReturning ? 'Processando…' : 'Devolver'}</Button>}</td>}</tr>
 }
 
-function LoanCard({ loan, navigate, onReturn, returnPending, returningLoanId }: { loan: Loan; navigate: ReturnType<typeof useNavigate>; onReturn: (request: ReturnRequest) => void; returnPending: boolean; returningLoanId?: number }) {
+function LoanCard({ loan, navigate, onReturn, returnPending, returningLoanId, readOnly = false }: { loan: Loan; navigate: ReturnType<typeof useNavigate>; onReturn: (request: ReturnRequest) => void; returnPending: boolean; returningLoanId?: number; readOnly?: boolean }) {
   const displayStatus = loanDisplayStatus(loan)
   const lateDays = loanDisplayLateDays(loan)
   const isReturning = returningLoanId === loan.id
-  return <li onClick={() => navigate(`/acervo/${loan.book_id}`)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between"><Link to={`/acervo/${loan.book_id}`} onClick={(event) => event.stopPropagation()} aria-label={`Abrir detalhes de ${loan.book_title}`} className="flex min-w-0 items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"><CoverImage src={loan.book_cover_url} title={loan.book_title} alt="" width={48} height={72} className="h-14 w-10 shrink-0 rounded-md border border-slate-200 dark:border-slate-600" sizes="40px" /><h3 className="truncate font-semibold">{loan.book_title}</h3></Link><Badge tone={statusTone(displayStatus)}>{statusLabel(displayStatus)}</Badge></div><p className="mt-1 text-sm text-slate-500">Exemplar <span className="font-mono">{loan.internal_code}</span> → {loan.borrower_username} ({loan.borrower_cpf_masked ?? 'CPF não informado'})</p><p className="text-xs text-slate-500">Retirada: {formatDate(loan.borrowed_at)} · Vencimento: {formatDate(loan.due_date)}{lateDays > 0 && ` · Atrasado ${lateDays} dia(s)`}</p>{loan.status !== 'returned' && <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={(event) => { event.stopPropagation(); onReturn({ id: loan.id, source: 'table' }) }} disabled={returnPending} aria-busy={isReturning} aria-label={`${isReturning ? 'Processando devolução de' : 'Devolver'} ${loan.book_title}, exemplar ${loan.internal_code}`}>{isReturning ? 'Processando…' : 'Devolver'}</Button>}</li>
+  return <li onClick={() => navigate(`/acervo/${loan.book_id}`)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"><div className="flex items-start justify-between"><Link to={`/acervo/${loan.book_id}`} onClick={(event) => event.stopPropagation()} aria-label={`Abrir detalhes de ${loan.book_title}`} className="flex min-w-0 items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"><CoverImage src={loan.book_cover_url} title={loan.book_title} alt="" width={48} height={72} className="h-14 w-10 shrink-0 rounded-md border border-slate-200 dark:border-slate-600" sizes="40px" /><h3 className="truncate font-semibold">{loan.book_title}</h3></Link><Badge tone={statusTone(displayStatus)}>{statusLabel(displayStatus)}</Badge></div><p className="mt-1 text-sm text-slate-500">Exemplar <span className="font-mono">{loan.internal_code}</span> → {loan.borrower_username} ({loan.borrower_cpf_masked ?? 'CPF não informado'})</p><p className="text-xs text-slate-500">Retirada: {formatDate(loan.borrowed_at)} · Vencimento: {formatDate(loan.due_date)}{lateDays > 0 && ` · Atrasado ${lateDays} dia(s)`}</p>{!readOnly && loan.status !== 'returned' && <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={(event) => { event.stopPropagation(); onReturn({ id: loan.id, source: 'table' }) }} disabled={returnPending} aria-busy={isReturning} aria-label={`${isReturning ? 'Processando devolução de' : 'Devolver'} ${loan.book_title}, exemplar ${loan.internal_code}`}>{isReturning ? 'Processando…' : 'Devolver'}</Button>}</li>
 }

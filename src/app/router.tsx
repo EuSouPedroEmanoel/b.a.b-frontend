@@ -2,6 +2,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { AccountPage } from '@/features/account/AccountPage'
+import { AccountManagementPage } from '@/features/account/AccountManagementPage'
 import { BooksPage } from '@/features/books/BooksPage'
 import { BookCreatePage } from '@/features/books/BookCreatePage'
 import { BookDetailPage } from '@/features/books/BookDetailPage'
@@ -116,6 +118,22 @@ export const router = createBrowserRouter([
         element: (
           <AccountOnly>
             <UsersPage />
+          </AccountOnly>
+        ),
+      },
+      {
+        path: '/minha-conta',
+        element: (
+          <AccountOnly>
+            <AccountPage />
+          </AccountOnly>
+        ),
+      },
+      {
+        path: '/minha-conta/gerenciar',
+        element: (
+          <AccountOnly>
+            <AccountManagementPage />
           </AccountOnly>
         ),
       },

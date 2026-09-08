@@ -18,6 +18,7 @@ import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 type AppUser = {
   id: number
   username: string
+  name: string
   email: string | null
   cpf_masked: string | null
   birthdate: string | null
@@ -134,12 +135,13 @@ export function UsersPage() {
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate)
   const [createError, setCreateError] = useState('')
   const [editing, setEditing] = useState<AppUser | null>(null)
-  const [editForm, setEditForm] = useState({ email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
+  const [editForm, setEditForm] = useState({ name: '', email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
 
   const { user: currentUser } = useAuth()
 
   const isSuperAdmin = currentUser?.role === 'super_admin'
-  const canManageStaffCapabilities = isSuperAdmin || currentUser?.role === 'school_admin'
+  const canManageStaffCapabilities = currentUser?.role === 'school_admin'
+  const canEditUser = (u: AppUser) => !isSuperAdmin || u.role === 'school_admin'
 
   const { data: schoolsData } = useQuery({
     queryKey: ['schools', 'options'],
@@ -154,6 +156,13 @@ export function UsersPage() {
     label: school.name,
     data: school,
   }))
+  const createSchoolLabel = useMemo(() => {
+    if (!isSuperAdmin) return ''
+    const selected = schoolFilter
+      ? schoolsData?.items.find((school) => school.id === Number(schoolFilter))
+      : schoolsData?.items[0]
+    return selected ? schoolLabel(selected.name, selected.code) : ''
+  }, [isSuperAdmin, schoolFilter, schoolsData])
 
   const queryKey = ['users', role, schoolFilter]
   const { data, isLoading, isError, error } = useQuery({
@@ -184,6 +193,7 @@ export function UsersPage() {
         const schoolId = schoolFilter || (schoolsData?.items[0]?.id ?? 0)
         const { data } = await api.post<AppUser>(`/schools/${schoolId}/admins`, {
           username: f.username.trim(),
+          name: f.name.trim(),
           email: f.email.trim(),
           cpf: f.cpf,
           password: f.password,
@@ -192,6 +202,7 @@ export function UsersPage() {
       }
       const { data } = await api.post<AppUser>('/users/', {
         username: f.username.trim(),
+        name: f.name.trim(),
         email: f.email.trim() || null,
         cpf: f.cpf,
         password: f.password,
@@ -216,7 +227,7 @@ export function UsersPage() {
 
   const update = useMutation({
     mutationFn: async () => {
-      const payload: Record<string, unknown> = { email: editForm.email || null }
+      const payload: Record<string, unknown> = { name: editForm.name.trim(), email: editForm.email || null }
       if (editing?.role === 'student') {
         payload.birthdate = editForm.birthdate
         payload.turma_numero = Number(editForm.turmaNumero)
@@ -266,9 +277,9 @@ export function UsersPage() {
         announce(bd.message ?? 'Data de nascimento inválida', 'assertive')
         return
       }
-    } else if (!f.username.trim() || !f.password) {
-      setCreateError('Preencha usuário e senha')
-      announce('Preencha usuário e senha', 'assertive')
+    } else if (!f.username.trim() || !f.name.trim() || !f.password) {
+      setCreateError('Preencha usuário, nome e senha')
+      announce('Preencha usuário, nome e senha', 'assertive')
       return
     } else if (!validateCpfDigits(f.cpf)) {
       setCreateError('Informe um CPF válido')
@@ -279,8 +290,10 @@ export function UsersPage() {
   }
 
   const openEdit = (u: AppUser) => {
+    if (!canEditUser(u)) return
     setEditing(u)
     setEditForm({
+      name: u.name || u.username,
       email: u.email ?? '',
       birthdate: u.birthdate ?? '',
       turmaNumero: u.turma_numero === null ? '' : String(u.turma_numero),
@@ -293,10 +306,13 @@ export function UsersPage() {
 
   const closeEdit = () => {
     setEditing(null)
-    setEditForm({ email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
+    setEditForm({ name: '', email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
   }
 
   const availableCreateTypes = useMemo(() => {
+    if (isSuperAdmin) {
+      return ROLE_OPTIONS.filter((o) => o.value === 'school_admin')
+    }
     return ROLE_OPTIONS.filter(
       (o) => o.value === '' || (o.value !== 'super_admin' && (o.value !== 'school_admin' || isSuperAdmin)),
     )
@@ -323,6 +339,46 @@ export function UsersPage() {
           showSchool: role !== 'super_admin',
           showTurma: isStudent,
           showNascimento: isStudent,
+        },
+      ]
+    }
+    if (isSuperAdmin) {
+      return [
+        {
+          key: 'school_admin',
+          title: 'Admins da escola',
+          roles: ['school_admin'],
+          showCpf: true,
+          showSchool: true,
+          showTurma: false,
+          showNascimento: false,
+        },
+        {
+          key: 'librarian',
+          title: 'Bibliotecários',
+          roles: ['librarian'],
+          showCpf: true,
+          showSchool: true,
+          showTurma: false,
+          showNascimento: false,
+        },
+        {
+          key: 'teacher',
+          title: 'Professores',
+          roles: ['teacher'],
+          showCpf: true,
+          showSchool: true,
+          showTurma: false,
+          showNascimento: false,
+        },
+        {
+          key: 'student',
+          title: 'Alunos',
+          roles: ['student'],
+          showCpf: true,
+          showSchool: true,
+          showTurma: true,
+          showNascimento: true,
         },
       ]
     }
@@ -364,7 +420,7 @@ export function UsersPage() {
         showNascimento: false,
       },
     ]
-  }, [role])
+  }, [isSuperAdmin, role])
 
   return (
     <div className="flex flex-col gap-6">
@@ -377,8 +433,8 @@ export function UsersPage() {
               : 'Usuários da sua escola — filtre por tipo.'}
           </PageDescription>
         </div>
-        <Button onClick={() => { setCreateError(''); setShowCreate(true) }}>
-          <Plus className="h-4 w-4 mr-2" aria-hidden="true" /> Criar usuário
+        <Button onClick={() => { setCreateError(''); setCreateForm(isSuperAdmin ? { ...emptyCreate, type: 'school_admin' } : emptyCreate); setShowCreate(true) }}>
+          <Plus className="h-4 w-4 mr-2" aria-hidden="true" /> {isSuperAdmin ? 'Criar admin da escola' : 'Criar usuário'}
         </Button>
       </header>
 
@@ -405,6 +461,12 @@ export function UsersPage() {
           )}
         </CardBody>
       </Card>
+
+      {isSuperAdmin && (
+        <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+          Você está consultando usuários em modo somente leitura. Apenas administradores das escolas podem ser editados pelo Super Admin.
+        </p>
+      )}
 
       {deprecatedCount > 0 && (
         <div
@@ -442,7 +504,7 @@ export function UsersPage() {
             })
             .filter((sec) => sec.items.length > 0)
             .map((sec) => (
-              <Card key={sec.key}>
+              <Card key={sec.key} className={isSuperAdmin && sec.items.every((u) => !canEditUser(u)) ? 'opacity-60' : ''}>
                 <CardHeader className="flex items-center justify-between">
                   <h2 className="font-semibold flex items-center gap-2">
                     <Users className="h-5 w-5" aria-hidden="true" /> {sec.title}
@@ -456,6 +518,7 @@ export function UsersPage() {
                       <thead className="bg-slate-50 dark:bg-slate-700/50">
                         <tr>
                           <th scope="col" className="px-4 py-3 text-left font-semibold">Nome</th>
+                          <th scope="col" className="px-4 py-3 text-left font-semibold">Usuário</th>
                           <th scope="col" className="px-4 py-3 text-left font-semibold">E-mail</th>
                           {sec.showCpf && <th scope="col" className="px-4 py-3 text-left font-semibold">CPF</th>}
                           {sec.showSchool && <th scope="col" className="px-4 py-3 text-left font-semibold">Escola</th>}
@@ -467,9 +530,11 @@ export function UsersPage() {
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                         {sec.items.map((u) => {
                           const deprecated = u.role === 'student' && isDeprecatedTurma(u.updated_at)
+                          const readOnly = !canEditUser(u)
                           return (
-                            <tr key={u.id}>
-                              <td className="px-4 py-3 font-medium">{u.username}</td>
+                            <tr key={u.id} className={readOnly ? 'opacity-60' : undefined}>
+                              <td className="px-4 py-3 font-medium">{u.name || u.username}</td>
+                              <td className="px-4 py-3 font-mono text-xs">{u.username}</td>
                               <td className="px-4 py-3">{u.email ?? '—'}</td>
                               {sec.showCpf && <td className="px-4 py-3 font-mono text-xs">{u.cpf_masked ?? '—'}</td>}
                               {sec.showSchool && (
@@ -487,7 +552,13 @@ export function UsersPage() {
                                 </td>
                               )}
                               <td className="px-4 py-3 text-right">
-                                <Button size="sm" variant="secondary" onClick={() => openEdit(u)}>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => openEdit(u)}
+                                  disabled={readOnly}
+                                  className={readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}
+                                >
                                   <Pencil className="h-4 w-4 mr-1" aria-hidden="true" /> Editar
                                 </Button>
                               </td>
@@ -539,10 +610,11 @@ export function UsersPage() {
             ) : (
               <>
                 <Input label="Nome de usuário" value={createForm.username} onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))} required autoComplete="off" />
+                <Input label="Nome completo" value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" />
                 <Input label="E-mail" type="email" value={createForm.email} onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))} autoComplete="off" />
                 <Input label="CPF" value={formatCpfInput(createForm.cpf)} onChange={(e) => setCreateForm((f) => ({ ...f, cpf: onlyDigits(e.target.value) }))} placeholder="000.000.000-00" required inputMode="numeric" autoComplete="off" />
                 {isSuperAdmin && createForm.type === 'school_admin' && (
-                  <Input label="Escola" value={schoolFilter || (schoolsData?.items[0]?.name ?? '')} disabled autoComplete="off" />
+                  <Input label="Escola" value={createSchoolLabel} disabled autoComplete="off" />
                 )}
               </>
             )}
@@ -564,10 +636,14 @@ export function UsersPage() {
       )}
 
       {editing && (
-        <Dialog title={`Editar usuário — ${editing.username}`} onClose={closeEdit}>
+        <Dialog title={`Editar usuário — ${editing.name || editing.username}`} onClose={closeEdit}>
           <form
             onSubmit={(e) => {
               e.preventDefault()
+              if (!editForm.name.trim()) {
+                announce('Informe o nome completo', 'assertive')
+                return
+              }
               if (editing.role === 'student' && (!editForm.turmaNumero || !editForm.turmaLetra.trim())) {
                 announce('Informe a turma (número e letra)', 'assertive')
                 return
@@ -583,6 +659,8 @@ export function UsersPage() {
             }}
             className="grid gap-4"
           >
+            <Input label="Nome completo" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" />
+            <Input label="Usuário" value={editing.username} disabled autoComplete="off" />
             <Input label="E-mail" type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} autoComplete="off" />
             {editing.role === 'student' && (
               <>
