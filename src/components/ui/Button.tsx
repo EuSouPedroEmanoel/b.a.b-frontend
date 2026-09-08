@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-secondary'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-secondary' | 'blue-secondary'
   size?: 'sm' | 'md' | 'lg'
 }
 
@@ -19,6 +19,7 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button({ var
     ghost: 'bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300',
     danger: 'bg-red-700 text-white hover:bg-red-800',
     'danger-secondary': 'bg-white border border-[var(--color-danger)] text-[var(--color-danger)] hover:bg-red-50 hover:text-red-900 dark:bg-slate-800 dark:border-red-400 dark:text-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-200',
+    'blue-secondary': 'bg-blue-800 border border-blue-900 text-white hover:bg-blue-900 hover:text-white dark:bg-blue-900 dark:border-blue-700 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white',
   }
   return <button ref={ref} className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props} />
 })

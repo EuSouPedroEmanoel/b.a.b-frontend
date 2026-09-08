@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
+import { UndoSnackbar } from '@/components/feedback/UndoSnackbar'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -59,17 +60,23 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
   const [rangeStart, setRangeStart] = useState('')
   const [rangeEnd, setRangeEnd] = useState('')
   const [singleDate, setSingleDate] = useState('')
-  const [dialog, setDialog] = useState<'date' | 'range' | 'holidays' | 'month' | null>(null)
+  const [dialog, setDialog] = useState<'date' | 'range' | 'holidays' | 'month' | 'remove-all' | null>(null)
+  const [undoAvailable, setUndoAvailable] = useState(false)
   const [monthAction, setMonthAction] = useState<'select' | 'remove'>('select')
   const [selectedMonth, setSelectedMonth] = useState(0)
   const dateDialogTrigger = useRef<HTMLButtonElement>(null)
   const rangeDialogTrigger = useRef<HTMLButtonElement>(null)
   const holidayDialogTrigger = useRef<HTMLButtonElement>(null)
   const monthDialogTrigger = useRef<HTMLButtonElement>(null)
+  const removeAllTrigger = useRef<HTMLButtonElement>(null)
   const dateInputRef = useRef<HTMLInputElement>(null)
   const rangeStartRef = useRef<HTMLInputElement>(null)
   const holidayDialogRef = useRef<HTMLDivElement>(null)
   const monthDialogRef = useRef<HTMLDivElement>(null)
+  const removeAllDialogRef = useRef<HTMLDivElement>(null)
+  const removeAllConfirmRef = useRef<HTMLButtonElement>(null)
+  const undoSnapshot = useRef<NonWorkingDay[]>([])
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const calendarHeadingRef = useRef<HTMLHeadingElement>(null)
   const nonWorkingHeadingRef = useRef<HTMLHeadingElement>(null)
   const isSuperAdmin = user?.role === 'super_admin'
@@ -110,6 +117,15 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
   }, [days])
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['library-calendar', effectiveSchoolId, year] })
+  const setDaysCache = (nextDays: NonWorkingDay[]) => {
+    queryClient.setQueryData(['library-calendar', effectiveSchoolId, year], { days: nextDays })
+  }
+  const clearUndo = () => {
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    undoTimer.current = null
+    undoSnapshot.current = []
+    setUndoAvailable(false)
+  }
   const addDay = useMutation({
     mutationFn: async (date: string) => api.post(`/library-calendar/${effectiveSchoolId}/non-working-days`, { date }),
     onSuccess: () => { announce('Dia não útil marcado.', 'polite'); invalidate() },
@@ -145,26 +161,66 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
     onError: () => announce('Não foi possível consultar ou importar os feriados nacionais.', 'assertive'),
   })
 
+  const removeAllDays = async () => {
+    if (!days.length) return
+    const snapshot = days.slice()
+    undoSnapshot.current = snapshot
+    setDaysCache([])
+    setUndoAvailable(true)
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    undoTimer.current = setTimeout(clearUndo, 5 * 60 * 1000)
+    closeDialog()
+    try {
+      await Promise.all(snapshot.map((day) => api.delete(`/library-calendar/${effectiveSchoolId}/non-working-days/${day.date}`)))
+      announce('Todos os dias não úteis foram removidos.', 'polite')
+    } catch {
+      clearUndo()
+      invalidate()
+      announce('Não foi possível remover todos os dias não úteis.', 'assertive')
+    }
+  }
+
+  const undoRemoveAll = async () => {
+    const snapshot = undoSnapshot.current.slice()
+    if (!snapshot.length) return
+    clearUndo()
+    const currentDays = queryClient.getQueryData<{ days?: NonWorkingDay[]; items?: NonWorkingDay[] }>(['library-calendar', effectiveSchoolId, year])?.days ?? []
+    const existing = new Set(currentDays.map((day) => day.date))
+    const missing = snapshot.filter((day) => !existing.has(day.date))
+    setDaysCache([...currentDays, ...missing].sort((a, b) => a.date.localeCompare(b.date)))
+    try {
+      await Promise.all(missing.map((day) => api.post(`/library-calendar/${effectiveSchoolId}/non-working-days`, { date: day.date })))
+      announce('Dias não úteis restaurados.', 'polite')
+      invalidate()
+    } catch {
+      invalidate()
+      announce('Não foi possível desfazer a remoção dos dias não úteis.', 'assertive')
+    }
+  }
+
+  useEffect(() => () => clearUndo(), [])
+
   useEffect(() => {
     if (!dialog) return
-    const focusTarget = dialog === 'date' ? dateInputRef : dialog === 'range' ? rangeStartRef : dialog === 'holidays' ? holidayDialogRef : monthDialogRef
+    const focusTarget = dialog === 'date' ? dateInputRef : dialog === 'range' ? rangeStartRef : dialog === 'holidays' ? holidayDialogRef : dialog === 'month' ? monthDialogRef : removeAllConfirmRef
     requestAnimationFrame(() => {
       if (dialog === 'holidays') holidayDialogRef.current?.focus()
       else if (dialog === 'month') monthDialogRef.current?.focus()
+      else if (dialog === 'remove-all') removeAllConfirmRef.current?.focus()
       else focusTarget.current?.focus()
     })
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.preventDefault()
       setDialog(null)
-      requestAnimationFrame(() => (dialog === 'date' ? dateDialogTrigger : dialog === 'range' ? rangeDialogTrigger : dialog === 'month' ? monthDialogTrigger : holidayDialogTrigger).current?.focus())
+      requestAnimationFrame(() => (dialog === 'date' ? dateDialogTrigger : dialog === 'range' ? rangeDialogTrigger : dialog === 'month' ? monthDialogTrigger : dialog === 'remove-all' ? removeAllTrigger : holidayDialogTrigger).current?.focus())
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [dialog])
 
   const closeDialog = () => {
-    const trigger = dialog === 'date' ? dateDialogTrigger : dialog === 'range' ? rangeDialogTrigger : dialog === 'month' ? monthDialogTrigger : holidayDialogTrigger
+    const trigger = dialog === 'date' ? dateDialogTrigger : dialog === 'range' ? rangeDialogTrigger : dialog === 'month' ? monthDialogTrigger : dialog === 'remove-all' ? removeAllTrigger : holidayDialogTrigger
     setDialog(null)
     requestAnimationFrame(() => trigger.current?.focus())
   }
@@ -231,14 +287,15 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
       {!effectiveSchoolId && <p aria-live="polite" className="text-slate-600 dark:text-slate-300">Selecione uma escola para consultar o calendário.</p>}
       {effectiveSchoolId && <p aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">{isManager ? 'Você pode gerenciar os dias não úteis.' : 'Modo de consulta: somente leitura.'}</p>}
       {effectiveSchoolId && <div className="flex flex-wrap gap-3 text-sm" aria-label="Legenda do calendário"><span className="rounded-md border border-slate-300 px-2 py-1 dark:border-slate-600">Dia útil</span><span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300">Fim de semana</span><span className={`inline-flex items-center gap-1 rounded-md border-2 px-2 py-1 font-semibold ${calendarMarkedOutlineClasses}`}><X className="h-4 w-4" aria-hidden="true" /><span>Dia não útil</span></span></div>}
+      {undoAvailable && <UndoSnackbar message="Todos os dias não úteis foram removidos." onUndo={() => void undoRemoveAll()} onClose={clearUndo} />}
       {effectiveSchoolId && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {monthNames.map((monthName, month) => { const { offset, days: total } = monthDays(year, month); const weekdays = Array.from({ length: total }, (_, index) => index + 1).filter((day) => !isWeekend(year, month, day)); const markedWeekdays = weekdays.filter((day) => dayMap.has(isoDate(year, month, day))).length; const complete = markedWeekdays === weekdays.length; return <Card key={monthName} className={isSuperAdmin ? 'opacity-60' : ''}><CardHeader className="flex items-center justify-between gap-2"><h2 className="font-semibold">{monthName}</h2>{isManager && <Button variant="secondary" size="sm" className="shrink-0 !px-2.5 !py-1.5 text-xs" onClick={(event) => { monthDialogTrigger.current = event.currentTarget; openMonthAction(month, complete ? 'remove' : 'select') }} aria-label={complete ? `Desmarcar os dias não úteis de ${monthName.toLowerCase()} de ${year}` : `Marcar todos os dias úteis de ${monthName.toLowerCase()} de ${year} como não úteis`}>{complete ? 'Desmarcar mês' : 'Selecionar mês'}</Button>}</CardHeader><CardBody className="p-3"><div className="grid grid-cols-7 gap-1 text-center text-xs text-slate-500" aria-hidden="true">{weekNames.map((name) => <span key={name}>{name}</span>)}</div><div className="mt-1 grid grid-cols-7 gap-1" role="grid" aria-label={`${monthName} de ${year}`}>
           {Array.from({ length: offset }).map((_, index) => <span key={`empty-${index}`} aria-hidden="true" />)}
           {Array.from({ length: total }, (_, index) => { const day = index + 1; const date = isoDate(year, month, day); const marked = dayMap.has(date); const weekend = isWeekend(year, month, day); const status = marked ? 'Dia não útil' : weekend ? 'Fim de semana' : 'Dia útil'; const action = marked ? 'pressione para tornar útil' : weekend ? 'fim de semana' : 'dia útil, pressione para marcar como não útil'; return <button key={date} type="button" role="gridcell" aria-label={`${day} de ${monthName} de ${year}, ${marked ? 'dia não útil, pressione para tornar útil' : action}`} aria-pressed={marked} disabled={!isManager || weekend} onClick={() => { if (marked) void removeDay.mutateAsync(date); else void addDay.mutateAsync(date) }} className={`group relative min-h-[38px] rounded-md border text-sm focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${marked ? `cursor-pointer border-2 ${calendarMarkedOutlineClasses}` : weekend ? 'border-transparent bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300' : 'border-transparent bg-slate-100 text-slate-900 hover:bg-blue-100 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600'}`}>{marked ? <UnavailableDayMark>{day}</UnavailableDayMark> : day}<Tooltip><strong className="text-base leading-5">{day}</strong><span>{status}</span></Tooltip></button> })}
         </div></CardBody></Card> })}
       </div>}
-      {days.length > 0 && <Card className={isSuperAdmin ? 'opacity-60' : ''}><CardHeader><h2 ref={nonWorkingHeadingRef} id="non-working-days-heading" tabIndex={-1} className="font-semibold focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]">Dias não úteis cadastrados</h2></CardHeader><CardBody><div className="grid gap-5" aria-label="Dias não úteis cadastrados">{groupedDays.map(([month, monthDays]) => <section key={month} aria-labelledby={`non-working-month-${month}`}><h3 id={`non-working-month-${month}`} className="mb-2 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">{monthNames[Number(month) - 1]}</h3><ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{monthDays.map((day) => <li key={day.date} className={`flex min-h-0 items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 ${dangerSubtleClasses}`}><strong className="text-base font-semibold sm:text-lg">{day.date.split('-').reverse().join('/')}</strong>{isManager && <Button size="sm" className="!min-h-11 !min-w-11 !p-2 cursor-pointer" variant="danger-secondary" onClick={() => void removeDay.mutateAsync(day.date)} aria-label={`Remover ${day.date.split('-').reverse().join('/')} dos dias não úteis`}><Trash2 className="h-5 w-5" aria-hidden="true" /></Button>}</li>)}</ul></section>)}</div><div className="mt-5"><Button variant="secondary" size="sm" onClick={() => focusSection(calendarHeadingRef)}>Voltar ao início do calendário</Button></div></CardBody></Card>}
-      {dialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog() }}><section role="dialog" aria-modal="true" aria-labelledby="calendar-dialog-title" tabIndex={-1} ref={dialog === 'holidays' ? holidayDialogRef : dialog === 'month' ? monthDialogRef : undefined} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800"><h2 id="calendar-dialog-title" className="text-lg font-semibold">{dialog === 'date' ? 'Adicionar por data' : dialog === 'range' ? 'Marcar intervalo' : dialog === 'month' ? (monthAction === 'remove' ? `Desmarcar os dias não úteis de ${monthNames[selectedMonth]} de ${year}?` : `Marcar todos os dias úteis de ${monthNames[selectedMonth].toLowerCase()} de ${year} como não úteis?`) : `Importar feriados nacionais — ${year}`}</h2>{dialog === 'month' ? <div className="mt-4 flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="button" variant="secondary" onClick={() => monthAction === 'remove' ? monthRemove.mutate({ month: selectedMonth }) : monthSelect.mutate({ month: selectedMonth })} disabled={monthRemove.isPending || monthSelect.isPending}>{monthRemove.isPending || monthSelect.isPending ? 'Salvando…' : monthAction === 'remove' ? 'Desmarcar' : 'Selecionar'}</Button></div> : dialog === 'date' ? <form className="mt-4 grid gap-4" onSubmit={submitSingleDate}><Input ref={dateInputRef} type="date" label="Data" value={singleDate} onChange={(event) => setSingleDate(event.target.value)} required /><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="submit" disabled={!singleDate || addDay.isPending}>{addDay.isPending ? 'Salvando…' : 'Marcar como não útil'}</Button></div></form> : dialog === 'range' ? <form className="mt-4 grid gap-4" onSubmit={submitRange}><div className="grid gap-4 sm:grid-cols-2"><Input ref={rangeStartRef} type="date" label="Data inicial" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} required /><Input type="date" label="Data final" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} required /></div><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="submit" disabled={!rangeStart || !rangeEnd || rangeStart > rangeEnd || addRange.isPending}>{addRange.isPending ? 'Salvando…' : 'Marcar intervalo'}</Button></div></form> : <div className="mt-4 grid gap-4"><div aria-live="polite">{holidayPreview.isFetching ? 'Consultando feriados nacionais…' : holidayPreview.isError ? 'Não foi possível consultar os feriados nacionais.' : `${holidayPreview.data?.added_count ?? 0} novos dias serão adicionados. ${holidayPreview.data?.already_added_count ?? 0} já estão cadastrados.`}</div>{holidayPreview.data && <ul className="max-h-72 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-600">{holidayPreview.data.holidays.map((holiday) => <li key={holiday.date} className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 last:border-b-0 dark:border-slate-700"><span>{holiday.date.split('-').reverse().join('/')} — {holiday.name}</span>{holiday.already_added && <span className="shrink-0 text-sm text-slate-500 dark:text-slate-300">Já adicionado</span>}</li>)}</ul>}<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="button" onClick={() => importHolidays.mutate()} disabled={!holidayPreview.data || holidayPreview.data.added_count === 0 || importHolidays.isPending}>{importHolidays.isPending ? 'Importando…' : 'Importar feriados'}</Button></div></div>}</section></div>}
+      {effectiveSchoolId && (days.length > 0 || isManager) && <Card className={isSuperAdmin ? 'opacity-60' : ''}><CardHeader className="flex items-center justify-between gap-3"><h2 ref={nonWorkingHeadingRef} id="non-working-days-heading" tabIndex={-1} className="font-semibold focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]">Dias não úteis cadastrados</h2>{isManager && <Button ref={removeAllTrigger} variant="danger-secondary" size="sm" onClick={() => setDialog('remove-all')} disabled={days.length === 0}>Remover todos</Button>}</CardHeader><CardBody>{days.length ? <div className="grid gap-5" aria-label="Dias não úteis cadastrados">{groupedDays.map(([month, monthDays]) => <section key={month} aria-labelledby={`non-working-month-${month}`}><h3 id={`non-working-month-${month}`} className="mb-2 text-base font-bold text-slate-800 dark:text-slate-100 sm:text-lg">{monthNames[Number(month) - 1]}</h3><ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{monthDays.map((day) => <li key={day.date} className={`flex min-h-0 items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 ${dangerSubtleClasses}`}><strong className="text-base font-semibold sm:text-lg">{day.date.split('-').reverse().join('/')}</strong>{isManager && <Button size="sm" className="!min-h-11 !min-w-11 !p-2 cursor-pointer" variant="danger-secondary" onClick={() => void removeDay.mutateAsync(day.date)} aria-label={`Remover ${day.date.split('-').reverse().join('/')} dos dias não úteis`}><Trash2 className="h-5 w-5" aria-hidden="true" /></Button>}</li>)}</ul></section>)}</div> : <p className="text-sm text-slate-600 dark:text-slate-300">Nenhum dia não útil cadastrado.</p>}<div className="mt-5"><Button variant="secondary" size="sm" onClick={() => focusSection(calendarHeadingRef)}>Voltar ao início do calendário</Button></div></CardBody></Card>}
+      {dialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog() }}><section role="dialog" aria-modal="true" aria-labelledby="calendar-dialog-title" aria-describedby="calendar-dialog-description" tabIndex={-1} ref={dialog === 'holidays' ? holidayDialogRef : dialog === 'month' ? monthDialogRef : dialog === 'remove-all' ? removeAllDialogRef : undefined} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800"><h2 id="calendar-dialog-title" className="text-lg font-semibold">{dialog === 'date' ? 'Adicionar por data' : dialog === 'range' ? 'Marcar intervalo' : dialog === 'month' ? (monthAction === 'remove' ? `Desmarcar os dias não úteis de ${monthNames[selectedMonth]} de ${year}?` : `Marcar todos os dias úteis de ${monthNames[selectedMonth].toLowerCase()} de ${year} como não úteis?`) : dialog === 'remove-all' ? 'Remover todos os dias não úteis?' : `Importar feriados nacionais — ${year}`}</h2><p id="calendar-dialog-description" className="mt-2 text-sm text-slate-600 dark:text-slate-300">{dialog === 'remove-all' ? 'Esta ação removerá todos os dias não úteis cadastrados para esta escola. Os prazos futuros poderão ser afetados conforme as regras de circulação configuradas.' : ''}</p>{dialog === 'remove-all' ? <div className="mt-4 flex justify-end gap-2"><Button type="button" variant="blue-secondary" onClick={closeDialog}>Cancelar</Button><Button ref={removeAllConfirmRef} type="button" variant="danger-secondary" onClick={() => void removeAllDays()}>Remover todos</Button></div> : dialog === 'month' ? <div className="mt-4 flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="button" variant="secondary" onClick={() => monthAction === 'remove' ? monthRemove.mutate({ month: selectedMonth }) : monthSelect.mutate({ month: selectedMonth })} disabled={monthRemove.isPending || monthSelect.isPending}>{monthRemove.isPending || monthSelect.isPending ? 'Salvando…' : monthAction === 'remove' ? 'Desmarcar' : 'Selecionar'}</Button></div> : dialog === 'date' ? <form className="mt-4 grid gap-4" onSubmit={submitSingleDate}><Input ref={dateInputRef} type="date" label="Data" value={singleDate} onChange={(event) => setSingleDate(event.target.value)} required /><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="submit" disabled={!singleDate || addDay.isPending}>{addDay.isPending ? 'Salvando…' : 'Marcar como não útil'}</Button></div></form> : dialog === 'range' ? <form className="mt-4 grid gap-4" onSubmit={submitRange}><div className="grid gap-4 sm:grid-cols-2"><Input ref={rangeStartRef} type="date" label="Data inicial" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} required /><Input type="date" label="Data final" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} required /></div><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="submit" disabled={!rangeStart || !rangeEnd || rangeStart > rangeEnd || addRange.isPending}>{addRange.isPending ? 'Salvando…' : 'Marcar intervalo'}</Button></div></form> : <div className="mt-4 grid gap-4"><div aria-live="polite">{holidayPreview.isFetching ? 'Consultando feriados nacionais…' : holidayPreview.isError ? 'Não foi possível consultar os feriados nacionais.' : `${holidayPreview.data?.added_count ?? 0} novos dias serão adicionados. ${holidayPreview.data?.already_added_count ?? 0} já estão cadastrados.`}</div>{holidayPreview.data && <ul className="max-h-72 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-600">{holidayPreview.data.holidays.map((holiday) => <li key={holiday.date} className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 last:border-b-0 dark:border-slate-700"><span>{holiday.date.split('-').reverse().join('/')} — {holiday.name}</span>{holiday.already_added && <span className="shrink-0 text-sm text-slate-500 dark:text-slate-300">Já adicionado</span>}</li>)}</ul>}<div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={closeDialog}>Cancelar</Button><Button type="button" onClick={() => importHolidays.mutate()} disabled={!holidayPreview.data || holidayPreview.data.added_count === 0 || importHolidays.isPending}>{importHolidays.isPending ? 'Importando…' : 'Importar feriados'}</Button></div></div>}</section></div>}
     </div>
   )
 }

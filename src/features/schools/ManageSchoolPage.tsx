@@ -8,6 +8,7 @@ import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocompl
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { CirculationPoliciesPage } from '@/features/circulation/CirculationPoliciesPage'
 import { LibraryCalendarPage } from './LibraryCalendarPage'
+import { segmentedControlContainerClasses, segmentedControlIndicatorClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
 
 type School = { id: number; name: string }
 type Paginated<T> = { items: T[] }
@@ -45,7 +46,7 @@ export function ManageSchoolPage() {
   if (!user || !['super_admin', 'school_admin', 'librarian'].includes(user.role)) {
     return <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">Você não tem permissão para gerenciar a escola.</p>
   }
-  return <div className="flex flex-col gap-6">
+  return <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
     <header><h1 className="text-2xl font-bold sm:text-3xl">Gerenciar escola</h1><PageDescription>Consulte e, quando permitido, altere as configurações da biblioteca.</PageDescription></header>
     {isSuperAdmin && (
       <div className="max-w-xl">
@@ -61,9 +62,10 @@ export function ManageSchoolPage() {
         />
       </div>
     )}
-    <div role="tablist" aria-label="Seções de gerenciamento" className="grid max-w-xl grid-cols-2 rounded-lg border border-slate-300 bg-slate-100 p-1 dark:border-slate-600 dark:bg-slate-800">
-      <button type="button" role="tab" aria-selected={section === 'rules'} onClick={() => selectSection('rules')} className={`rounded-md px-3 py-2 font-medium focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${section === 'rules' ? 'bg-blue-600 text-white' : 'text-slate-700 dark:text-slate-200'}`}>Regras de circulação</button>
-      <button type="button" role="tab" aria-selected={section === 'calendar'} onClick={() => selectSection('calendar')} className={`rounded-md px-3 py-2 font-medium focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${section === 'calendar' ? 'bg-blue-600 text-white' : 'text-slate-700 dark:text-slate-200'}`}>Calendário da biblioteca</button>
+    <div role="tablist" aria-label="Seções de gerenciamento" className={`${segmentedControlContainerClasses} max-w-xl grid grid-cols-2`}>
+      <span aria-hidden="true" className={segmentedControlIndicatorClasses('primary', section === 'calendar' ? 1 : 0)} />
+      <button type="button" role="tab" aria-selected={section === 'rules'} onClick={() => selectSection('rules')} className={segmentedControlItemClasses(section === 'rules', 'primary')}>Regras de circulação</button>
+      <button type="button" role="tab" aria-selected={section === 'calendar'} onClick={() => selectSection('calendar')} className={segmentedControlItemClasses(section === 'calendar', 'primary')}>Calendário da biblioteca</button>
     </div>
     {section === 'rules' ? <CirculationPoliciesPage schoolIdOverride={schoolId} showSchoolSelector={false} /> : <LibraryCalendarPage schoolIdOverride={schoolId} showSchoolSelector={false} />}
   </div>
