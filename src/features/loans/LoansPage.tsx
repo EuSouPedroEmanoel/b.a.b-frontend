@@ -574,6 +574,13 @@ function OperationalLoansPage() {
     mutationFn: async ({ id }: ReturnRequest) => (await api.post<Loan>(`/loans/${id}/return`)).data,
     onSuccess: (loan, request) => {
       announce(`Devolução concluída. Atraso: ${loan.late_days} dia(s).`, 'polite')
+      qc.setQueriesData<Paginated<Loan>>({ queryKey: ['loans'] }, (current) => {
+        if (!current) return current
+        return {
+          ...current,
+          items: current.items.map((item) => item.id === loan.id ? loan : item),
+        }
+      })
       qc.invalidateQueries({ queryKey: ['loans'] }); qc.invalidateQueries({ queryKey: ['copies'] }); qc.invalidateQueries({ queryKey: ['books'] })
       if (request.source === 'copy') {
         setReturnLookup(''); setReturnSearch(null); setReturnInputError(undefined)
@@ -582,7 +589,15 @@ function OperationalLoansPage() {
         focusReturnAfterId.current = loan.id
       }
     },
-    onError: (error: unknown) => announce(getErrorMessage(error, 'Erro ao concluir a devolução.'), 'assertive'),
+    onError: async (error: unknown) => {
+      const status = (error as { response?: { status?: number } })?.response?.status
+      if (status === 409) {
+        await qc.invalidateQueries({ queryKey: ['loans'] })
+        announce('Este empréstimo já foi devolvido. A lista foi atualizada.', 'polite')
+        return
+      }
+      announce(getErrorMessage(error, 'Erro ao concluir a devolução.'), 'assertive')
+    },
   })
 
   const returningLoanId = returnMut.isPending ? returnMut.variables?.id : undefined
