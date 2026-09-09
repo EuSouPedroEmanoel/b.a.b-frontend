@@ -54,6 +54,27 @@ type SuggestItem =
   | { kind: 'book'; id: number; title: string; isbn: string | null }
   | { kind: 'availability'; state: string; label: string }
 
+const DESKTOP_MEDIA_QUERY = '(min-width: 768px)'
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === 'undefined') return false
+    if (typeof window.matchMedia === 'function') return window.matchMedia(DESKTOP_MEDIA_QUERY).matches
+    return window.innerWidth >= 768
+  })
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined
+    const media = window.matchMedia(DESKTOP_MEDIA_QUERY)
+    const update = () => setIsDesktop(media.matches)
+    update()
+    media.addEventListener?.('change', update)
+    return () => media.removeEventListener?.('change', update)
+  }, [])
+
+  return isDesktop
+}
+
 export function BooksPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => {
@@ -82,6 +103,7 @@ export function BooksPage() {
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
   const isPersonalCatalog = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
+  const isDesktop = useIsDesktop()
   const deniedNoticeRef = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {
@@ -857,7 +879,7 @@ export function BooksPage() {
 
         {data && viewMode === 'table' && (
           <>
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {isDesktop ? <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <table className="w-full text-sm table-auto">
                 <caption className="sr-only">Tabela de livros com capa, título e descrição, exemplares, autores, gêneros, ano e data de cadastro</caption>
                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-left">
@@ -954,9 +976,7 @@ export function BooksPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <ul className="md:hidden grid gap-4" role="list" aria-label="Lista de livros">
+            </div> : <ul className="grid gap-4" role="list" aria-label="Lista de livros">
               {data.items.map((b) => (
                 <li
                   key={b.id}
@@ -1035,14 +1055,14 @@ export function BooksPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity md:hidden">
+                  <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/5 dark:bg-white/10">
                       <ArrowDown className="h-3.5 w-3.5 -rotate-90 text-slate-400" aria-hidden="true" />
                     </span>
                   </div>
                 </li>
               ))}
-            </ul>
+            </ul>}
 
             {data.items.length === 0 && <p className="text-sm text-slate-500 py-8 text-center">Nenhum livro encontrado.</p>}
 
