@@ -30,6 +30,21 @@ function availabilityText(book: Book): string {
   if (total === 0) return '0 exemplares'
   return `${available} de ${total} ${available === 1 ? 'disponível' : 'disponíveis'}`
 }
+
+function defaultViewForRole(role?: string): 'table' | 'grid' {
+  return role === 'student' || role === 'teacher' || role === 'guest' ? 'grid' : 'table'
+}
+
+function viewPreferenceKey(user: { id?: number; role?: string } | null): string {
+  return user?.id ? `acervo:viewMode:user:${user.id}` : 'acervo:viewMode:guest'
+}
+
+function readViewPreference(user: { id?: number; role?: string } | null): 'table' | 'grid' | null {
+  try {
+    const value = window.localStorage.getItem(viewPreferenceKey(user))
+    return value === 'table' || value === 'grid' ? value : null
+  } catch { return null }
+}
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 type Resolve = { kind: 'isbn' | 'internal_code' | 'title' | 'none'; book_id: number | null }
 type BookSuggestion = { id: number; title: string; isbn: string | null }
@@ -65,7 +80,7 @@ export function BooksPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { resolved } = useTheme()
   const isDarkTheme = resolved === 'dark'
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
@@ -78,17 +93,21 @@ export function BooksPage() {
     window.requestAnimationFrame(() => deniedNoticeRef.current?.focus())
   }, [location.state])
 
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('acervo:viewMode') as 'table' | 'grid' | null
-      return saved === 'grid' ? 'grid' : 'table'
-    }
-    return 'table'
-  })
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => defaultViewForRole(user?.role))
+  const hydratedPreference = useRef(false)
 
   useEffect(() => {
-    localStorage.setItem('acervo:viewMode', viewMode)
-  }, [viewMode])
+    if (authLoading) return
+    if (hydratedPreference.current) return
+    const saved = typeof window !== 'undefined' ? readViewPreference(user) : null
+    if (saved) setViewMode(saved)
+    hydratedPreference.current = true
+  }, [authLoading, user])
+
+  const chooseViewMode = (mode: 'table' | 'grid') => {
+    setViewMode(mode)
+    try { window.localStorage.setItem(viewPreferenceKey(user), mode) } catch { /* armazenamento indisponível */ }
+  }
 
   useEffect(() => {
     localStorage.setItem('acervo:pageSize', String(pageSize))
@@ -286,7 +305,7 @@ export function BooksPage() {
       window.clearTimeout(retry)
       window.clearTimeout(clear)
     }
-  }, [isGridLoading, isLoading, location.pathname, location.search, location.state, viewMode])
+  }, [isGridLoading, isLoading, location.pathname, location.search, location.state])
 
   const hasSearchQuery = searchParams.has('q')
 
@@ -741,7 +760,7 @@ export function BooksPage() {
             size="sm"
             variant={viewMode === 'table' ? 'primary' : 'secondary'}
             aria-pressed={viewMode === 'table'}
-            onClick={() => setViewMode('table')}
+            onClick={() => chooseViewMode('table')}
             aria-label="Visualização em tabela"
             className={`gap-1.5 ${viewMode === 'table' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
           >
@@ -751,7 +770,7 @@ export function BooksPage() {
             size="sm"
             variant={viewMode === 'grid' ? 'primary' : 'secondary'}
             aria-pressed={viewMode === 'grid'}
-            onClick={() => setViewMode('grid')}
+            onClick={() => chooseViewMode('grid')}
             aria-label="Visualização em grade"
             className={`gap-1.5 ${viewMode === 'grid' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
           >
