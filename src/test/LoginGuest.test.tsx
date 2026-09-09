@@ -35,6 +35,7 @@ describe('Guest school autocomplete', () => {
         <Route path="/entrar" element={<LoginPage />} />
         <Route path="/visitar/:schoolCode" element={<LoginPage />} />
         <Route path="/" element={<LocationText />} />
+        <Route path="/inicio" element={<LocationText />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -175,6 +176,6 @@ describe('Guest school autocomplete', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     fireEvent.submit(input.closest('form')!)
 
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/'))
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/inicio'))
   })
 })

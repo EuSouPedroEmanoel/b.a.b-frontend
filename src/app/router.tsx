@@ -1,30 +1,41 @@
+import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
-import { DiscoveryHome, HomePage } from '@/features/home/HomePage'
 import { LoginPage } from '@/features/auth/LoginPage'
-import { AccountPage } from '@/features/account/AccountPage'
-import { AccountManagementPage } from '@/features/account/AccountManagementPage'
-import { BooksPage } from '@/features/books/BooksPage'
-import { BookCreatePage } from '@/features/books/BookCreatePage'
-import { BookDetailPage } from '@/features/books/BookDetailPage'
-import { BookCopyCreatePage } from '@/features/books/BookCopyCreatePage'
-import { CopiesPage } from '@/features/copies/CopiesPage'
-import { LoansPage } from '@/features/loans/LoansPage'
-import { ReservationsPage } from '@/features/reservations/ReservationsPage'
-import { SchoolsPage } from '@/features/schools/SchoolsPage'
-import { StudentsPage } from '@/features/students/StudentsPage'
-import { UsersPage } from '@/features/users/UsersPage'
-import { ManageSchoolPage } from '@/features/schools/ManageSchoolPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
 import { AccountOnly, Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
+
+const AccountPage = lazy(() => import('@/features/account/AccountPage').then((module) => ({ default: module.AccountPage })))
+const HomePage = lazy(() => import('@/features/home/HomePage').then((module) => ({ default: module.HomePage })))
+const DiscoveryHome = lazy(() => import('@/features/home/HomePage').then((module) => ({ default: module.DiscoveryHome })))
+const AccountManagementPage = lazy(() => import('@/features/account/AccountManagementPage').then((module) => ({ default: module.AccountManagementPage })))
+const BooksPage = lazy(() => import('@/features/books/BooksPage').then((module) => ({ default: module.BooksPage })))
+const BookCreatePage = lazy(() => import('@/features/books/BookCreatePage').then((module) => ({ default: module.BookCreatePage })))
+const BookDetailPage = lazy(() => import('@/features/books/BookDetailPage').then((module) => ({ default: module.BookDetailPage })))
+const BookCopyCreatePage = lazy(() => import('@/features/books/BookCopyCreatePage').then((module) => ({ default: module.BookCopyCreatePage })))
+const CopiesPage = lazy(() => import('@/features/copies/CopiesPage').then((module) => ({ default: module.CopiesPage })))
+const LoansPage = lazy(() => import('@/features/loans/LoansPage').then((module) => ({ default: module.LoansPage })))
+const ReservationsPage = lazy(() => import('@/features/reservations/ReservationsPage').then((module) => ({ default: module.ReservationsPage })))
+const SchoolsPage = lazy(() => import('@/features/schools/SchoolsPage').then((module) => ({ default: module.SchoolsPage })))
+const StudentsPage = lazy(() => import('@/features/students/StudentsPage').then((module) => ({ default: module.StudentsPage })))
+const UsersPage = lazy(() => import('@/features/users/UsersPage').then((module) => ({ default: module.UsersPage })))
+const ManageSchoolPage = lazy(() => import('@/features/schools/ManageSchoolPage').then((module) => ({ default: module.ManageSchoolPage })))
+
+function RouteLoading() {
+  return <div role="status" aria-live="polite" aria-busy="true" className="flex min-h-[12rem] items-center justify-center p-8 text-sm text-[var(--color-text-muted)]">Carregando página…</div>
+}
+
+function LazyRoute({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<RouteLoading />}>{children}</Suspense>
+}
 
 export const router = createBrowserRouter([
   {
     element: <Layout />,
     errorElement: <RouteErrorFallback />,
     children: [
-      { path: '/', element: <Protected><HomePage /></Protected> },
-      { path: '/inicio', element: <Protected><DiscoveryHome /></Protected> },
+      { path: '/', element: <Protected><LazyRoute><HomePage /></LazyRoute></Protected> },
+      { path: '/inicio', element: <Protected><LazyRoute><DiscoveryHome /></LazyRoute></Protected> },
       {
         path: '/entrar',
         element: (
@@ -42,7 +53,7 @@ export const router = createBrowserRouter([
         path: '/acervo',
         element: (
           <Protected>
-            <BooksPage />
+            <LazyRoute><BooksPage /></LazyRoute>
           </Protected>
         ),
       },
@@ -50,7 +61,7 @@ export const router = createBrowserRouter([
         path: '/acervo/novo',
         element: (
           <AccountOnly>
-            <BookCreatePage />
+            <LazyRoute><BookCreatePage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -58,7 +69,7 @@ export const router = createBrowserRouter([
         path: '/acervo/:bookId',
         element: (
           <Protected>
-            <BookDetailPage />
+            <LazyRoute><BookDetailPage /></LazyRoute>
           </Protected>
         ),
       },
@@ -66,7 +77,7 @@ export const router = createBrowserRouter([
         path: '/acervo/:bookId/exemplares/novo',
         element: (
           <AccountOnly>
-            <BookCopyCreatePage />
+            <LazyRoute><BookCopyCreatePage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -78,7 +89,7 @@ export const router = createBrowserRouter([
         path: '/exemplares',
         element: (
           <AccountOnly>
-            <CopiesPage />
+            <LazyRoute><CopiesPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -86,7 +97,7 @@ export const router = createBrowserRouter([
         path: '/emprestimos',
         element: (
           <AccountOnly>
-            <LoansPage />
+            <LazyRoute><LoansPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -94,7 +105,7 @@ export const router = createBrowserRouter([
         path: '/reservas',
         element: (
           <AccountOnly>
-            <ReservationsPage />
+            <LazyRoute><ReservationsPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -102,7 +113,7 @@ export const router = createBrowserRouter([
         path: '/escolas',
         element: (
           <AccountOnly>
-            <SchoolsPage />
+            <LazyRoute><SchoolsPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -110,7 +121,7 @@ export const router = createBrowserRouter([
         path: '/alunos',
         element: (
           <AccountOnly>
-            <StudentsPage />
+            <LazyRoute><StudentsPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -118,7 +129,7 @@ export const router = createBrowserRouter([
         path: '/usuarios',
         element: (
           <AccountOnly>
-            <UsersPage />
+            <LazyRoute><UsersPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -126,7 +137,7 @@ export const router = createBrowserRouter([
         path: '/minha-conta',
         element: (
           <AccountOnly>
-            <AccountPage />
+            <LazyRoute><AccountPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -134,7 +145,7 @@ export const router = createBrowserRouter([
         path: '/minha-conta/gerenciar',
         element: (
           <AccountOnly>
-            <AccountManagementPage />
+            <LazyRoute><AccountManagementPage /></LazyRoute>
           </AccountOnly>
         ),
       },
@@ -142,7 +153,7 @@ export const router = createBrowserRouter([
         path: '/gerenciar-escola',
         element: (
           <AccountOnly>
-            <ManageSchoolPage />
+            <LazyRoute><ManageSchoolPage /></LazyRoute>
           </AccountOnly>
         ),
       },
