@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAverageColor } from '@/hooks/useAverageColor'
 import { OverflowTags } from '@/components/ui/OverflowTags'
@@ -92,7 +93,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           hideTimeoutRef.current = window.setTimeout(() => setPortalHovered(false), 80)
         }
       }}
-      className={`group relative w-full ${disableHover ? '' : 'hover:z-10 focus-within:z-10'}`}
+      className={`group relative isolate w-full ${disableHover ? '' : 'hover:z-50 focus-within:z-50'}`}
     >
       {/* Card base - tamanho fixo padrão no repouso: w-full + aspect-[2/3] garante mesma altura/largura */}
       <Link
@@ -152,7 +153,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           onClick={savePosition}
           aria-hidden="true"
           tabIndex={-1}
-          className="pointer-events-none invisible absolute left-1/2 top-1/2 z-10 flex w-full aspect-[2/3] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 scale-90 flex-col justify-between overflow-hidden rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:scale-125 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:scale-125 group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+          className="pointer-events-none invisible absolute left-1/2 top-1/2 z-40 flex w-full aspect-[2/3] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 scale-90 flex-col justify-between overflow-visible rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:scale-125 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:scale-125 group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
         style={{
           background: hoverBg,
           boxShadow: '0 24px 48px rgba(0,0,0,0.38), 0 10px 20px rgba(0,0,0,0.28)',
@@ -181,8 +182,8 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
               <span
                 role="button"
                 tabIndex={0}
-                title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}
-                className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white"
+                aria-describedby={`grid-state-tooltip-${book.id}`}
+                className="group/category inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white"
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -196,18 +197,18 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                   }
                 }}
               >
-                {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
+                {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}<Tooltip id={`grid-state-tooltip-${book.id}`} variant="category">{isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}</Tooltip>
               </span>
             </div>
           </div>
         </div>
 
         {/* Gêneros – badges reduzidas text-[10px] compact, linha única nowrap +N */}
-        <div className="relative shrink-0 overflow-hidden px-3.5 pb-3">
+        <div className="relative shrink-0 overflow-visible px-3.5 pb-3">
           <div className="mb-1 flex items-center gap-1">
             <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Gêneros</span>
           </div>
-          <div className="flex flex-nowrap overflow-hidden">
+          <div className="flex flex-nowrap overflow-visible">
             {book.genres.length > 0 ? (
               <OverflowTags
                 items={book.genres}
@@ -255,7 +256,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 height: `${portalRect.height * 1.25}px`,
                 maxWidth: '90vw',
                 maxHeight: '90vh',
-                zIndex: 20,
+                zIndex: 1000,
                 transformOrigin: 'center center',
                 willChange: 'transform, opacity',
               }}
@@ -277,7 +278,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 onClick={savePosition}
                 aria-hidden="true"
                 tabIndex={-1}
-                className="flex h-full w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/20 shadow-2xl backdrop-blur-md"
+                className="flex h-full w-full flex-col justify-between overflow-visible rounded-2xl border border-white/20 shadow-2xl backdrop-blur-md"
                 style={{
                   background: hoverBg,
                   boxShadow: '0 24px 48px rgba(0,0,0,0.38), 0 10px 20px rgba(0,0,0,0.28)',
@@ -295,13 +296,13 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
               </div>
               <div className="flex flex-wrap gap-1">
-                <span role="button" tabIndex={0} title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`} className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white">{isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}</span>
+                <span role="button" tabIndex={0} aria-describedby={`grid-state-tooltip-portal-${book.id}`} className="group/category inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white">{isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}<Tooltip id={`grid-state-tooltip-portal-${book.id}`} variant="category">{isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}</Tooltip></span>
               </div>
             </div>
           </div>
-          <div className="relative shrink-0 overflow-hidden px-3.5 pb-3">
+          <div className="relative shrink-0 overflow-visible px-3.5 pb-3">
             <div className="mb-1 flex items-center gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Gêneros</span></div>
-            <div className="flex flex-nowrap overflow-hidden">
+            <div className="flex flex-nowrap overflow-visible">
               {book.genres.length > 0 ? <OverflowTags items={book.genres} variant="dark" onItemClick={(item) => { openCatalogQuery(`/acervo?genre_id=${item.id}`) }} /> : <span className="text-xs text-white/60">—</span>}
             </div>
           </div>

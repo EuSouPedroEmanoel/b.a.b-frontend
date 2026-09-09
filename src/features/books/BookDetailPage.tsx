@@ -15,6 +15,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { buttonVariantClasses } from '@/components/ui/Button'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { Badge } from '@/components/ui/Badge'
 import { Carousel } from '@/components/ui/Carousel'
 import { GridCard } from '@/features/books/GridCard'
@@ -495,7 +497,7 @@ export function BookDetailPage() {
         <div role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 p-4 text-sm text-red-800 dark:text-red-200">
           Erro ao carregar livro: {(error as { message?: string })?.message ?? 'tente novamente'}
         </div>
-        <button type="button" onClick={handleBack} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm sm:text-[15px] font-medium shadow-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-[var(--color-primary)] dark:hover:text-white transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 mt-4">
+        <button type="button" onClick={handleBack} className={`mt-4 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 ${buttonVariantClasses.secondary}`}>
           <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" /> Voltar ao acervo
         </button>
       </div>
@@ -506,7 +508,7 @@ export function BookDetailPage() {
     <div style={{ background: pageBg, transition: 'background-color 0.3s ease, background 0.3s ease' }} className="w-full">
       <div className="mx-auto max-w-full !max-w-4xl w-full overflow-visible flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button type="button" onClick={handleBack} aria-label="Voltar ao acervo" className="inline-flex items-center justify-center gap-2 px-5 py-3 min-h-[48px] rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm sm:text-base font-semibold shadow-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-[var(--color-primary)] dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-500 transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2">
+          <button type="button" onClick={handleBack} aria-label="Voltar ao acervo" className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 ${buttonVariantClasses.secondary}`}>
             <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" /> Voltar ao acervo
           </button>
 
@@ -532,7 +534,7 @@ export function BookDetailPage() {
         >
           <Link
             to={`/acervo/${id}/exemplares/novo`}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-[#0f4c75] text-white hover:bg-[#0e3f61] active:bg-[#0c3d5e] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 dark:active:bg-slate-200 min-h-[44px] font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+            className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md px-4 py-2 font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 ${buttonVariantClasses.secondary}`}
           >
             <Plus className="h-4 w-4" aria-hidden="true" /> Cadastrar exemplar
           </Link>
@@ -683,7 +685,7 @@ export function BookDetailPage() {
                       const bg = isDark ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
                       const color = isDark ? '#fff' : stringToHsl(a.name, 65, 22)
                       const border = isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
-                      return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?author_id=${a.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?author_id=${a.id}`) } }}>{a.name}</span>
+                      return <span key={a.id} aria-describedby={`book-author-tooltip-${a.id}`} style={{ background: bg, color, borderColor: border }} className="group relative inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?author_id=${a.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?author_id=${a.id}`) } }}>{a.name}<Tooltip id={`book-author-tooltip-${a.id}`} variant="category">{a.name}</Tooltip></span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
@@ -692,7 +694,7 @@ export function BookDetailPage() {
                   <dd className="col-span-2 flex flex-wrap items-center gap-1.5">
                     {book.genres?.length ? book.genres.map((g) => {
                       const bg = isDark ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
-                      return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?genre_id=${g.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?genre_id=${g.id}`) } }}>{g.name}</span>
+                      return <span key={g.id} aria-describedby={`book-genre-tooltip-${g.id}`} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="group relative inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?genre_id=${g.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?genre_id=${g.id}`) } }}>{g.name}<Tooltip id={`book-genre-tooltip-${g.id}`} variant="category">{g.name}</Tooltip></span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>

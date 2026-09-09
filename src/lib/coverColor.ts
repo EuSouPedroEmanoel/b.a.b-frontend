@@ -29,7 +29,22 @@ export function stringToHsl(input: string, saturation = 65, lightness = 30): str
   const normalized = (input ?? '').trim()
   if (!normalized) return `hsl(210, ${saturation}%, ${lightness}%)`
   const hue = hashString(normalized) % 360
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+  // Cores categóricas não devem competir com status funcionais.
+  const categoricalSaturation = saturation >= 70 ? 42 : saturation <= 65 ? 24 : saturation
+  return `hsl(${hue}, ${categoricalSaturation}%, ${lightness}%)`
+}
+
+/** Paleta categórica determinística para tags, sem aparência de estado semântico. */
+export function categoricalTagColor(input: string, kind: 'author' | 'genre', dark: boolean): { background: string; color: string; border: string } {
+  const hue = hashString((input ?? '').trim()) % 360
+  if (kind === 'author') {
+    return dark
+      ? { background: `hsl(${hue}, 24%, 28%)`, color: '#f5eee5', border: 'rgba(255,255,255,0.18)' }
+      : { background: `hsl(${hue}, 24%, 78%)`, color: '#29221d', border: `hsl(${hue}, 22%, 58%)` }
+  }
+  return dark
+    ? { background: `hsl(${hue}, 42%, 30%)`, color: '#fff', border: 'rgba(255,255,255,0.2)' }
+    : { background: `hsl(${hue}, 42%, 52%)`, color: '#29221d', border: `hsl(${hue}, 38%, 38%)` }
 }
 
 const CAPPUCCINO_BASE = [191, 168, 137] as const

@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Carousel } from '@/components/ui/Carousel'
 
@@ -120,22 +121,22 @@ describe('Carousel circular sem peeks', () => {
     expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4'])
   })
 
-  it('aplica zoom e opacity sutis aos grupos durante a navegação', () => {
+  it('mantém os cards em opacity e escala estáveis durante a navegação', () => {
     renderCarousel(9)
     configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
     const carouselTrack = track()
-    const currentPane = carouselTrack.children[1] as HTMLElement
-    const nextPane = carouselTrack.children[2] as HTMLElement
+    const currentPane = Array.from(carouselTrack.children).find((pane) => pane.getAttribute('aria-hidden') !== 'true') as HTMLElement
+    const nextPane = currentPane.nextElementSibling as HTMLElement
     const currentCard = currentPane.querySelector('[data-carousel-card="true"]') as HTMLElement
     const nextCard = nextPane.querySelector('[data-carousel-card="true"]') as HTMLElement
 
     expect(currentCard.style.transform).toBe('scale(1)')
     fireEvent.click(nextButton())
 
-    expect(currentCard.style.transform).toBe('scale(0.86)')
-    expect(currentCard.style.opacity).toBe('0.72')
-    expect(nextCard.style.transform).toBe('scale(0.86)')
-    expect(nextCard.style.opacity).toBe('0.72')
+    expect(currentCard.style.transform).toBe('scale(1)')
+    expect(currentCard.style.opacity).toBe('1')
+    expect(nextCard.style.transform).toBe('scale(1)')
+    expect(nextCard.style.opacity).toBe('1')
     expect(carouselTrack.style.transition).toContain('280ms')
   })
 
@@ -144,9 +145,36 @@ describe('Carousel circular sem peeks', () => {
     configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
     fireEvent.click(previousButton())
     const carouselTrack = track()
-    expect(carouselTrack.style.transform).toBe('translateX(0px)')
-    expect((carouselTrack.children[0] as HTMLElement).querySelector('[data-carousel-card="true"]')?.getAttribute('style')).toContain('scale(0.86)')
+    expect(carouselTrack.style.transform).toBe('translateX(-960px)')
     expect(carouselTrack.style.transition).toContain('280ms')
+  })
+
+  it('mantém montada a mesma instância que entrou e a reutiliza ao voltar', () => {
+    const lifecycle: string[] = []
+    function ProbeCard({ item }: { item: { id: number } }) {
+      useEffect(() => {
+        lifecycle.push(`mount:${item.id}`)
+        return () => { lifecycle.push(`unmount:${item.id}`) }
+      }, [item.id])
+      return <article aria-label={`Livro ${item.id + 1}`}>Livro {item.id + 1}</article>
+    }
+    render(<Carousel title="Livros" items={Array.from({ length: 9 }, (_, id) => ({ id }))} circular renderItem={(item) => <ProbeCard item={item} />} />)
+    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
+    const carouselTrack = track()
+    const initialPane = Array.from(carouselTrack.children).find((pane) => pane.getAttribute('aria-hidden') !== 'true') as HTMLElement
+    const initialCard = initialPane.querySelector('[aria-label="Livro 1"]') as HTMLElement
+    const enteringCard = (initialPane.nextElementSibling as HTMLElement).querySelector('[aria-label="Livro 5"]') as HTMLElement
+    lifecycle.length = 0
+
+    fireEvent.click(nextButton()); finishTransition()
+    expect(enteringCard).toBeInTheDocument()
+    expect(enteringCard.closest('[aria-hidden="true"]')).toBeNull()
+    expect(lifecycle).toEqual([])
+
+    fireEvent.click(previousButton()); finishTransition()
+    expect(initialCard).toBeInTheDocument()
+    expect(initialCard.closest('[aria-hidden="true"]')).toBeNull()
+    expect(lifecycle).toEqual([])
   })
 
   it('remove slide e zoom quando prefers-reduced-motion está ativo', () => {

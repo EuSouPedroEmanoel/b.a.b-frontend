@@ -23,6 +23,13 @@ import { GridCard } from './GridCard'
 import { hasPersonalReaderCapability } from '@/lib/permissions'
 
 type Book = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; is_active: boolean; added_by: number; cover_url: string | null; published_date: string | null; created_at: string | null; updated_at: string | null; total_copies?: number; available_copies?: number; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
+
+function availabilityText(book: Book): string {
+  const total = book.total_copies ?? 0
+  const available = book.available_copies ?? 0
+  if (total === 0) return '0 exemplares'
+  return `${available} de ${total} ${available === 1 ? 'disponível' : 'disponíveis'}`
+}
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 type Resolve = { kind: 'isbn' | 'internal_code' | 'title' | 'none'; book_id: number | null }
 type BookSuggestion = { id: number; title: string; isbn: string | null }
@@ -788,8 +795,8 @@ export function BooksPage() {
         {data && viewMode === 'table' && (
           <>
             <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <table className="w-full text-sm table-fixed">
-                <caption className="sr-only">Tabela de livros com capa, título e descrição, disponibilidade, exemplares, data de cadastro e lançamento</caption>
+              <table className="w-full text-sm table-auto">
+                <caption className="sr-only">Tabela de livros com capa, título e descrição, exemplares, autores, gêneros, ano e data de cadastro</caption>
                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-left">
                   <tr>
                     <th scope="col" className="px-3 py-3 font-semibold w-14 text-center">
@@ -798,22 +805,19 @@ export function BooksPage() {
                     <th scope="col" className="px-2 py-2 font-semibold w-[28%]">
                       Título
                     </th>
-                    <th scope="col" className="px-5 py-3 font-semibold whitespace-nowrap w-[120px] text-center">
+                    <th scope="col" className="px-5 py-3 font-semibold whitespace-nowrap w-[90px] text-center">
                       Disponibilidade
                     </th>
-                    <th scope="col" className="px-5 py-3 font-semibold whitespace-nowrap w-[90px] text-center">
-                      Exemplares
-                    </th>
-                    <th scope="col" className="px-3 py-3 font-semibold w-[12%] min-w-[105px] text-center">
+                    <th scope="col" className="w-[1%] max-w-[190px] px-3 py-3 font-semibold text-center">
                       Autores
                     </th>
-                    <th scope="col" className="px-2 py-2 font-semibold text-center w-[96px]">
+                    <th scope="col" className="w-[1%] max-w-[150px] px-2 py-2 font-semibold text-center">
                       Gêneros
                     </th>
-                    <th scope="col" className="px-6 py-3 font-semibold whitespace-nowrap w-[88px] text-center">
-                      Lançamento
+                    <th scope="col" className="px-2 py-3 font-semibold whitespace-nowrap w-[64px] text-center">
+                      Ano
                     </th>
-                    <th scope="col" className="px-6 py-3 font-semibold whitespace-nowrap w-[90px] text-center">
+                    <th scope="col" className="px-2 py-3 font-semibold whitespace-nowrap w-[110px] text-center">
                       Cadastro
                     </th>
                   </tr>
@@ -834,7 +838,7 @@ export function BooksPage() {
                       aria-label={`Abrir livro ${b.title}`}
                       className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-[-2px]"
                     >
-                      <td className="px-2 py-2">
+                      <td className="w-[1%] max-w-[150px] px-2 py-2">
                         {b.cover_url ? (
                           <CoverImage
                             src={b.cover_url}
@@ -868,26 +872,21 @@ export function BooksPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-center">
-                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); if (!isGuest) { setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') } }} onKeyDown={(e: any) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1) } }} role={!isGuest ? 'button' : undefined} tabIndex={!isGuest ? 0 : undefined} title={isGuest ? publicBookStateLabel(b.derived_state) : `Filtrar por ${bookStateLabel(b.derived_state)}`}>{isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}</Badge>
-                      </td>
-                      <td className="px-5 py-3 text-center">
+                      <td className="px-2 py-3 text-center">
                         {typeof b.total_copies === 'number' ? (
-                          <Badge tone="neutral" title={`${b.available_copies ?? 0} de ${b.total_copies} disponíveis`}>
-                            {b.available_copies ?? 0}/{b.total_copies}
-                          </Badge>
+                          <div className="flex flex-col items-center justify-center gap-1"><span className="whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-200">{availabilityText(b)}</span><Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); if (!isGuest) { setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') } }} onKeyDown={(e: any) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1) } }} role={!isGuest ? 'button' : undefined} tabIndex={!isGuest ? 0 : undefined} title={isGuest ? publicBookStateLabel(b.derived_state) : `Filtrar por ${bookStateLabel(b.derived_state)}`}>{isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}</Badge></div>
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3">
-                        <OverflowTags items={b.authors} tone="info" maxVisibleFallback={2} className="max-w-[15ch] mx-auto justify-center" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setAuthorFilter(String(item.id)); setPage(1); announce(`Filtrando por autor ${item.name}`, 'polite') }} />
+                      <td className="w-[1%] max-w-[190px] px-3 py-3">
+                        <OverflowTags items={b.authors} tone="info" maxVisibleFallback={2} itemMaxWidthClass="max-w-[170px]" className="w-full max-w-none min-w-0 justify-start" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setAuthorFilter(String(item.id)); setPage(1); announce(`Filtrando por autor ${item.name}`, 'polite') }} />
                       </td>
                       <td className="px-2 py-2">
-                        <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} className="max-w-[12ch] mx-auto justify-center" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setGenreFilter(String(item.id)); setPage(1); announce(`Filtrando por gênero ${item.name}`, 'polite') }} />
+                        <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} maxVisible={1} itemMaxWidthClass="max-w-[140px]" className="w-full max-w-none min-w-0 justify-start" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setGenreFilter(String(item.id)); setPage(1); announce(`Filtrando por gênero ${item.name}`, 'polite') }} />
                       </td>
-                      <td className="px-6 py-3 whitespace-nowrap text-center bg-slate-50/70 dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</td>
-                      <td className="px-6 py-3 whitespace-nowrap text-center bg-slate-50/70 dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -987,8 +986,8 @@ export function BooksPage() {
                           <Calendar className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                         </span>
                         <span className="flex flex-col leading-none">
-                          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Lançamento</span>
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{b.published_date ? new Date(b.published_date).toLocaleDateString('pt-BR') : '—'}</span>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Ano</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</span>
                         </span>
                       </span>
                       <span className="h-8 w-px bg-slate-200 dark:bg-slate-600" aria-hidden="true" />
