@@ -17,7 +17,7 @@ export function Pagination({ page, pages, total, onChange }: Props) {
           type="button"
           disabled={page <= 1}
           onClick={() => onChange(page - 1)}
-          className="min-h-[44px] min-w-[44px] px-3 rounded-md border border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="min-h-[44px] min-w-[44px] cursor-pointer px-3 rounded-md border border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
           aria-label="Página anterior"
         >
           ‹ Anterior
@@ -36,7 +36,7 @@ export function Pagination({ page, pages, total, onChange }: Props) {
               aria-current={page === p ? 'page' : undefined}
               aria-label={`Ir para página ${p}`}
               onClick={() => onChange(p)}
-              className={`min-h-[44px] min-w-[44px] px-3 rounded-md border text-sm font-medium ${
+              className={`min-h-[44px] min-w-[44px] cursor-pointer px-3 rounded-md border text-sm font-medium ${
                 page === p
                   ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
                   : 'border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -50,7 +50,7 @@ export function Pagination({ page, pages, total, onChange }: Props) {
           type="button"
           disabled={page >= pages}
           onClick={() => onChange(page + 1)}
-          className="min-h-[44px] min-w-[44px] px-3 rounded-md border border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="min-h-[44px] min-w-[44px] cursor-pointer px-3 rounded-md border border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
           aria-label="Próxima página"
         >
           Próxima ›

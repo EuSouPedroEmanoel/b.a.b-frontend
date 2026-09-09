@@ -4,22 +4,29 @@
 
 /* Design tokens — W3C WCAG 2.2 AA (contraste 4.5:1+) */
 @theme {
-  --color-primary: #0f4c75;
-  --color-primary-hover: #0e3f61;
+  --color-primary: #075985;
+  --color-primary-hover: #0c4a6e;
+  --color-primary-active: #0c4a6e;
   --color-primary-contrast: #ffffff;
-  --color-accent: #3282b8;
-  --color-surface: #ffffff;
-  --color-bg: #f8fafc;
-  --color-text: #0f172a;
-  --color-text-muted: #475569;
-  --color-border: #cbd5e1;
+  --color-accent: #075985;
+  --color-surface: #d8c5ac;
+  --color-surface-elevated: #e5d5c0;
+  --color-field: #eadbc8;
+  --color-surface-muted: #bfa889;
+  --color-bg: #bfa889;
+  --color-text: #29221d;
+  --color-text-muted: #4a3d35;
+  --color-border: #685443;
+  --color-field-border-hover: #5b4838;
+  --color-disabled-bg: #c6b192;
+  --color-disabled-text: #4a3d35;
   --color-success: #14532d;
   --color-success-bg: #dcfce7;
   --color-warning: #7c2d12;
   --color-warning-bg: #fef3c7;
   --color-danger: #7f1d1d;
   --color-danger-bg: #fee2e2;
-  --color-focus: #f59e0b;
+  --color-focus: #7c3e00;
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -27,12 +34,92 @@
 html.dark {
   --color-bg: #0f172a;
   --color-surface: #1e293b;
+  --color-surface-elevated: #1e293b;
+  --color-field: #1e293b;
   --color-text: #f1f5f9;
   --color-text-muted: #94a3b8;
   --color-border: #334155;
   --color-primary: #38bdf8;
   --color-primary-hover: #7dd3fc;
   --color-primary-contrast: #0f172a;
+}
+
+/*
+ * Ponte temporária para as utilidades claras legadas. O projeto ainda usa
+ * classes Tailwind neutras em páginas e componentes; concentrar o mapeamento
+ * aqui evita espalhar a paleta Cappuccino e mantém as variantes dark:* intactas.
+ */
+html:not(.dark) :is(.bg-white, .bg-slate-50, .bg-slate-100, .bg-slate-200,
+  .bg-slate-300, .bg-slate-400) {
+  background-color: var(--color-surface);
+}
+html:not(.dark) :is(.bg-slate-500, .bg-slate-600, .bg-slate-700,
+  .bg-slate-800, .bg-slate-900, .bg-slate-950) {
+  background-color: var(--color-primary);
+}
+html:not(.dark) :is(.border-slate-100, .border-slate-200, .border-slate-300,
+  .border-slate-400, .border-slate-500, .border-slate-600, .border-slate-700,
+  .border-slate-800, .border-slate-900) {
+  border-color: var(--color-border);
+}
+html:not(.dark) :is(.divide-slate-100, .divide-slate-200, .divide-slate-300,
+  .divide-slate-400, .divide-slate-500, .divide-slate-600, .divide-slate-700,
+  .divide-slate-800, .divide-slate-900) > :not(:last-child) {
+  border-color: var(--color-border);
+}
+html:not(.dark) :is(.text-slate-400, .text-slate-500, .text-slate-600) {
+  color: var(--color-text-muted);
+}
+html:not(.dark) :is(.text-slate-700, .text-slate-800, .text-slate-900,
+  .text-slate-950) {
+  color: var(--color-text);
+}
+html:not(.dark) :is(.hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover,
+  .hover\:bg-slate-200:hover, .hover\:bg-slate-300:hover,
+  .hover\:bg-slate-400:hover, .hover\:bg-white:hover) {
+  background-color: var(--color-surface-muted);
+}
+html:not(.dark) :is(.bg-blue-600, .bg-\[\#0f4c75\]) {
+  background-color: var(--color-primary);
+}
+html:not(.dark) :is(.border-blue-600, .border-\[\#0c3d5e\]) {
+  border-color: var(--color-primary);
+}
+html:not(.dark) :is(.hover\:bg-blue-700:hover, .hover\:bg-\[\#0e3f61\]:hover,
+  .active\:bg-\[\#0c3d5e\]:active) {
+  background-color: var(--color-primary-hover);
+}
+html:not(.dark) :is(.text-\[\#0f4c75\], .group:hover .group-hover\:text-\[\#0f4c75\]) {
+  color: var(--color-primary);
+}
+/* Campos precisam permanecer distinguíveis da superfície do card antes do foco. */
+html:not(.dark) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+  background-color: var(--color-field);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+html:not(.dark) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):hover:not(:disabled) {
+  border-color: var(--color-field-border-hover);
+}
+html:not(.dark) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus-visible {
+  border-color: var(--color-focus);
+}
+html:not(.dark) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea)::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+/* Disabled usa apenas neutros Cappuccino; não mantém aparência de ação primária. */
+html:not(.dark) :is(button, input, textarea, select):disabled {
+  opacity: 1;
+  background-color: var(--color-disabled-bg);
+  border-color: var(--color-border);
+  color: var(--color-disabled-text);
+  cursor: not-allowed;
+}
+html:not(.dark) :is(button, input, textarea, select):disabled:hover {
+  background-color: var(--color-disabled-bg);
+  border-color: var(--color-border);
+  color: var(--color-disabled-text);
 }
 html { color-scheme: light; }
 html.dark { color-scheme: dark; }
@@ -79,6 +166,13 @@ body {
   outline-offset: 2px;
 }
 
+/* Affordance consistente para controles interativos. */
+button:not(:disabled):not([aria-disabled="true"]), a[href],
+[role="button"]:not([aria-disabled="true"]),
+input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled),
+input[type="range"]:not(:disabled), select:not(:disabled) { cursor: pointer; }
+button:disabled, [aria-disabled="true"], input:disabled, select:disabled { cursor: not-allowed !important; }
+
 /* sr-only */
 .sr-only {
   position: absolute; width: 1px; height: 1px;
@@ -92,8 +186,8 @@ body {
 }
 .loan-confirmation-button:disabled {
   opacity: 1 !important;
-  background-color: #64748b !important;
-  color: #ffffff !important;
+  background-color: var(--color-disabled-bg) !important;
+  color: var(--color-disabled-text) !important;
 }
 html.dark .loan-confirmation-button {
   background-color: #2563eb !important;

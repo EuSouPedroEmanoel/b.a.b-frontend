@@ -5,10 +5,10 @@ export type User = {
   username: string
   name: string
   email: string | null
-  cpf_masked: string | null
-  birthdate: string | null
-  turma_numero: number | null
-  turma_letra: string | null
+  cpf_masked?: string | null
+  birthdate?: string | null
+  turma_numero?: number | null
+  turma_letra?: string | null
   role: string
   school_id: number | null
   school_code?: string | null

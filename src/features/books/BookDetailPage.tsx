@@ -8,7 +8,7 @@ import { bookConditionLabel, bookStateLabel, bookStateTone, publicBookStateLabel
 import { CoverImage } from '@/components/ui/CoverImage'
 import { getCoverProxyUrl } from '@/lib/imageProxy'
 import { generateFallbackCoverDataUrl } from '@/lib/coverFallback'
-import { stringToHsl } from '@/lib/coverColor'
+import { cappuccinoCoverBackground, cappuccinoCoverSurface, stringToHsl } from '@/lib/coverColor'
 import { useAverageColor } from '@/hooks/useAverageColor'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -21,6 +21,7 @@ import { GridCard } from '@/features/books/GridCard'
 import { ReservationConfirmDialog } from '@/features/books/ReservationConfirmDialog'
 import { catalogRouteState, getCatalogOrigin } from '@/lib/catalogNavigation'
 import { hasPersonalReaderCapability } from '@/lib/permissions'
+import { canViewBookCirculation, selectBookLoansForCopies, selectMyBookLoans, shouldShowMyBookLoans } from '@/lib/bookLoanSections'
 
 type Book = {
   id: number
@@ -41,12 +42,10 @@ type Book = {
   available_copies?: number
 }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
-type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code?: string; book_id?: number; book_title?: string }
-type User = { id: number; username: string; email: string; role: string; school_id: number | null; is_active: boolean }
+type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code?: string; book_id?: number; book_title?: string; borrower_username?: string }
 type Reservation = { id: number; book_id: number; status: string; created_at?: string; ready_at?: string | null; internal_code?: string | null; copy_id?: number | null; queue_position?: number; queue_total?: number }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 
-const MANAGE_ROLES = ['librarian', 'school_admin', 'super_admin']
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const id = Number(bookId)
@@ -55,9 +54,10 @@ export function BookDetailPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const canManage = !!user && MANAGE_ROLES.includes(user.role)
+  const canManage = canViewBookCirculation(user?.role)
   const canReserve = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
+  const canViewMyLoans = !!user && !isGuest
   const catalogOrigin = getCatalogOrigin(location.state)
 
   const handleBack = useCallback(() => {
@@ -221,24 +221,23 @@ export function BookDetailPage() {
     [copiesPage],
   )
 
-  const { data: activeLoans, isLoading: loansLoading } = useQuery({
-    queryKey: ['book-loans', id],
+  const { data: circulationLoans, isLoading: circulationLoading } = useQuery({
+    queryKey: ['book-loans', 'circulation', id],
     queryFn: async () => {
-      const endpoint = canManage ? '/loans/?status=active&size=100' : '/loans/me?size=100'
+      const endpoint = '/loans/?size=100'
       const { data } = await api.get<Paginated<Loan>>(endpoint)
-      const filtered = data.items.filter((l) => activeCopyIds.has(l.copy_id))
-      return filtered
+      return selectBookLoansForCopies(data.items, activeCopyIds)
     },
-    enabled: Number.isFinite(id) && copiesPage !== undefined && (canManage || canReserve),
+    enabled: Number.isFinite(id) && copiesPage !== undefined && canManage,
   })
 
-  const { data: usersPage } = useQuery({
-    queryKey: ['users', 'all'],
+  const { data: myLoans, isLoading: myLoansLoading } = useQuery({
+    queryKey: ['book-loans', 'me', id],
     queryFn: async () => {
-      const { data } = await api.get<Paginated<User>>('/users/?size=100')
-      return data
+      const { data } = await api.get<Paginated<Loan>>('/loans/me?size=100')
+      return selectMyBookLoans(data.items, user?.id, activeCopyIds)
     },
-    enabled: Number.isFinite(id) && canManage,
+    enabled: Number.isFinite(id) && copiesPage !== undefined && canViewMyLoans,
   })
 
   const { data: similarBooks, isLoading: similarLoading } = useQuery({
@@ -343,10 +342,6 @@ export function BookDetailPage() {
     const map = new Map((copiesPage?.items ?? []).map((c) => [c.id, c.code]))
     return (copyIdNum: number) => map.get(copyIdNum) ?? String(copyIdNum)
   }, [copiesPage])
-  const userLabel = useMemo(() => {
-    const map = new Map((usersPage?.items ?? []).map((u) => [u.id, u.username]))
-    return (userIdNum: number) => map.get(userIdNum) ?? String(userIdNum)
-  }, [usersPage])
 
   const { resolved } = useTheme()
   // otimizado: proxy 40px + cache FastAverageColor + hash memoizado; sem placeholder neutro (transição suave)
@@ -380,13 +375,13 @@ export function BookDetailPage() {
     return 220
   }, [avgHex])
   const cardBg = useMemo(() => {
-    if (!coverThemeReady) return resolved === 'dark' ? '#1e293b' : '#ffffff'
-    return resolved === 'dark' ? `hsl(${baseHue}, 65%, 20%)` : `hsl(${baseHue}, 35%, 96%)`
-  }, [baseHue, coverThemeReady, resolved])
+    if (!coverThemeReady) return resolved === 'dark' ? '#1e293b' : '#D8C5AC'
+    return resolved === 'dark' ? `hsl(${baseHue}, 65%, 20%)` : cappuccinoCoverSurface(avgHex ?? '')
+  }, [avgHex, baseHue, coverThemeReady, resolved])
   const pageBg = useMemo(() => {
-    if (!coverThemeReady) return resolved === 'dark' ? '#0f172a' : '#f1f5f9'
-    return resolved === 'dark' ? `hsl(${baseHue}, 65%, 14%)` : `hsl(${baseHue}, 35%, 90%)`
-  }, [baseHue, coverThemeReady, resolved])
+    if (!coverThemeReady) return resolved === 'dark' ? '#0f172a' : '#BFA889'
+    return resolved === 'dark' ? `hsl(${baseHue}, 65%, 14%)` : cappuccinoCoverBackground(avgHex ?? '')
+  }, [avgHex, baseHue, coverThemeReady, resolved])
 
   const isDark = resolved === 'dark'
 
@@ -439,7 +434,7 @@ export function BookDetailPage() {
       announce(`Devolução concluída. Atraso: ${l.late_days} dia(s)`, 'polite')
       qc.invalidateQueries({ queryKey: ['book', id] })
       qc.invalidateQueries({ queryKey: ['copies', id] })
-      qc.invalidateQueries({ queryKey: ['book-loans', id] })
+      qc.invalidateQueries({ queryKey: ['book-loans'] })
     },
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Erro na devolução'
@@ -565,7 +560,7 @@ export function BookDetailPage() {
             <Link
               ref={reservationLinkRef}
               to="/reservas"
-              className="inline-flex items-center justify-center font-medium rounded-md transition-colors min-h-[44px] px-4 py-2 text-sm !bg-blue-600 !text-white hover:!bg-blue-700 !border-blue-600 dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+              className="inline-flex items-center justify-center font-medium rounded-md transition-colors min-h-[44px] px-4 py-2 text-sm !bg-[var(--color-primary)] !text-[var(--color-primary-contrast)] hover:!bg-[var(--color-primary-hover)] !border-[var(--color-primary)] dark:!bg-blue-600 dark:!text-white dark:hover:!bg-blue-700 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
             >
               Ver minha reserva
             </Link>
@@ -766,57 +761,39 @@ export function BookDetailPage() {
         </div>
       )}
 
-      <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
-        <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
-        <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
-          <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`} aria-live="polite">
-            <Undo2 className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> {isGuest ? 'Acesso visitante' : canManage ? 'Devoluções — empréstimos ativos deste livro' : 'Histórico do livro'}
-          </h2>
-        </CardHeader>
-        <CardBody className="relative">
-          {isGuest ? <p className={isDark ? 'text-white/80' : 'text-slate-500'}>Entre com sua conta para consultar empréstimos e reservas.</p> : <>
-          {(loansLoading || (canReserve && reservationsLoading)) && <p aria-live="polite" className={isDark ? 'text-white/80' : 'text-slate-500'}>Carregando histórico...</p>}
-          {!loansLoading && !reservationsLoading && activeLoans && activeLoans.length === 0 && !currentReservation && (
-            <p className={`text-sm py-4 text-center ${isDark ? 'text-white/70' : 'text-slate-500'}`}>{canManage ? 'Nenhum empréstimo ativo para este livro.' : 'Você ainda não possui empréstimos, devoluções ou reservas deste livro.'}</p>
-          )}</>}
-          {((activeLoans && activeLoans.length > 0) || currentReservation) && (
-            <ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
-              {currentReservation && (
-                <li className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div className="text-sm">
-                    <p className={isDark ? 'text-white/90' : 'text-slate-800'}>
-                      <Badge tone={currentReservation.status === 'ready' ? 'success' : 'info'}>
-                        {currentReservation.status === 'ready' ? 'Reserva pronta' : 'Reserva ativa'}
-                      </Badge>{' '}Reserva deste livro
-                    </p>
-                    <p className={`text-xs mt-0.5 ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
-                      {currentReservation.queue_position != null && currentReservation.queue_total != null
-                        ? `${currentReservation.queue_position}º de ${currentReservation.queue_total} na fila`
-                        : currentReservation.status === 'ready' ? 'Pronta para retirada' : 'Aguardando exemplar'}
-                      {currentReservation.internal_code ? ` · Exemplar ${currentReservation.internal_code}` : ''}
-                    </p>
-                  </div>
-                </li>
-              )}
-              {(activeLoans ?? []).map((l) => (
-                <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div className="text-sm">
-                    <p className={isDark ? 'text-white/90' : 'text-slate-800'}>{canManage ? <><span className="font-mono">#{l.id}</span> · Exemplar{' '}<span className="font-mono">{copyCode(l.copy_id)}</span> · {userLabel(l.user_id)}</> : <><Badge tone={l.status === 'returned' ? 'neutral' : 'warning'}>{l.status === 'returned' ? 'Devolvido' : 'Em andamento'}</Badge>{' '}Exemplar <span className="font-mono">{l.internal_code ?? copyCode(l.copy_id)}</span></>}</p>
-                    <p className={`text-xs mt-0.5 ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
-                      Emprestado em {new Date(l.borrowed_at).toLocaleDateString('pt-BR')} · {l.status === 'returned' && l.returned_at ? `Devolvido em ${new Date(l.returned_at).toLocaleDateString('pt-BR')}` : `Devolução prevista em ${new Date(l.due_date).toLocaleDateString('pt-BR')}`}
-                    </p>
-                  </div>
-                  {canManage && (
-                    <Button size="sm" variant="secondary" onClick={() => returnLoan.mutate(l.id)} disabled={returnLoan.isPending}>
-                      Devolver
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
+      {canManage && (
+        <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
+          <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
+          <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}>
+            <h2 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-800'}`}>
+              <Undo2 className={`h-5 w-5 ${isDark ? 'text-white/90' : 'text-slate-600'}`} aria-hidden="true" /> Circulação
+            </h2>
+          </CardHeader>
+          <CardBody className="relative">
+            {circulationLoading ? <p aria-live="polite" className={isDark ? 'text-white/80' : 'text-slate-500'}>Carregando circulação...</p> : circulationLoans?.length ? <>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div><dt className="text-xs opacity-75">Total de empréstimos</dt><dd className="font-semibold">{circulationLoans.length}</dd></div>
+                <div><dt className="text-xs opacity-75">Último empréstimo</dt><dd className="font-semibold">{new Date([...circulationLoans].sort((a, b) => b.borrowed_at.localeCompare(a.borrowed_at))[0].borrowed_at).toLocaleDateString('pt-BR')}</dd></div>
+                <div><dt className="text-xs opacity-75">Última devolução</dt><dd className="font-semibold">{(() => { const returned = circulationLoans.filter((l) => l.returned_at).sort((a, b) => (b.returned_at ?? '').localeCompare(a.returned_at ?? ''))[0]; return returned?.returned_at ? new Date(returned.returned_at).toLocaleDateString('pt-BR') : 'Ainda não registrada' })()}</dd></div>
+                <div><dt className="text-xs opacity-75">Situação mais recente</dt><dd className="font-semibold">{circulationLoans[0].status === 'returned' ? 'Devolvido' : 'Em andamento'}</dd></div>
+              </dl>
+              <ul className={`mt-4 divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
+                {circulationLoans.map((loan) => <li key={loan.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="text-sm"><p className="font-medium">#{loan.id} · Exemplar <span className="font-mono">{loan.internal_code ?? copyCode(loan.copy_id)}</span> · {loan.borrower_username ?? 'Leitor não identificado'}</p><p className="text-xs opacity-75">Emprestado em {new Date(loan.borrowed_at).toLocaleDateString('pt-BR')} · {loan.status === 'returned' && loan.returned_at ? `Devolvido em ${new Date(loan.returned_at).toLocaleDateString('pt-BR')}` : `Devolução prevista em ${new Date(loan.due_date).toLocaleDateString('pt-BR')}`}</p></div>{loan.status !== 'returned' && <Button size="sm" variant="secondary" onClick={() => returnLoan.mutate(loan.id)} disabled={returnLoan.isPending}>Devolver</Button>}</li>)}
+              </ul>
+            </> : <p className={`text-sm py-4 text-center ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Nenhum empréstimo registrado para este livro.</p>}
+          </CardBody>
+        </Card>
+      )}
+
+      {canViewMyLoans && !myLoansLoading && myLoans && shouldShowMyBookLoans(user?.role, myLoans) && (
+        <Card className={`relative overflow-hidden ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>
+          <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
+          <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}><h2 className="font-semibold flex items-center gap-2"><Undo2 className="h-5 w-5" aria-hidden="true" /> Meus empréstimos e devoluções</h2></CardHeader>
+          <CardBody className="relative"><ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
+            {myLoans.map((loan) => <li key={loan.id} className="py-3 text-sm"><p><Badge tone={loan.status === 'returned' ? 'neutral' : 'warning'}>{loan.status === 'returned' ? 'Devolvido' : 'Em andamento'}</Badge></p><p className="mt-1 text-xs opacity-75">Emprestado em {new Date(loan.borrowed_at).toLocaleDateString('pt-BR')} · {loan.returned_at ? `Devolvido em ${new Date(loan.returned_at).toLocaleDateString('pt-BR')}` : `Devolução prevista em ${new Date(loan.due_date).toLocaleDateString('pt-BR')}`}</p></li>)}
+          </ul></CardBody>
+        </Card>
+      )}
 
       {similarLoading ? (
         <Card className={`relative overflow-visible ${isDark ? 'border-white/20 text-white' : 'border-slate-200 text-slate-800'}`} style={{ background: cardBg }}>

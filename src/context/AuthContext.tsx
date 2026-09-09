@@ -2,16 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import api from '@/lib/api'
 import { AuthContext, type User } from './auth-context'
 
-// Decode JWT payload without verification (only for display)
-function decodeSub(token: string): string | null {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return payload.sub ?? null
-  } catch {
-    return null
-  }
-}
-
 function decodeClaim(token: string, claim: string): string | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]))
@@ -59,37 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       return
     }
-    const username = decodeSub(token)
-    if (!username) {
-      setLoading(false)
-      return
-    }
     try {
-      // Backend retorna PaginatedResponse { items, ... } (atual) ou legado { users } — suporta ambos
-      type PaginatedUsers = { items?: User[]; users?: User[] }
-      const { data } = await api.get<PaginatedUsers>('/users/?size=100')
-      const list: User[] = (data.items ?? data.users ?? []) as User[]
-      const found = list.find((u) => u.username === username) ?? null
-      if (found) setUser(found)
-      else
-        setUser({
-          id: 0,
-          username,
-          name: username,
-          email: null,
-          cpf_masked: null,
-          birthdate: null,
-          turma_numero: null,
-          turma_letra: null,
-          role: 'unknown',
-          school_id: null,
-          is_active: true,
-        })
+      const { data } = await api.get<User>('/users/me')
+      setUser(data)
     } catch {
-      // se falhar listagem (permissão), mantém minimal user para não deslogar
-      const sub = decodeSub(token)
-      if (sub)
-        setUser({ id: 0, username: sub, name: sub, email: null, cpf_masked: null, birthdate: null, turma_numero: null, turma_letra: null, role: 'unknown', school_id: null, is_active: true })
+      setUser(null)
     } finally {
       setLoading(false)
     }

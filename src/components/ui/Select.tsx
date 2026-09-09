@@ -51,7 +51,7 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
         aria-controls={listId}
         disabled={disabled}
         onClick={() => !disabled && setOpen((o) => !o)}
-        className="w-full rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2.5 text-sm bg-white dark:bg-slate-800 flex items-center justify-between gap-2 text-left min-h-[44px] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full cursor-pointer rounded-md border border-[var(--color-border)] dark:border-slate-600 px-3 py-2.5 text-sm bg-[var(--color-field)] dark:bg-slate-800 flex items-center justify-between gap-2 text-left min-h-[44px] hover:border-[var(--color-field-border-hover)] dark:hover:border-slate-500 focus-visible:border-[var(--color-focus)] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="truncate">{selected ? selected.label : (placeholder ?? options[0]?.label ?? '')}</span>
         <ArrowDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
@@ -61,7 +61,7 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
           id={listId}
           role="listbox"
           aria-labelledby={`${buttonId}-label`}
-          className="absolute z-20 top-full mt-1 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg overflow-auto"
+          className="absolute z-20 top-full mt-1 w-full rounded-md border border-[var(--color-border)] dark:border-slate-600 bg-[var(--color-field)] dark:bg-slate-800 shadow-lg overflow-auto"
           style={{ maxHeight: '200px' }}
         >
           {options.map((opt) => (

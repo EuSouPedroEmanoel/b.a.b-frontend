@@ -203,9 +203,7 @@ export function LoginPage() {
   return (
     <div className="mx-auto max-w-md">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Entrar na Biblioteca</h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Entre com seu usuário, e-mail ou CPF. Dica dev: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">superadmin / superadmin123</code>
-      </p>
+      <p className="text-sm text-slate-500 mb-6">Entre com seu usuário, e-mail ou CPF.</p>
 
       <div role="tablist" aria-label="Tipo de acesso" className="mb-4 grid grid-cols-2 rounded-lg border border-slate-300 bg-slate-100 p-1 dark:border-slate-600 dark:bg-slate-800">
         <button
