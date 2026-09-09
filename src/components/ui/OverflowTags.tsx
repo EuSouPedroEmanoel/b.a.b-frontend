@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { stringToHsl } from '@/lib/coverColor'
@@ -15,11 +15,15 @@ type Props = {
   onItemClick?: (item: Item) => void
   itemMaxWidthClass?: string
   maxVisible?: number
+  hiddenLabel?: string
 }
 
-export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVisibleFallback = 2, className = '', onItemClick, itemMaxWidthClass = 'max-w-[12ch]', maxVisible }: Props) {
+export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVisibleFallback = 2, className = '', onItemClick, itemMaxWidthClass = 'max-w-[12ch]', maxVisible, hiddenLabel = 'itens adicionais' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState<number>(() => Math.min(items.length, maxVisibleFallback))
+  const [expanded, setExpanded] = useState(false)
+  const overflowButtonRef = useRef<HTMLButtonElement>(null)
+  const overflowId = `overflow-tags-${useId().replace(/:/g, '')}`
   let resolved: 'light' | 'dark' = 'light'
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -85,24 +89,44 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
     }
 
     compute()
-    const ro = new ResizeObserver(compute)
-    ro.observe(el)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(compute) : null
+    ro?.observe(el)
     window.addEventListener('resize', compute)
     return () => {
-      ro.disconnect()
+      ro?.disconnect()
       window.removeEventListener('resize', compute)
     }
   }, [items, maxVisibleFallback, maxVisible])
 
-  if (items.length === 0) return <span className="text-slate-400">—</span>
-
   const visible = items.slice(0, maxVisible ? Math.min(visibleCount, maxVisible) : visibleCount)
   const hidden = items.slice(visible.length)
+
+  useEffect(() => {
+    if (!expanded) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setExpanded(false)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setExpanded(false)
+        overflowButtonRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [expanded])
+
+  if (items.length === 0) return <span className="text-slate-400">—</span>
 
   const isDark = variant === 'dark'
   const clickable = !!onItemClick
   return (
-    <div ref={containerRef} className={`flex flex-nowrap gap-1 items-center overflow-visible min-w-0 ${className}`}>
+    <div ref={containerRef} className={`relative flex flex-nowrap gap-1 items-center overflow-visible min-w-0 ${className}`}>
       {visible.map((it) => {
         const handleClick = (e: React.MouseEvent) => {
           e.stopPropagation()
@@ -155,15 +179,30 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
         )
       })}
       {hidden.length > 0 && (
-        <span
+        <>
+        <button
+          ref={overflowButtonRef}
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={overflowId}
+          aria-label={`Mostrar ${hidden.length} ${hiddenLabel}`}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setExpanded((value) => !value)
+          }}
           className={
             isDark
               ? 'group/category relative cursor-default shrink-0 whitespace-nowrap rounded-full bg-white/25 px-3 py-0.5 text-xs font-medium text-white border border-white/20 transition-colors duration-200 hover:brightness-110 hover:bg-white/30'
               : 'group/category relative cursor-default shrink-0 whitespace-nowrap rounded-full bg-slate-200 dark:bg-slate-700 px-3 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition-colors duration-200 hover:brightness-105 hover:shadow-sm'
           }
-        >
-          +{hidden.length}<Tooltip variant="category">{hidden.map((h) => h.name).join(', ')}</Tooltip>
-        </span>
+        >+{hidden.length}<Tooltip variant="category">{hidden.map((h) => h.name).join(', ')}</Tooltip></button>
+        {expanded && <div id={overflowId} role="dialog" aria-label={hiddenLabel} className="absolute bottom-full right-0 z-50 mb-2 max-w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-slate-200 bg-white p-2 text-xs shadow-xl dark:border-slate-600 dark:bg-slate-800">
+          <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto" role="list">
+            {hidden.map((item) => <li key={item.id} className="rounded px-2 py-1 text-slate-700 dark:text-slate-200">{item.name}</li>)}
+          </ul>
+        </div>}
+        </>
       )}
     </div>
   )

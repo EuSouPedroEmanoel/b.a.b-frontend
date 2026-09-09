@@ -26,7 +26,7 @@
   --color-warning-bg: #fef3c7;
   --color-danger: #7f1d1d;
   --color-danger-bg: #fee2e2;
-  --color-focus: #7c3e00;
+  --color-focus: #facc15;
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -164,6 +164,7 @@ body {
 :focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
+  box-shadow: 0 0 0 5px #0f172a;
 }
 
 /* Affordance consistente para controles interativos. */
@@ -199,4 +200,10 @@ html.dark .loan-confirmation-button:hover {
 html.dark .loan-confirmation-button:disabled {
   background-color: #475569 !important;
   color: #ffffff !important;
+}
+
+/* Card previews are a pointer/hover enhancement only; touch cards stay compact. */
+.grid-card-hover-preview { display: none !important; }
+@media (hover: hover) and (pointer: fine) {
+  .grid-card-hover-preview { display: flex !important; }
 }

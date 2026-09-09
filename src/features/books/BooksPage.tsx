@@ -6,8 +6,6 @@ import api from '@/lib/api'
 import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { useAuth } from '@/hooks/useAuth'
-import { useTheme } from '@/hooks/useTheme'
-import { stringToHsl } from '@/lib/coverColor'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -81,8 +79,6 @@ export function BooksPage() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user, loading: authLoading } = useAuth()
-  const { resolved } = useTheme()
-  const isDarkTheme = resolved === 'dark'
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
   const isPersonalCatalog = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
@@ -252,6 +248,12 @@ export function BooksPage() {
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const filterWrapperRef = useRef<HTMLDivElement>(null)
   const filterMenuRef = useRef<HTMLDivElement>(null)
+  const filterTriggerRef = useRef<HTMLButtonElement>(null)
+
+  const closeFilterMenu = useCallback(() => {
+    setFilterMenuOpen(false)
+    window.setTimeout(() => filterTriggerRef.current?.focus(), 0)
+  }, [])
 
   // sentinel para scroll infinito no modo grade
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -305,7 +307,7 @@ export function BooksPage() {
       window.clearTimeout(retry)
       window.clearTimeout(clear)
     }
-  }, [isGridLoading, isLoading, location.pathname, location.search, location.state])
+  }, [isGridLoading, isLoading, location.pathname, location.search, location.state, viewMode])
 
   const hasSearchQuery = searchParams.has('q')
 
@@ -319,7 +321,7 @@ export function BooksPage() {
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node
       if (filterWrapperRef.current && !filterWrapperRef.current.contains(t)) {
-        setFilterMenuOpen(false)
+        closeFilterMenu()
       }
     }
     const onClickCapture = (e: MouseEvent) => {
@@ -328,12 +330,13 @@ export function BooksPage() {
         e.preventDefault()
         e.stopPropagation()
         // mousedown já fechou, garante fechado
-        setFilterMenuOpen(false)
+        closeFilterMenu()
       }
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setFilterMenuOpen(false)
+        e.preventDefault()
+        closeFilterMenu()
       }
     }
     document.addEventListener('mousedown', onDown)
@@ -344,7 +347,29 @@ export function BooksPage() {
       document.removeEventListener('click', onClickCapture, true)
       document.removeEventListener('keydown', onKey)
     }
+  }, [closeFilterMenu, filterMenuOpen])
+
+  useEffect(() => {
+    if (!filterMenuOpen) return
+    window.requestAnimationFrame(() => {
+      filterMenuRef.current?.querySelector<HTMLElement>('button[role="combobox"]')?.focus()
+    })
   }, [filterMenuOpen])
+
+  const trapFilterFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab') return
+    const focusable = Array.from(filterMenuRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)') ?? [])
+    if (!focusable.length) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   useEffect(() => {
     const raw = query.trim()
@@ -508,24 +533,29 @@ export function BooksPage() {
         </CardHeader>
         <CardBody>
           <form onSubmit={onSearch} className="flex flex-col gap-3" role="search" aria-label="Buscar livros">
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-end items-stretch">
-              <div className="flex-1 min-w-0 w-full relative max-w-[58%] sm:max-w-[62%]">
-                <div role="combobox" aria-expanded={suggestOpen} aria-controls={suggestListId} aria-haspopup="listbox">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="w-full min-w-0 sm:max-w-[62%] sm:flex-1 relative">
+                <div>
                   <Input
                     label="Buscar"
                     id="book-search"
                     ref={searchInputRef}
                     placeholder={isGuest ? 'Título, ISBN, gênero, autor ou disponibilidade' : 'Título, ISBN, código interno, gênero, autor ou disponibilidade'}
+                    className="!pr-3 sm:!pr-20"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={onKeyDown}
                     onFocus={() => query.trim().length >= 2 && setSuggestOpen(true)}
                     onBlur={() => setTimeout(closeSuggestions, 120)}
                     aria-autocomplete="list"
+                    role="combobox"
+                    aria-expanded={suggestOpen && suggestItems.length > 0}
+                    aria-controls={suggestListId}
+                    aria-haspopup="listbox"
                     aria-activedescendant={activeIndex >= 0 ? `${suggestListId}-${activeIndex}` : undefined}
                     hint="Busque por título, gênero, autor ou disponibilidade — autocomplete disponível"
                     rightElement={
-                      <Button type="submit" size="sm" className="px-3 py-1.5 min-h-0 h-8 transition-colors">
+                      <Button type="submit" size="sm" className="!hidden sm:!inline-flex px-3 py-1.5 min-h-0 h-8 transition-colors">
                         Buscar
                       </Button>
                     }
@@ -536,7 +566,7 @@ export function BooksPage() {
                     id={suggestListId}
                     role="listbox"
                     aria-label="Sugestões de livros, autores, gêneros e disponibilidade"
-                    className="absolute z-20 top-full left-0 right-0 mt-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg overflow-hidden"
+                    className="absolute left-0 right-0 top-full z-30 mt-1 max-h-[min(18rem,calc(100dvh-8rem))] overflow-y-auto overscroll-contain rounded-md border border-slate-300 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800"
                   >
                     {suggestItems.map((s, i) => (
                       <li
@@ -544,7 +574,7 @@ export function BooksPage() {
                         id={`${suggestListId}-${i}`}
                         role="option"
                         aria-selected={i === activeIndex}
-                        onMouseDown={(e) => {
+                        onPointerDown={(e) => {
                           e.preventDefault()
                           openSuggestion(s)
                         }}
@@ -581,12 +611,19 @@ export function BooksPage() {
                   </ul>
                 )}
               </div>
+              <Button type="submit" className="w-full sm:hidden">
+                Buscar
+              </Button>
               <div ref={filterWrapperRef} className="relative flex items-center justify-end gap-2 w-full sm:w-auto sm:self-end sm:mb-[21px] shrink-0">
                 <Button
+                  ref={filterTriggerRef}
                   type="button"
                   variant={hasActiveFilters ? 'primary' : 'secondary'}
-                  onClick={() => setFilterMenuOpen((o) => !o)}
-                  aria-haspopup="menu"
+                  onClick={() => {
+                    if (filterMenuOpen) closeFilterMenu()
+                    else setFilterMenuOpen(true)
+                  }}
+                  aria-haspopup="dialog"
                   aria-expanded={filterMenuOpen}
                   aria-controls="filter-menu"
                   aria-label="Filtros"
@@ -602,20 +639,26 @@ export function BooksPage() {
                 </Button>
                 {filterMenuOpen && (
                   <>
-                    <button
-                      type="button"
-                      aria-label="Fechar filtros"
-                      onClick={() => setFilterMenuOpen(false)}
-                      className="fixed inset-0 z-20 bg-transparent cursor-default"
-                      tabIndex={-1}
+                    <div
+                      aria-hidden="true"
+                      className="fixed inset-0 z-20 cursor-default bg-transparent"
                     />
                     <div
                       id="filter-menu"
                       ref={filterMenuRef}
-                      role="menu"
-                      aria-label="Opções de filtro"
-                      className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-80 max-w-[90vw] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl p-4 z-30 flex flex-col gap-4"
-                  >
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="filter-menu-title"
+                      onKeyDown={trapFilterFocus}
+                      className="fixed inset-x-0 bottom-0 z-30 flex max-h-[min(85dvh,40rem)] w-full flex-col gap-4 overflow-hidden rounded-t-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-800 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-full sm:mt-2 sm:max-h-none sm:w-80 sm:-translate-x-1/2 sm:rounded-xl"
+                    >
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
+                        <h3 id="filter-menu-title" className="text-base font-semibold">Filtros</h3>
+                        <Button type="button" variant="ghost" size="sm" onClick={closeFilterMenu} aria-label="Fechar filtros">
+                          Fechar
+                        </Button>
+                      </div>
+                      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain">
                     <Select
                       label="Gênero"
                       id="genre-filter"
@@ -651,7 +694,8 @@ export function BooksPage() {
                         { value: 'author', label: 'Autor' },
                       ]}
                     />
-                    <div className="flex justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                      </div>
+                      <div className="flex justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
                       <Button
                         type="button"
                         variant="secondary"
@@ -667,7 +711,7 @@ export function BooksPage() {
                       >
                         Limpar filtros
                       </Button>
-                      <Button type="button" onClick={() => setFilterMenuOpen(false)}>
+                      <Button type="button" onClick={closeFilterMenu}>
                         Aplicar
                       </Button>
                     </div>
@@ -942,7 +986,7 @@ export function BooksPage() {
                         <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
                           {b.title}
                         </h3>
-                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5" onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); if (!isGuest) { setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') } }} role={!isGuest ? 'button' : undefined} tabIndex={!isGuest ? 0 : undefined} title={isGuest ? publicBookStateLabel(b.derived_state) : `Filtrar por ${bookStateLabel(b.derived_state)}`}>
+                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5" title={isGuest ? publicBookStateLabel(b.derived_state) : `Estado: ${bookStateLabel(b.derived_state)}`}>
                           {isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}
                         </Badge>
                       </div>
@@ -950,55 +994,25 @@ export function BooksPage() {
                         <Hash className="h-3 w-3 opacity-60" aria-hidden="true" />
                         <span className="truncate">{b.isbn ?? 'Sem ISBN'}</span>
                       </p>
-                      {(b.authors?.length > 0 || b.genres?.length > 0) && (
-                        <div className="flex flex-col gap-1.5">
-                          {b.authors?.length > 0 && (
-                            <div className="flex flex-nowrap gap-1 items-center">
-                              {b.authors.slice(0, 1).map((a) => {
-                                const bg = isDarkTheme ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
-                                const color = isDarkTheme ? '#fff' : stringToHsl(a.name, 65, 22)
-                                const border = isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
-                                return <span key={a.id} title={a.name} style={{ background: bg, color, borderColor: border }} className="inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1); announce(`Filtrando por autor ${a.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(a.name); setQueryQ(a.name); setAuthorFilter(String(a.id)); setPage(1) } }}>{a.name}</span>
-                              })}
-                              {b.authors.length > 1 && (
-                                <span className="relative inline-flex group/authors shrink-0">
-                                  <span className="cursor-help rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-[11px] font-bold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-colors duration-200 hover:brightness-110">+{b.authors.length - 1}</span>
-                                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-xl border border-slate-700 group-hover/authors:block mb-1 max-w-[200px] text-center">
-                                    {b.authors.slice(1).map((a) => a.name).join(', ')}
-                                  </span>
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {b.genres?.length > 0 && (
-                            <div className="flex flex-nowrap gap-1 items-center">
-                              {b.genres.slice(0, 2).map((g) => {
-                                const bg = isDarkTheme ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
-                                return <span key={g.id} title={g.name} style={{ background: bg, color: '#fff', borderColor: isDarkTheme ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium shrink-0 whitespace-nowrap transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1); announce(`Filtrando por gênero ${g.name}`, 'polite') }} onKeyDown={(e: any) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setQuery(g.name); setQueryQ(g.name); setGenreFilter(String(g.id)); setPage(1) } }}>{g.name}</span>
-                              })}
-                              {b.genres.length > 2 && (
-                                <span className="relative inline-flex group/genres shrink-0">
-                                  <span className="cursor-help rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:text-slate-200 transition-colors duration-200 hover:brightness-110">+{b.genres.length - 2}</span>
-                                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white shadow-xl border border-slate-700 group-hover/genres:block mb-1 max-w-[200px] text-center">
-                                    {b.genres.slice(2).map((g) => g.name).join(', ')}
-                                  </span>
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </Link>
 
                   <div className="mx-4 border-t border-slate-100 dark:border-slate-700" />
 
                   <div className="px-4 py-3 space-y-3">
+                    {(b.authors.length > 0 || b.genres.length > 0) && <div className="flex min-w-0 flex-col gap-1.5">
+                      {b.authors.length > 0 && <OverflowTags items={b.authors} tone="info" maxVisibleFallback={1} hiddenLabel="autores adicionais" itemMaxWidthClass="max-w-[18ch]" className="w-full" />}
+                      {b.genres.length > 0 && <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} maxVisible={2} hiddenLabel="gêneros adicionais" itemMaxWidthClass="max-w-[18ch]" className="w-full" />}
+                    </div>}
                     {b.description && (
                       <p className="line-clamp-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                         {b.description}
                       </p>
                     )}
+                    {typeof b.total_copies === 'number' && <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs dark:bg-slate-700/40">
+                      <span className="font-medium text-slate-500 dark:text-slate-400">Disponibilidade</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{availabilityText(b)}</span>
+                    </div>}
                     <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 dark:bg-slate-700/40 px-3 py-2.5">
                       <span className="flex items-center gap-1.5 text-xs">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500">

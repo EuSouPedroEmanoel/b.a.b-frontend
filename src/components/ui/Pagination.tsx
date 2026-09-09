@@ -8,11 +8,34 @@ type Props = {
 export function Pagination({ page, pages, total, onChange }: Props) {
   if (pages <= 1) return null
   return (
-    <nav aria-label="Paginação" className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+    <nav aria-label="Paginação" className="flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
       <p className="text-sm text-slate-500">
         Total <span className="font-medium text-slate-700 dark:text-slate-200">{total}</span> itens — página {page} de {pages}
       </p>
-      <div className="flex items-center gap-1" role="group" aria-label="Navegar páginas">
+      <div className="flex w-full items-center justify-between gap-2 sm:hidden" role="group" aria-label="Navegar páginas">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          className="min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-slate-300 px-3 text-lg dark:border-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
+          aria-label="Página anterior"
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
+        <span className="shrink-0 text-sm font-medium text-slate-700 dark:text-slate-200" aria-current="page">
+          Página {page} de {pages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= pages}
+          onClick={() => onChange(page + 1)}
+          className="min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-slate-300 px-3 text-lg dark:border-slate-600 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
+          aria-label="Próxima página"
+        >
+          <span aria-hidden="true">›</span>
+        </button>
+      </div>
+      <div className="hidden items-center gap-1 sm:flex" role="group" aria-label="Navegar páginas">
         <button
           type="button"
           disabled={page <= 1}

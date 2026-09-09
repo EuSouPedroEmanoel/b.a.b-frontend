@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
-import { Tooltip } from '@/components/ui/Tooltip'
 import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAverageColor } from '@/hooks/useAverageColor'
 import { OverflowTags } from '@/components/ui/OverflowTags'
@@ -46,6 +45,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
     if (location.pathname === '/acervo' && catalogOrigin) saveCatalogSnapshot(catalogOrigin, window.scrollY)
   }
   const openCatalogQuery = (url: string) => navigate(url, { state: catalogRouteState('new-catalog-navigation') })
+  const stateLabel = isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)
   const hasCover = !!book.cover_url
   const isPriority = index < 6
   const proxiedUrl = getCoverProxyUrl(book.cover_url, 400)
@@ -78,7 +78,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
     <div
       ref={cardRef}
       onMouseEnter={() => {
-        if (portalHover) {
+        if (portalHover && (typeof window === 'undefined' || !window.matchMedia || window.matchMedia('(hover: hover) and (pointer: fine)').matches)) {
           if (hideTimeoutRef.current) {
             window.clearTimeout(hideTimeoutRef.current)
             hideTimeoutRef.current = null
@@ -93,14 +93,14 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           hideTimeoutRef.current = window.setTimeout(() => setPortalHovered(false), 80)
         }
       }}
-      className={`group relative isolate w-full ${disableHover ? '' : 'hover:z-50 focus-within:z-50'}`}
+        className={`group relative isolate w-full min-w-0 ${disableHover ? '' : 'hover:z-50 focus-within:z-50'}`}
     >
       {/* Card base - tamanho fixo padrão no repouso: w-full + aspect-[2/3] garante mesma altura/largura */}
       <Link
         to={`/acervo/${book.id}`}
         state={detailRouteState(catalogOrigin)}
         onClick={savePosition}
-        aria-label={`${rankingPosition ? `Posição ${rankingPosition} do ranking. ` : ''}Abrir detalhes de ${book.title}, autor ${book.authors[0]?.name ?? 'desconhecido'}, status ${book.derived_state}`}
+        aria-label={`${rankingPosition ? `Posição ${rankingPosition} do ranking. ` : ''}Abrir detalhes de ${book.title}, autor ${book.authors[0]?.name ?? 'desconhecido'}`}
         className="flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-shadow duration-300 hover:shadow-lg focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"
       >
         <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
@@ -114,29 +114,6 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             className="absolute inset-0 h-full w-full"
           />
           {rankingPosition !== undefined && <span aria-hidden="true" className="absolute left-2 top-2 z-10 text-2xl font-black text-white/85 drop-shadow">{rankingPosition}º</span>}
-          <div className="absolute top-2 right-2 z-10">
-            <Badge
-              tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)}
-              className="shadow text-[10px] px-2 py-0.5 backdrop-blur-sm cursor-pointer"
-              role="button"
-              tabIndex={0}
-              title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                openCatalogQuery(`/acervo?state=${book.derived_state}`)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  openCatalogQuery(`/acervo?state=${book.derived_state}`)
-                }
-              }}
-            >
-              {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
-            </Badge>
-          </div>
           {/* Rodapé da capa – igual para com imagem e fallback: Título + Autor sobre gradiente escuro */}
           <div className="absolute inset-x-0 bottom-0 overflow-hidden bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
             <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
@@ -144,6 +121,22 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           </div>
         </div>
       </Link>
+
+      <Badge
+        tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)}
+        className="absolute right-2 top-2 z-20 min-h-11 min-w-11 cursor-pointer justify-center shadow text-[10px] px-2 py-0.5 backdrop-blur-sm"
+        role="button"
+        tabIndex={0}
+        title={isGuest ? stateLabel : `Buscar por estado: ${stateLabel}`}
+        aria-label={`${stateLabel}. ${isGuest ? 'Filtrar por disponibilidade' : 'Filtrar livros por este estado'}`}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openCatalogQuery(`/acervo?state=${book.derived_state}`) }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openCatalogQuery(`/acervo?state=${book.derived_state}`) } }}
+      >{stateLabel}</Badge>
+
+      <div className="flex min-w-0 flex-col gap-1.5 px-2 pb-2 pt-1 md:hidden">
+        <OverflowTags items={book.authors} tone="info" maxVisibleFallback={1} hiddenLabel="autores adicionais" itemMaxWidthClass="max-w-[18ch]" />
+        <OverflowTags items={book.genres} tone="neutral" maxVisibleFallback={1} hiddenLabel="gêneros adicionais" itemMaxWidthClass="max-w-[18ch]" />
+      </div>
 
       {/* Hover expandido - banner padronizado: ambos exibem capa no mesmo slot */}
       {!disableHover && !portalHover && (
@@ -153,7 +146,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           onClick={savePosition}
           aria-hidden="true"
           tabIndex={-1}
-          className="pointer-events-none invisible absolute left-1/2 top-1/2 z-40 flex w-full aspect-[2/3] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 scale-90 flex-col justify-between overflow-visible rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:scale-125 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:scale-125 group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+          className="grid-card-hover-preview pointer-events-none invisible absolute left-1/2 top-1/2 z-40 flex w-full aspect-[2/3] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 scale-90 flex-col justify-between overflow-visible rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:scale-125 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:scale-125 group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
         style={{
           background: hoverBg,
           boxShadow: '0 24px 48px rgba(0,0,0,0.38), 0 10px 20px rgba(0,0,0,0.28)',
@@ -179,26 +172,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
               <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
             </div>
             <div className="flex flex-wrap gap-1">
-              <span
-                role="button"
-                tabIndex={0}
-                aria-describedby={`grid-state-tooltip-${book.id}`}
-                className="group/category inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  openCatalogQuery(`/acervo?state=${book.derived_state}`)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    openCatalogQuery(`/acervo?state=${book.derived_state}`)
-                  }
-                }}
-              >
-                {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}<Tooltip id={`grid-state-tooltip-${book.id}`} variant="category">{isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}</Tooltip>
-              </span>
+              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm">{stateLabel}</span>
             </div>
           </div>
         </div>
@@ -213,9 +187,6 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
               <OverflowTags
                 items={book.genres}
                 variant="dark"
-                onItemClick={(item) => {
-                  openCatalogQuery(`/acervo?genre_id=${item.id}`)
-                }}
               />
             ) : (
               <span className="text-xs text-white/60">—</span>
@@ -296,14 +267,14 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
               </div>
               <div className="flex flex-wrap gap-1">
-                <span role="button" tabIndex={0} aria-describedby={`grid-state-tooltip-portal-${book.id}`} className="group/category inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm cursor-pointer transition-colors duration-200 hover:brightness-110 hover:shadow-md focus-visible:outline-2 focus-visible:outline-white">{isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}<Tooltip id={`grid-state-tooltip-portal-${book.id}`} variant="category">{isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por estado: ${bookStateLabel(book.derived_state)}`}</Tooltip></span>
+                <span className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm">{stateLabel}</span>
               </div>
             </div>
           </div>
           <div className="relative shrink-0 overflow-visible px-3.5 pb-3">
             <div className="mb-1 flex items-center gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Gêneros</span></div>
             <div className="flex flex-nowrap overflow-visible">
-              {book.genres.length > 0 ? <OverflowTags items={book.genres} variant="dark" onItemClick={(item) => { openCatalogQuery(`/acervo?genre_id=${item.id}`) }} /> : <span className="text-xs text-white/60">—</span>}
+              {book.genres.length > 0 ? <OverflowTags items={book.genres} variant="dark" /> : <span className="text-xs text-white/60">—</span>}
             </div>
           </div>
           {book.description ? (

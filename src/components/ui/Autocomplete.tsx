@@ -31,11 +31,11 @@ export function AutocompleteOptionItem({
       role="option"
       aria-selected={selected}
       aria-disabled={disabled || undefined}
-      onMouseDown={(event) => {
+      onPointerDown={(event) => {
         event.preventDefault()
         if (!disabled) onSelect()
       }}
-      className={`min-h-10 rounded px-3 py-2 text-sm ${
+      className={`min-h-[44px] rounded px-3 py-2 text-sm ${
         disabled
           ? 'cursor-not-allowed opacity-50'
           : 'cursor-pointer text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700'
@@ -148,6 +148,8 @@ export function Autocomplete<T>({
         }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
+            event.preventDefault()
+            event.stopPropagation()
             setOpen(false)
             setActiveIndex(-1)
             return
@@ -182,7 +184,7 @@ export function Autocomplete<T>({
           id={listboxId}
           role="listbox"
           aria-label={label}
-          className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-300 bg-white p-1 shadow-lg dark:border-slate-600 dark:bg-slate-800"
+          className="absolute z-30 mt-1 max-h-[min(15rem,calc(100dvh-8rem))] w-full overflow-auto overscroll-contain rounded-md border border-slate-300 bg-white p-1 shadow-lg dark:border-slate-600 dark:bg-slate-800"
         >
           {filteredOptions.length ? filteredOptions.map((option, optionIndex) => {
             const enabledIndex = enabledOptions.indexOf(option)

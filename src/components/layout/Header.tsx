@@ -109,7 +109,7 @@ export function Header() {
   const mobileNavRef = useRef<HTMLElement>(null)
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-sm">
+    <header className="sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-sm pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-6">
@@ -203,7 +203,6 @@ export function Header() {
           </div>
 
           <div className="md:hidden flex items-center gap-2" role="group" aria-label="Ações da conta">
-            {isGuest && <span className="max-w-[9rem] truncate text-xs text-white/90" aria-label={`Visitante na escola ${user?.school_name ?? user?.school_code ?? 'selecionada'}`}>Visitante · {user?.school_name ?? user?.school_code}</span>}
             <button
               type="button"
               onClick={handleToggle}
@@ -223,8 +222,6 @@ export function Header() {
             >
               {open ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
             </button>
-            {isGuest && <button type="button" onClick={handleChangeSchool} className={`${secondaryActionCls} px-3`}>Trocar escola</button>}
-            {isGuest && <button type="button" onClick={handleLogout} className={`${logoutCls} px-3`}>Sair</button>}
           </div>
         </div>
 
@@ -243,7 +240,15 @@ export function Header() {
               {!isGuest && <li><Link to="/minha-conta" aria-current={isActivePath('/minha-conta') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/minha-conta')}>Ver perfil</Link></li>}
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">
-              {isAuthenticated ? (
+              {isGuest ? (
+                <>
+                  <p className="px-3 py-2 text-sm text-white/90 dark:text-slate-300 break-words">
+                    Visitante · {user?.school_name ?? user?.school_code ?? 'Escola selecionada'}
+                  </p>
+                  <button type="button" onClick={handleChangeSchool} className={`w-full ${secondaryActionCls} justify-center`}>Trocar escola</button>
+                  <button type="button" onClick={handleLogout} className={`w-full ${logoutCls} justify-center`}>Sair</button>
+                </>
+              ) : isAuthenticated ? (
                 <button type="button" onClick={handleLogout} className={`w-full ${logoutCls} justify-center`}>Sair ({isGuest ? 'Visitante' : user?.name ?? user?.username})</button>
               ) : (
                 <Link to="/entrar" onClick={() => setOpen(false)} className={`w-full ${secondaryActionCls} justify-center`}>Entrar</Link>

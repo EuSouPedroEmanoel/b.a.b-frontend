@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Header } from '@/components/layout/Header'
@@ -59,12 +59,8 @@ describe('Guest navigation', () => {
 
     expect(screen.getByRole('navigation', { name: 'Principal' })).toHaveTextContent('Início')
     expect(screen.getByRole('navigation', { name: 'Principal' })).toHaveTextContent('Acervo')
-    expect(screen.getByRole('link', { name: 'Início' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Início' })).toHaveAttribute('href', '/inicio')
     expect(screen.getByRole('link', { name: 'Acervo' })).toHaveAttribute('href', '/acervo')
-    expect(screen.getAllByText(/Visitante/).length).toBeGreaterThan(0)
-    expect(screen.getAllByLabelText('Visitante na escola Escola Central').length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('button', { name: 'Trocar escola' }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('button', { name: 'Sair' }).length).toBeGreaterThan(0)
     expect(screen.queryByRole('link', { name: 'Empréstimos' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Reservas' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument()
@@ -77,6 +73,11 @@ describe('Guest navigation', () => {
     expect(mobileNavigation).toHaveTextContent('Acervo')
     expect(mobileNavigation).not.toHaveTextContent('Empréstimos')
     expect(mobileNavigation).not.toHaveTextContent('Reservas')
+    expect(mobileNavigation).toHaveTextContent('Visitante · Escola Central')
+    expect(mobileNavigation).toHaveTextContent('Trocar escola')
+    expect(mobileNavigation).toHaveTextContent('Sair')
+    expect(within(mobileNavigation).getByRole('button', { name: 'Trocar escola' })).toBeInTheDocument()
+    expect(within(mobileNavigation).getByRole('button', { name: 'Sair' })).toBeInTheDocument()
   })
 
   it('keeps the internal navigation for a librarian', () => {
