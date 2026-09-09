@@ -1,5 +1,6 @@
 const DETAIL_PT: Record<string, string> = {
   'Username or Password is wrong': 'Usuário ou senha incorretos',
+  'Network Error': 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
 }
 
 function translateDetail(value: string): string {

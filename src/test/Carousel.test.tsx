@@ -90,6 +90,30 @@ describe('Carousel circular sem peeks', () => {
     expect(nextButton()).toBeDisabled()
   })
 
+  it('usa itens leves para medir sem chamar o renderizador pesado na medição', () => {
+    let heavyCalls = 0
+    let measureCalls = 0
+    render(
+      <Carousel
+        title="Livros"
+        items={Array.from({ length: 9 }, (_, id) => ({ id }))}
+        circular
+        renderItem={(item) => {
+          heavyCalls += 1
+          return <article aria-label={`Livro pesado ${item.id}`}>Livro</article>
+        }}
+        measureItem={() => {
+          measureCalls += 1
+          return <div data-testid="light-measure-item" />
+        }}
+      />,
+    )
+
+    expect(measureCalls).toBe(9)
+    expect(heavyCalls).toBe(9)
+    expect(screen.getAllByTestId('light-measure-item')).toHaveLength(9)
+  })
+
   it('mostra quatro cards principais completos sem peeks laterais', () => {
     renderCarousel(9)
     configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })

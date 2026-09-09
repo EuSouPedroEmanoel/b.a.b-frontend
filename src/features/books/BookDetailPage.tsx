@@ -825,6 +825,7 @@ export function BookDetailPage() {
                   <GridCard book={b as any} index={idx} portalHover isGuest={isGuest} />
                 </div>
               )}
+              measureItem={() => <div aria-hidden="true" className="h-0 w-[160px] shrink-0 sm:w-[180px] lg:w-[200px]" />}
             />
           </CardBody>
         </Card>

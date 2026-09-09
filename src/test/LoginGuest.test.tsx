@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LoginPage } from '@/features/auth/LoginPage'
 
 const fixtures = vi.hoisted(() => ({
+  login: vi.fn().mockResolvedValue(undefined),
   loginGuest: vi.fn().mockResolvedValue(undefined),
   schools: [
     { code: 'S1', name: 'Escola Central' },
@@ -12,7 +13,7 @@ const fixtures = vi.hoisted(() => ({
 }))
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ login: vi.fn(), loginGuest: fixtures.loginGuest }),
+  useAuth: () => ({ login: fixtures.login, loginGuest: fixtures.loginGuest }),
 }))
 
 vi.mock('@/lib/api', () => ({
@@ -26,6 +27,7 @@ vi.mock('@/components/feedback/LiveRegionContext', () => ({
 describe('Guest school autocomplete', () => {
   afterEach(() => {
     cleanup()
+    fixtures.login.mockReset().mockResolvedValue(undefined)
     fixtures.loginGuest.mockClear()
   })
 
@@ -177,5 +179,19 @@ describe('Guest school autocomplete', () => {
     fireEvent.submit(input.closest('form')!)
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/inicio'))
+  })
+
+  it('shows a clear message when the API cannot be reached during account login', async () => {
+    fixtures.login.mockRejectedValueOnce(new Error('Network Error'))
+    renderLogin()
+
+    await screen.findByRole('tab', { name: 'Entrar com conta' })
+    fireEvent.change(screen.getByRole('textbox', { name: /Usuário, e-mail ou CPF/ }), { target: { value: 'bibliotecario' } })
+    fireEvent.change(document.getElementById('password')!, { target: { value: 'senha-segura' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+    )
   })
 })

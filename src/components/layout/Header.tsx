@@ -96,6 +96,7 @@ export function Header() {
     !!user && (user.role === 'super_admin' || user.role === 'school_admin')
   const isLibrarian = user?.role === 'librarian'
   const isGuest = user?.role === 'guest'
+  const homePath = user && ['student', 'teacher', 'guest'].includes(user.role) ? '/inicio' : '/'
 
   // Ações (Tema / Entrar / Sair) — mesmos tokens de estado que links, mas Sair mantém destaque outline/destrutivo suave
   const themeBtnCls =
@@ -128,7 +129,7 @@ export function Header() {
             <nav ref={desktopNavRef} aria-label="Principal" className="relative hidden md:flex items-center">
               <ActiveNavIndicator navRef={desktopNavRef} activeKey={location.pathname} />
               <ul className="flex items-center gap-1 list-none m-0 p-0">
-                <li><Link to="/inicio" aria-current={isActivePath('/inicio') ? 'page' : undefined} className={navItemCls('/inicio')}>Início</Link></li>
+                <li><Link to={homePath} aria-current={isActivePath(homePath) ? 'page' : undefined} className={navItemCls(homePath)}>Início</Link></li>
                 <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
                 {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
                 {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
@@ -229,7 +230,7 @@ export function Header() {
           <nav ref={mobileNavRef} id="mobile-nav" aria-label="Principal móvel" className="relative md:hidden pb-4 flex flex-col gap-1">
             <ActiveNavIndicator navRef={mobileNavRef} activeKey={location.pathname} />
             <ul className="flex flex-col gap-1 list-none m-0 p-0">
-              <li><Link to="/inicio" aria-current={isActivePath('/inicio') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/inicio')}>Início</Link></li>
+              <li><Link to={homePath} aria-current={isActivePath(homePath) ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls(homePath)}>Início</Link></li>
               <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/acervo')}>Acervo</Link></li>
               {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} onClick={() => setOpen(false)} className={navItemCls('/reservas')}>Reservas</Link></li>}

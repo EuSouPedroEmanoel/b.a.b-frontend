@@ -2,11 +2,15 @@ import { Link } from 'react-router-dom'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import { Carousel } from '@/components/ui/Carousel'
+import { ProgressiveCarouselSection } from './ProgressiveCarouselSection'
 import { GridCard } from '@/features/books/GridCard'
 
 function renderBook(book: any, index: number, ranking = false) {
   return <div className="relative w-[140px] shrink-0 sm:w-[160px] lg:w-[180px]"><GridCard book={book} index={index} isGuest portalHover rankingPosition={ranking ? index + 1 : undefined} /></div>
+}
+
+function measureBook() {
+  return <div aria-hidden="true" className="relative h-0 w-[140px] shrink-0 sm:w-[160px] lg:w-[180px]" />
 }
 
 export function GuestHome() {
@@ -32,8 +36,8 @@ export function GuestHome() {
           Ver acervo
         </Link>
       </section>
-      {(data?.carousels ?? []).map((section: { type: string; title: string; books: any[]; ranking?: boolean }) => (
-        <Carousel key={section.type} title={section.title} items={section.books} circular={!section.ranking} renderItem={(book, index) => renderBook(book, index, section.ranking)} emptyText="Nenhum livro disponível nesta seção." />
+      {(data?.carousels ?? []).map((section: { type: string; title: string; books: any[]; ranking?: boolean }, index) => (
+        <ProgressiveCarouselSection key={section.type} title={section.title} items={section.books} circular={!section.ranking} renderItem={(book, cardIndex) => renderBook(book, cardIndex, section.ranking)} measureItem={measureBook} emptyText="Nenhum livro disponível nesta seção." priority={index === 0} />
       ))}
     </div>
   )

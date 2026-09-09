@@ -3,11 +3,10 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
+import { HomePage, DiscoveryHome } from '@/features/home/HomePage'
 import { AccountOnly, Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
 
 const AccountPage = lazy(() => import('@/features/account/AccountPage').then((module) => ({ default: module.AccountPage })))
-const HomePage = lazy(() => import('@/features/home/HomePage').then((module) => ({ default: module.HomePage })))
-const DiscoveryHome = lazy(() => import('@/features/home/HomePage').then((module) => ({ default: module.DiscoveryHome })))
 const AccountManagementPage = lazy(() => import('@/features/account/AccountManagementPage').then((module) => ({ default: module.AccountManagementPage })))
 const BooksPage = lazy(() => import('@/features/books/BooksPage').then((module) => ({ default: module.BooksPage })))
 const BookCreatePage = lazy(() => import('@/features/books/BookCreatePage').then((module) => ({ default: module.BookCreatePage })))
