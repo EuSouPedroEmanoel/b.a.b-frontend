@@ -242,6 +242,14 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
     }
   }
 
+  const clearRestoreUndo = () => {
+    if (restoreUndoTimer.current) clearTimeout(restoreUndoTimer.current)
+    restoreUndoTimer.current = null
+    setRestoreUndo(null)
+  }
+
+  useEffect(() => () => clearRestoreUndo(), [])
+
   if (!canView) {
     return <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">Você não tem permissão para administrar regras de circulação.</p>
   }
@@ -263,14 +271,6 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
     setRestoreOpen(false)
     requestAnimationFrame(() => restoreTriggerRef.current?.focus())
   }
-
-  const clearRestoreUndo = () => {
-    if (restoreUndoTimer.current) clearTimeout(restoreUndoTimer.current)
-    restoreUndoTimer.current = null
-    setRestoreUndo(null)
-  }
-
-  useEffect(() => () => clearRestoreUndo(), [])
 
   const restoreDefaults = () => {
     const previousPolicies = normalizePolicies(originalPolicies)
