@@ -1,5 +1,5 @@
 import { Minus, PersonStanding, Plus, RotateCcw, X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 type Side = 'left' | 'right'
 
@@ -16,6 +16,10 @@ const DEFAULT_SCALE = 1
 const BUTTON_SIZE = 48
 const VIEWPORT_MARGIN = 12
 const DRAG_THRESHOLD = 6
+const SNAP_DURATION = 250
+const MIN_IMPACT_OVERSHOOT = 4
+const MAX_IMPACT_OVERSHOOT = 16
+const MAX_DRAG_SPEED = 1.2
 
 function readPreferences(): Required<StoredPreference> {
   try {
@@ -36,17 +40,26 @@ function clampTop(top: number) {
   return Math.min(Math.max(top, VIEWPORT_MARGIN), Math.max(VIEWPORT_MARGIN, window.innerHeight - BUTTON_SIZE - VIEWPORT_MARGIN))
 }
 
+function initialLeft(side: Side) {
+  return side === 'left' ? VIEWPORT_MARGIN : window.innerWidth - BUTTON_SIZE - VIEWPORT_MARGIN
+}
+
 export function AccessibilityMenu() {
   const initial = readPreferences()
   const [side, setSide] = useState<Side>(initial.side)
+  const [left, setLeft] = useState(() => initialLeft(initial.side))
   const [top, setTop] = useState(() => clampTop(initial.top <= 1 ? (window.innerHeight - BUTTON_SIZE) * initial.top : initial.top))
   const [textScale, setTextScale] = useState(initial.textScale)
   const [open, setOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [snapping, setSnapping] = useState(false)
   const [suppressExpansion, setSuppressExpansion] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
-  const dragRef = useRef({ pointerId: -1, startX: 0, startY: 0, startTop: 0, moved: false })
+  const animationRef = useRef(0)
+  const snapAnimationRef = useRef<Animation | null>(null)
+  const pendingSnapRef = useRef<{ id: number; originLeft: number; side: Side; speed: number } | null>(null)
+  const dragRef = useRef({ pointerId: -1, startX: 0, startY: 0, startTop: 0, startLeft: 0, lastX: 0, lastY: 0, lastTime: 0, speed: 0, moved: false })
 
   const persist = useCallback((next: Partial<StoredPreference>) => {
     const current = readPreferences()
@@ -75,8 +88,53 @@ export function AccessibilityMenu() {
     if (open) closeRef.current?.focus()
   }, [open])
 
+  useLayoutEffect(() => {
+    const pending = pendingSnapRef.current
+    const button = buttonRef.current
+    if (!pending || !button) return
+
+    const targetLeft = button.getBoundingClientRect().left
+    const distance = pending.originLeft - targetLeft
+    const intensity = Math.min(1, pending.speed / MAX_DRAG_SPEED)
+    const overshoot = MIN_IMPACT_OVERSHOOT
+      + (MAX_IMPACT_OVERSHOOT - MIN_IMPACT_OVERSHOOT) * intensity
+    const direction = pending.side === 'right' ? 1 : -1
+
+    pendingSnapRef.current = null
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setSnapping(false)
+      return
+    }
+
+    const animation = button.animate(
+      [
+        { transform: `translateX(${distance}px) scale(1, 1)` },
+        {
+          transform: `translateX(${direction * overshoot}px) scale(${1 + 0.12 * intensity}, ${1 - 0.06 * intensity})`,
+          offset: 0.65,
+        },
+        { transform: 'translateX(0) scale(1, 1)' },
+      ],
+      {
+        duration: SNAP_DURATION,
+        easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)',
+      },
+    )
+    snapAnimationRef.current = animation
+    void animation.finished.catch(() => undefined).then(() => {
+      if (animationRef.current !== pending.id) return
+      snapAnimationRef.current = null
+      setSnapping(false)
+    })
+  }, [dragging, side, top])
+
   const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
-    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startTop: top, moved: false }
+    animationRef.current += 1
+    snapAnimationRef.current?.cancel()
+    snapAnimationRef.current = null
+    pendingSnapRef.current = null
+    setSnapping(false)
+    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startTop: top, startLeft: initialLeft(side), lastX: event.clientX, lastY: event.clientY, lastTime: performance.now(), speed: 0, moved: false }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -85,10 +143,19 @@ export function AccessibilityMenu() {
     if (drag.pointerId !== event.pointerId) return
     const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY)
     if (distance < DRAG_THRESHOLD) return
+    const previousX = drag.lastX
+    const previousY = drag.lastY
+    const previousTime = drag.lastTime
+    const now = performance.now()
     drag.moved = true
     setDragging(true)
     setSuppressExpansion(true)
-    setTop(clampTop(drag.startTop + event.clientY - drag.startY))
+    drag.lastX = event.clientX
+    drag.lastY = event.clientY
+    drag.speed = Math.min(MAX_DRAG_SPEED, Math.hypot(event.clientX - previousX, event.clientY - previousY) / Math.max(now - previousTime, 1))
+    drag.lastTime = now
+    setLeft(drag.startLeft + event.clientX - drag.startX)
+    setTop(drag.startTop + event.clientY - drag.startY)
   }
 
   const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -96,8 +163,8 @@ export function AccessibilityMenu() {
     if (drag.pointerId !== event.pointerId) return
     if (drag.moved) {
       const nextSide = event.clientX < window.innerWidth / 2 ? 'left' : 'right'
-      setSide(nextSide)
-      persist({ side: nextSide, top: clampTop(top) })
+      const nextTop = clampTop(drag.startTop + event.clientY - drag.startY)
+      startSnap(nextSide, nextTop, drag.speed)
       setDragging(false)
     } else {
       setOpen((current) => !current)
@@ -114,6 +181,18 @@ export function AccessibilityMenu() {
 
   const updateScale = (next: number) => setTextScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, next)))
 
+  const startSnap = (nextSide: Side, nextTop: number, speed: number) => {
+    const button = buttonRef.current
+    const id = ++animationRef.current
+    const originLeft = button?.getBoundingClientRect().left ?? left
+    pendingSnapRef.current = { id, originLeft, side: nextSide, speed }
+    setSide(nextSide)
+    setLeft(initialLeft(nextSide))
+    setTop(nextTop)
+    setSnapping(true)
+    persist({ side: nextSide, top: nextTop })
+  }
+
   return (
     <>
       <button
@@ -125,10 +204,18 @@ export function AccessibilityMenu() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={() => { setDragging(false); dragRef.current.pointerId = -1 }}
+        onPointerCancel={() => {
+          if (dragRef.current.moved) {
+            const nextSide = dragRef.current.lastX < window.innerWidth / 2 ? 'left' : 'right'
+            const nextTop = clampTop(top)
+            startSnap(nextSide, nextTop, dragRef.current.speed)
+          }
+          setDragging(false)
+          dragRef.current.pointerId = -1
+        }}
         onPointerLeave={() => setSuppressExpansion(false)}
-        className={`group fixed z-50 flex h-12 w-12 aspect-square touch-none select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full border border-blue-900 bg-blue-800 text-white leading-none shadow-md outline-none transition-[top,left,right,width,border-radius,transform,background-color,box-shadow] duration-200 hover:bg-blue-900 hover:text-white active:bg-blue-900 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white ${dragging ? 'cursor-grabbing gap-0 transition-none' : suppressExpansion ? 'cursor-grab gap-0 transition-none' : 'cursor-grab gap-0 hover:w-40 hover:gap-2 focus-visible:w-40 focus-visible:gap-2 hover:rounded-xl focus-visible:rounded-xl'}`}
-        style={{ top, [side]: VIEWPORT_MARGIN }}
+        className={`group fixed z-50 flex h-12 w-12 aspect-square touch-none select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full border border-blue-900 bg-blue-800 text-white leading-none shadow-md outline-none transition-[top,left,right,width,border-radius,transform,background-color,box-shadow] duration-200 hover:bg-blue-900 hover:text-white active:bg-blue-900 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white ${dragging ? 'cursor-grabbing gap-0 transition-none' : suppressExpansion || snapping ? 'cursor-grab gap-0' : 'cursor-grab gap-0 hover:w-40 hover:gap-2 focus-visible:w-40 focus-visible:gap-2 hover:rounded-xl focus-visible:rounded-xl'}`}
+        style={dragging ? { top, left } : { top, [side]: VIEWPORT_MARGIN }}
       >
         <PersonStanding aria-hidden="true" className="block h-8 w-8 shrink-0" strokeWidth={2.5} />
         {!dragging && !suppressExpansion && (
