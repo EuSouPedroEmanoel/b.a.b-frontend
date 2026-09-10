@@ -18,7 +18,7 @@ export function GuestHome() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Biblioteca Ginásio</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Base de Acesso Bibliotecário</h1>
         <PageDescription className="max-w-3xl">
           Consulte os livros disponíveis no acervo público.
         </PageDescription>

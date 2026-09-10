@@ -114,14 +114,9 @@ export function Header() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-6">
-            <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="Biblioteca Ginásio — página inicial">
+            <Link to="/" className="flex items-center shrink-0" aria-label="Base de Acesso Bibliotecário — página inicial">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#0f4c75] dark:bg-white dark:text-slate-900 font-bold text-lg shadow-sm" aria-hidden="true">
-                BG
-              </span>
-              <span className="hidden sm:block font-semibold text-white dark:text-white leading-none">
-                Biblioteca
-                <br />
-                <span className="text-xs font-normal text-white/80 dark:text-slate-400">Ginásio</span>
+                BAB
               </span>
             </Link>
 

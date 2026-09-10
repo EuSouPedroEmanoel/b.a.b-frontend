@@ -10,7 +10,7 @@ export function DashboardPage() {
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Bem-vindo{user ? `, ${user.name || user.username}` : ''}</h1>
         <PageDescription className="max-w-3xl">
-          Sistema de gestão da Biblioteca Ginásio — catálogo, exemplares, empréstimos e reservas. Interface responsiva e acessível (WCAG 2.2 AA, HTML semântico, navegação por teclado).
+          Sistema de gestão da Base de Acesso Bibliotecário — catálogo, exemplares, empréstimos e reservas. Interface responsiva e acessível (WCAG 2.2 AA, HTML semântico, navegação por teclado).
         </PageDescription>
       </header>
 
