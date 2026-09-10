@@ -1,11 +1,13 @@
 import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { SkipLink } from './SkipLink'
+import { AccessibilityMenu } from '../accessibility/AccessibilityMenu'
 
 export function Layout() {
   return (
     <>
       <SkipLink />
+      <AccessibilityMenu />
       <div className="min-h-dvh flex flex-col">
         <Header />
         <main id="main-content" tabIndex={-1} className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">

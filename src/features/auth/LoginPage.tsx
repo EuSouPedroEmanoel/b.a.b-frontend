@@ -5,6 +5,7 @@ import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { Eye, EyeOff } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { getErrorMessage } from '@/lib/errors'
 import api from '@/lib/api'
@@ -85,6 +86,11 @@ export function LoginPage() {
   useEffect(() => {
     if (schoolCode) setMode('guest')
   }, [schoolCode])
+
+  useEffect(() => {
+    if (mode !== 'account') return
+    window.requestAnimationFrame(() => usernameRef.current?.focus())
+  }, [mode])
 
   useEffect(() => {
     if (mode === 'guest' && !guestSchoolsLoading) {
@@ -200,6 +206,11 @@ export function LoginPage() {
     }
   }
 
+  const submitDisabled = loading || !username.trim() || !password.trim()
+  const submitTooltip = loading ? 'Entrando, aguarde' : 'Preencha usuário e senha para entrar'
+  const guestSubmitDisabled = !guestSchoolCode || guestLoading
+  const guestSubmitTooltip = guestLoading ? 'Entrando como visitante, aguarde' : 'Selecione uma escola para continuar'
+
   return (
     <div className="mx-auto max-w-md">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Entrar na Biblioteca</h1>
@@ -279,8 +290,8 @@ export function LoginPage() {
                   aria-describedby={`${error ? 'login-error ' : ''}pwd-hint`.trim()}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full rounded-md border px-3 py-2.5 pr-12 text-base bg-white dark:bg-slate-800 min-h-[44px] placeholder:text-slate-400 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${
-                    error ? 'border-red-600' : 'border-slate-300 dark:border-slate-600'
+                  className={`w-full rounded-md border px-3 py-2.5 pr-12 text-base bg-[var(--color-field)] dark:bg-slate-800/80 min-h-[44px] placeholder:text-slate-400 transition-colors border-[var(--color-field-border-hover)] dark:border-slate-600 hover:border-[var(--color-border)] dark:hover:border-slate-400 focus-visible:border-transparent focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${
+                    error ? 'border-red-600' : ''
                   }`}
                 />
                 <button
@@ -288,42 +299,46 @@ export function LoginPage() {
                   aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   aria-pressed={showPassword}
                   aria-controls="password"
-                  title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   onClick={() => {
                     const next = !showPassword
                     setShowPassword(next)
                     announce(next ? 'Senha visível' : 'Senha oculta', 'polite')
                   }}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200 min-h-[44px] min-w-[44px] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+                  className="group absolute right-1 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200 min-h-[44px] min-w-[44px] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
+                  <Tooltip>{showPassword ? 'Ocultar senha' : 'Mostrar senha'}</Tooltip>
                 </button>
               </div>
               <p id="pwd-hint" className="sr-only">
                 Para tecnologia assistiva a senha é sempre anunciada caractere a caractere — use o botão ao lado para alternar a exibição visual.
               </p>
             </div>
-            <Button
-              type="submit"
-              aria-busy={loading}
-              disabled={loading || !username.trim() || !password.trim()}
-              onClick={(ev) => {
-                if (loading) ev.preventDefault()
-              }}
-            >
-              {loading ? (
-                <>
-                  <span aria-hidden="true">Entrando…</span>
-                  <span className="sr-only">Entrando, aguarde</span>
-                  <span
-                    aria-hidden="true"
-                    className="ml-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-                  />
-                </>
-              ) : (
-                'Entrar'
-              )}
-            </Button>
+            <span className="group relative block">
+              <Button
+                type="submit"
+                aria-busy={loading}
+                disabled={submitDisabled}
+                className="w-full"
+                onClick={(ev) => {
+                  if (loading) ev.preventDefault()
+                }}
+              >
+                {loading ? (
+                  <>
+                    <span aria-hidden="true">Entrando…</span>
+                    <span className="sr-only">Entrando, aguarde</span>
+                    <span
+                      aria-hidden="true"
+                      className="ml-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                    />
+                  </>
+                ) : (
+                  'Entrar'
+                )}
+              </Button>
+              {submitDisabled && <Tooltip>{submitTooltip}</Tooltip>}
+            </span>
             <p className="text-xs text-slate-500 text-center">
               Problemas para acessar? <Link to="/" className="underline underline-offset-2">Voltar ao início</Link>
             </p>
@@ -426,16 +441,20 @@ export function LoginPage() {
             <p id="guest-status" role="status" aria-live="polite" className="text-xs text-slate-500">
               {guestSchoolsLoading ? 'Carregando escolas…' : guestListOpen && guestSchoolQuery.trim().length < 2 ? 'Digite pelo menos 2 caracteres para buscar.' : guestListOpen ? guestSuggestions.length === 0 ? 'Nenhuma escola encontrada.' : `${guestSuggestions.length} ${guestSuggestions.length === 1 ? 'escola encontrada' : 'escolas encontradas'}. Use as setas para navegar.` : guestSchoolCode ? `Escola selecionada: ${guestSchoolName}` : 'Digite pelo menos 2 caracteres para buscar uma escola.'}
             </p>
-            <Button
-              type="submit"
-              ref={guestButtonRef}
-              disabled={!guestSchoolCode || guestLoading}
-              aria-busy={guestLoading}
-              aria-label="Acessar o acervo como visitante"
-            >
-              {guestLoading ? 'Entrando como visitante…' : 'Acessar como visitante'}
-            </Button>
-            <p className="text-xs text-slate-500">O acesso é temporário e permite somente consultar o acervo.</p>
+            <span className="group relative block">
+              <Button
+                type="submit"
+                ref={guestButtonRef}
+                disabled={guestSubmitDisabled}
+                aria-busy={guestLoading}
+                aria-label="Acessar o acervo como visitante"
+                className="w-full"
+              >
+                {guestLoading ? 'Entrando como visitante…' : 'Acessar como visitante'}
+              </Button>
+              {guestSubmitDisabled && <Tooltip>{guestSubmitTooltip}</Tooltip>}
+            </span>
+            <p className="text-center text-xs text-slate-500">O acesso é temporário e permite somente consultar o acervo.</p>
         </form>
         </CardBody>
       </section>
