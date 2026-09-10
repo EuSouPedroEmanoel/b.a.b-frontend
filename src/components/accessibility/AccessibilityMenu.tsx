@@ -15,6 +15,7 @@ const MAX_SCALE = 1.2
 const DEFAULT_SCALE = 1
 const BUTTON_SIZE = 48
 const VIEWPORT_MARGIN = 12
+const NAVBAR_GAP = 12
 const DRAG_THRESHOLD = 6
 const SNAP_DURATION = 250
 const MIN_IMPACT_OVERSHOOT = 4
@@ -37,7 +38,10 @@ function readPreferences(): Required<StoredPreference> {
 }
 
 function clampTop(top: number) {
-  return Math.min(Math.max(top, VIEWPORT_MARGIN), Math.max(VIEWPORT_MARGIN, window.innerHeight - BUTTON_SIZE - VIEWPORT_MARGIN))
+  const navbar = document.querySelector<HTMLElement>('[data-app-navbar]')
+  const navbarBottom = navbar?.getBoundingClientRect().bottom ?? 0
+  const minimumTop = Math.max(VIEWPORT_MARGIN, navbarBottom + NAVBAR_GAP)
+  return Math.min(Math.max(top, minimumTop), Math.max(minimumTop, window.innerHeight - BUTTON_SIZE - VIEWPORT_MARGIN))
 }
 
 function initialLeft(side: Side) {
@@ -56,6 +60,8 @@ export function AccessibilityMenu() {
   const [suppressExpansion, setSuppressExpansion] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+  const [panelHeight, setPanelHeight] = useState(0)
   const animationRef = useRef(0)
   const snapAnimationRef = useRef<Animation | null>(null)
   const pendingSnapRef = useRef<{ id: number; originLeft: number; side: Side; speed: number } | null>(null)
@@ -73,6 +79,7 @@ export function AccessibilityMenu() {
   }, [persist, textScale])
 
   useEffect(() => {
+    setTop((current) => clampTop(current))
     const handleResize = () => {
       setTop((current) => {
         const next = clampTop(current)
@@ -83,6 +90,19 @@ export function AccessibilityMenu() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [persist])
+
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current) return undefined
+    const update = () => setPanelHeight(panelRef.current?.getBoundingClientRect().height ?? 0)
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update)
+    observer?.observe(panelRef.current)
+    window.addEventListener('resize', update)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [open, textScale])
 
   useEffect(() => {
     if (open) closeRef.current?.focus()
@@ -147,6 +167,12 @@ export function AccessibilityMenu() {
     const previousY = drag.lastY
     const previousTime = drag.lastTime
     const now = performance.now()
+    if (!drag.moved) {
+      drag.startX = event.clientX
+      drag.startY = event.clientY
+      drag.startLeft = event.clientX - BUTTON_SIZE / 2
+      drag.startTop = event.clientY - BUTTON_SIZE / 2
+    }
     drag.moved = true
     setDragging(true)
     setSuppressExpansion(true)
@@ -154,14 +180,23 @@ export function AccessibilityMenu() {
     drag.lastY = event.clientY
     drag.speed = Math.min(MAX_DRAG_SPEED, Math.hypot(event.clientX - previousX, event.clientY - previousY) / Math.max(now - previousTime, 1))
     drag.lastTime = now
-    setLeft(drag.startLeft + event.clientX - drag.startX)
-    setTop(drag.startTop + event.clientY - drag.startY)
+    const nextLeft = drag.startLeft + event.clientX - drag.startX
+    const nextTop = clampTop(drag.startTop + event.clientY - drag.startY)
+    const button = buttonRef.current
+    if (button) {
+      button.style.left = `${nextLeft}px`
+      button.style.right = 'auto'
+      button.style.top = `${nextTop}px`
+    }
+    setLeft(nextLeft)
+    setTop(nextTop)
   }
 
   const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current
     if (drag.pointerId !== event.pointerId) return
     if (drag.moved) {
+      setSuppressExpansion(true)
       const nextSide = event.clientX < window.innerWidth / 2 ? 'left' : 'right'
       const nextTop = clampTop(drag.startTop + event.clientY - drag.startY)
       startSnap(nextSide, nextTop, drag.speed)
@@ -204,6 +239,9 @@ export function AccessibilityMenu() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onLostPointerCapture={() => {
+          if (dragRef.current.pointerId !== -1) setDragging(false)
+        }}
         onPointerCancel={() => {
           if (dragRef.current.moved) {
             const nextSide = dragRef.current.lastX < window.innerWidth / 2 ? 'left' : 'right'
@@ -214,7 +252,7 @@ export function AccessibilityMenu() {
           dragRef.current.pointerId = -1
         }}
         onPointerLeave={() => setSuppressExpansion(false)}
-        className={`group fixed z-50 flex h-12 w-12 aspect-square touch-none select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full border border-blue-900 bg-blue-800 text-white leading-none shadow-md outline-none transition-[top,left,right,width,border-radius,transform,background-color,box-shadow] duration-200 hover:bg-blue-900 hover:text-white active:bg-blue-900 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white ${dragging ? 'cursor-grabbing gap-0 transition-none' : suppressExpansion || snapping ? 'cursor-grab gap-0' : 'cursor-grab gap-0 hover:w-40 hover:gap-2 focus-visible:w-40 focus-visible:gap-2 hover:rounded-xl focus-visible:rounded-xl'}`}
+        className={`group fixed z-50 flex h-12 w-12 aspect-square touch-none select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full border border-blue-900 bg-blue-800 text-white leading-none shadow-md outline-none transition-[top,left,right,width,border-radius,transform,background-color,box-shadow] duration-200 hover:bg-blue-900 hover:text-white active:bg-blue-900 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white ${side === 'left' ? 'flex-row-reverse' : ''} ${dragging ? '!cursor-grabbing gap-0 transition-none' : suppressExpansion || snapping ? '!cursor-pointer gap-0' : '!cursor-pointer gap-0 hover:w-40 hover:gap-2 focus-visible:w-40 focus-visible:gap-2 hover:rounded-xl focus-visible:rounded-xl'}`}
         style={dragging ? { top, left } : { top, [side]: VIEWPORT_MARGIN }}
       >
         <PersonStanding aria-hidden="true" className="block h-8 w-8 shrink-0" strokeWidth={2.5} />
@@ -227,10 +265,11 @@ export function AccessibilityMenu() {
 
       {open && (
         <section
+          ref={panelRef}
           id="accessibility-panel"
           aria-labelledby="accessibility-panel-title"
           className={`fixed z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-slate-300 bg-white p-4 text-slate-900 shadow-xl dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 ${side === 'left' ? 'left-4' : 'right-4'}`}
-          style={{ top: Math.min(top, Math.max(VIEWPORT_MARGIN, window.innerHeight - 310)) }}
+          style={{ top: Math.min(top, Math.max(VIEWPORT_MARGIN, window.innerHeight - (panelHeight || 310) - VIEWPORT_MARGIN)) }}
         >
           <div className="flex items-start justify-between gap-3">
             <h2 id="accessibility-panel-title" className="text-lg font-semibold">Acessibilidade</h2>
