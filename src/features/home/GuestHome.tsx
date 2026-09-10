@@ -36,7 +36,7 @@ export function GuestHome() {
           Ver acervo
         </Link>
       </section>
-      {(data?.carousels ?? []).map((section: { type: string; title: string; books: any[]; ranking?: boolean }, index) => (
+      {(data?.carousels ?? []).map((section: { type: string; title: string; books: any[]; ranking?: boolean }, index: number) => (
         <ProgressiveCarouselSection key={section.type} title={section.title} items={section.books} circular={!section.ranking} renderItem={(book, cardIndex) => renderBook(book, cardIndex, section.ranking)} measureItem={measureBook} emptyText="Nenhum livro disponível nesta seção." priority={index === 0} />
       ))}
     </div>

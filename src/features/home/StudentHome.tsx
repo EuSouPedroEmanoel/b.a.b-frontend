@@ -69,7 +69,7 @@ export function StudentHome() {
       {isError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">Não foi possível carregar suas recomendações. Você ainda pode explorar o acervo.</p>}
 
       <div className="flex flex-col gap-6">
-        {homeCarousels.map((section: { type: string; title: string; books: DiscoveryBook[]; emptyText?: string; ranking?: boolean }, index) => (
+        {homeCarousels.map((section: { type: string; title: string; books: DiscoveryBook[]; emptyText?: string; ranking?: boolean }, index: number) => (
           <ProgressiveCarouselSection key={section.type} title={section.title} items={section.books} circular={!section.ranking} renderItem={(book, cardIndex) => renderDiscoveryBook(book, cardIndex, section.ranking)} measureItem={measureDiscoveryBook} emptyText={section.emptyText ?? 'Nenhum livro disponível nesta seção.'} priority={index === 0} />
         ))}
 

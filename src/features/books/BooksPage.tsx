@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Loader2, Plus, Table } from 'lucide-react'
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { Select } from '@/components/ui/Select'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { OverflowTags } from '@/components/ui/OverflowTags'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { getBookCoverGradient } from '@/lib/coverColor'
@@ -253,6 +254,19 @@ export function BooksPage() {
 
   const gridItems = gridData?.pages.flatMap((p) => p.items) ?? []
   const gridTotal = gridData?.pages[0]?.total ?? 0
+  const [searchPlaceholder, setSearchPlaceholder] = useState('Ex.: título de um livro do acervo')
+  const placeholderTitles = useMemo(
+    () => (viewMode === 'table' ? data?.items ?? [] : gridData?.pages.flatMap((pageData) => pageData.items) ?? [])
+      .map((book) => book.title.trim())
+      .filter(Boolean),
+    [data?.items, gridData, viewMode],
+  )
+
+  useEffect(() => {
+    if (!placeholderTitles.length) return
+    const randomTitle = placeholderTitles[Math.floor(Math.random() * placeholderTitles.length)]
+    setSearchPlaceholder(`Ex.: ${randomTitle}`)
+  }, [placeholderTitles])
 
   const resolveMut = useMutation({
     mutationFn: async (term: string) => {
@@ -271,6 +285,7 @@ export function BooksPage() {
   const filterWrapperRef = useRef<HTMLDivElement>(null)
   const filterMenuRef = useRef<HTMLDivElement>(null)
   const filterTriggerRef = useRef<HTMLButtonElement>(null)
+  const sortOrderButtonRef = useRef<HTMLButtonElement>(null)
 
   const closeFilterMenu = useCallback(() => {
     setFilterMenuOpen(false)
@@ -370,6 +385,21 @@ export function BooksPage() {
       document.removeEventListener('keydown', onKey)
     }
   }, [closeFilterMenu, filterMenuOpen])
+
+  useLayoutEffect(() => {
+    const filterButton = filterTriggerRef.current
+    const sortButton = sortOrderButtonRef.current
+    if (!filterButton || !sortButton) return
+
+    const syncSquareSize = () => {
+      sortButton.style.width = `${filterButton.getBoundingClientRect().height}px`
+    }
+
+    syncSquareSize()
+    const observer = new ResizeObserver(syncSquareSize)
+    observer.observe(filterButton)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     if (!filterMenuOpen) return
@@ -554,16 +584,16 @@ export function BooksPage() {
           <h2 className="font-semibold">Buscar no acervo</h2>
         </CardHeader>
         <CardBody>
-          <form onSubmit={onSearch} className="flex flex-col gap-3" role="search" aria-label="Buscar livros">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="w-full min-w-0 sm:max-w-[62%] sm:flex-1 relative">
+          <form onSubmit={onSearch} className="flex flex-wrap items-start gap-3" role="search" aria-label="Buscar livros">
+            <div className="order-[1] flex min-w-0 flex-[1_1_72%] flex-wrap items-start gap-3">
+              <div className="relative min-w-0 basis-full sm:flex-1">
                 <div>
                   <Input
                     label="Buscar"
                     id="book-search"
                     ref={searchInputRef}
-                    placeholder={isGuest ? 'Título, ISBN, gênero, autor ou disponibilidade' : 'Título, ISBN, código interno, gênero, autor ou disponibilidade'}
-                    className="!pr-3 sm:!pr-20"
+                    placeholder={searchPlaceholder}
+                    className="!pr-3"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={onKeyDown}
@@ -576,11 +606,6 @@ export function BooksPage() {
                     aria-haspopup="listbox"
                     aria-activedescendant={activeIndex >= 0 ? `${suggestListId}-${activeIndex}` : undefined}
                     hint="Busque por título, gênero, autor ou disponibilidade — autocomplete disponível"
-                    rightElement={
-                      <Button type="submit" size="sm" className="!hidden sm:!inline-flex px-3 py-1.5 min-h-0 h-8 transition-colors">
-                        Buscar
-                      </Button>
-                    }
                   />
                 </div>
                 {suggestOpen && suggestItems.length > 0 && (
@@ -633,10 +658,15 @@ export function BooksPage() {
                   </ul>
                 )}
               </div>
-              <Button type="submit" className="w-full sm:hidden">
-                Buscar
-              </Button>
-              <div ref={filterWrapperRef} className="relative flex items-center justify-end gap-2 w-full sm:w-auto sm:self-end sm:mb-[21px] shrink-0">
+                <Button
+                  type="submit"
+                  className="mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] h-[calc(var(--text-base)*var(--text-base--line-height)+1.25rem)] shrink-0"
+                >
+                  Buscar
+                </Button>
+              </div>
+            <div className="order-[2] mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] ml-auto flex shrink-0 flex-wrap items-stretch gap-2 pl-5">
+              <div ref={filterWrapperRef} className="relative shrink-0 self-stretch">
                 <Button
                   ref={filterTriggerRef}
                   type="button"
@@ -649,7 +679,7 @@ export function BooksPage() {
                   aria-expanded={filterMenuOpen}
                   aria-controls="filter-menu"
                   aria-label="Filtros"
-                  className={`w-full sm:w-auto gap-2 transition-colors ${hasActiveFilters ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
+                  className={`relative z-30 h-full gap-2 transition-colors ${hasActiveFilters ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
                 >
                   <Funnel className="h-4 w-4" aria-hidden="true" />
                   Filtros
@@ -663,6 +693,7 @@ export function BooksPage() {
                   <>
                     <div
                       aria-hidden="true"
+                      onClick={closeFilterMenu}
                       className="fixed inset-0 z-20 cursor-default bg-transparent"
                     />
                     <div
@@ -742,28 +773,44 @@ export function BooksPage() {
                 )}
               </div>
               <Button
+                ref={sortOrderButtonRef}
                 type="button"
                 variant="secondary"
-                size="sm"
                 onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
                 aria-label={sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
-                title={sortOrder === 'asc' ? 'Crescente' : 'Decrescente'}
-                className="shrink-0 self-end sm:mb-[21px] hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
+                aria-describedby="sort-order-tooltip"
+                className="group relative min-w-0 shrink-0 self-stretch !px-0 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
               >
-                {sortOrder === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                {sortOrder === 'asc' ? <ArrowUp className="size-[calc(var(--text-sm)*1.15)]" /> : <ArrowDown className="size-[calc(var(--text-sm)*1.15)]" />}
+                <Tooltip id="sort-order-tooltip">
+                  {sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
+                </Tooltip>
               </Button>
-              {(queryQ || genreFilter || authorFilter || stateFilter) && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => { setQuery(''); setQueryQ(''); setGenreFilter(''); setAuthorFilter(''); setStateFilter(''); setPage(1) }} className="hidden sm:inline-flex whitespace-nowrap shrink-0 self-end sm:mb-[21px] ml-2 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors" aria-label="Limpar busca">
-                  Limpar
-                </Button>
-              )}
             </div>
-            {(queryQ || genreFilter || authorFilter || stateFilter) && (
-              <div className="flex flex-wrap gap-2">
+            {(queryQ || hasActiveFilters) && (
+              <div className="order-[4] flex basis-full flex-wrap gap-2">
                 {queryQ && <Badge tone="info">Busca: {queryQ}</Badge>}
                 {genreFilter && <Badge tone="neutral">Gênero aplicado</Badge>}
                 {authorFilter && <Badge tone="info">Autor aplicado</Badge>}
                 {stateFilter && <Badge tone="neutral">Disponibilidade: {availabilityOptions.find((o) => o.value === stateFilter)?.label}</Badge>}
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setGenreFilter('')
+                      setAuthorFilter('')
+                      setStateFilter('')
+                      setSortBy('created_at')
+                      setSortOrder('asc')
+                      setPage(1)
+                    }}
+                    className="whitespace-nowrap hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
+                  >
+                    Limpar filtros
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="secondary"

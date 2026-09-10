@@ -17,22 +17,22 @@ export function DashboardPage() {
       {/* Atalhos — ul/li para navegação por lista (tecla L no NVDA/JAWS, rotor no VO) não pular para footer */}
       <section aria-labelledby="atalhos-heading">
         <h2 id="atalhos-heading" className="sr-only">Atalhos</h2>
-        <ul aria-labelledby="atalhos-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 list-none m-0 p-0">
+        <ul aria-labelledby="atalhos-heading" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,calc(var(--text-sm)*18)),1fr))] gap-4 list-none m-0 p-0">
           {[
             { to: '/acervo', title: 'Acervo', desc: 'Clique no livro para ver e cadastrar exemplares (código único por escola)', tone: 'bg-sky-50 dark:bg-sky-900/20' },
             { to: '/emprestimos', title: 'Empréstimos', desc: 'Emprestar e devolver, cálculo de atraso', tone: 'bg-amber-50 dark:bg-amber-900/20' },
             { to: '/reservas', title: 'Reservas', desc: 'Reservar títulos e acompanhar fila', tone: 'bg-violet-50 dark:bg-violet-900/20' },
             { to: '/exemplares', title: 'Exemplares', desc: 'Acesso via Acervo — clique no livro', tone: 'bg-emerald-50 dark:bg-emerald-900/20' },
           ].map((c) => (
-            <li key={c.to}>
+            <li key={c.to} className="flex">
               <Link
                 to={c.to}
                 aria-label={`${c.title} — ${c.desc}`}
-                className={`flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md active:shadow-sm active:bg-slate-50 dark:active:bg-slate-800 transition-all focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 min-h-[44px] ${c.tone}`}
+                className={`flex h-full flex-1 flex-col rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md active:shadow-sm active:bg-slate-50 dark:active:bg-slate-800 transition-all focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 min-h-[44px] ${c.tone}`}
               >
                 <h3 className="font-semibold" aria-hidden="true">{c.title}</h3>
                 <p className="text-sm text-slate-600 dark:text-slate-300 mt-1" aria-hidden="true">{c.desc}</p>
-                <span className="inline-flex mt-3 text-sm font-medium text-[var(--color-primary)]" aria-hidden="true">Acessar →</span>
+                <span className="mt-auto inline-flex pt-3 text-sm font-medium text-[var(--color-primary)]" aria-hidden="true">Acessar →</span>
               </Link>
             </li>
           ))}
