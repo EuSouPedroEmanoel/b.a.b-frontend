@@ -934,22 +934,22 @@ export function BooksPage() {
                     <th scope="col" className="px-3 py-3 font-semibold w-14 text-center">
                       Capa
                     </th>
-                    <th scope="col" className="px-2 py-2 font-semibold w-[28%]">
+                    <th scope="col" className="px-2 py-2 font-semibold w-[42%] 2xl:w-[28%]">
                       Título
                     </th>
                     <th scope="col" className="px-5 py-3 font-semibold whitespace-nowrap w-[90px] text-center">
                       Disponibilidade
                     </th>
-                    <th scope="col" className="w-[1%] max-w-[190px] px-3 py-3 font-semibold text-center">
+                    <th scope="col" className="hidden w-[1%] max-w-[190px] px-3 py-3 font-semibold text-center 2xl:table-cell">
                       Autores
                     </th>
-                    <th scope="col" className="w-[1%] max-w-[150px] px-2 py-2 font-semibold text-center">
+                    <th scope="col" className="hidden w-[1%] max-w-[150px] px-2 py-2 font-semibold text-center 2xl:table-cell">
                       Gêneros
                     </th>
-                    <th scope="col" className="px-2 py-3 font-semibold whitespace-nowrap w-[64px] text-center">
+                    <th scope="col" className="hidden px-2 py-3 font-semibold whitespace-nowrap w-[64px] text-center 2xl:table-cell">
                       Ano
                     </th>
-                    <th scope="col" className="px-2 py-3 font-semibold whitespace-nowrap w-[110px] text-center">
+                    <th scope="col" className="hidden px-2 py-3 font-semibold whitespace-nowrap w-[110px] text-center 2xl:table-cell">
                       Cadastro
                     </th>
                   </tr>
@@ -990,7 +990,7 @@ export function BooksPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-2 w-[28%]">
+                      <td className="px-2 py-2 w-[42%] 2xl:w-[28%]">
                         <div className="flex flex-col gap-1 min-w-0">
                           <span className="line-clamp-2 break-words font-medium text-slate-900 dark:text-slate-100" title={b.title}>
                             {b.title}
@@ -1002,6 +1002,12 @@ export function BooksPage() {
                           ) : (
                             <span className="text-xs text-slate-400">—</span>
                           )}
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 2xl:hidden">
+                            {b.authors.length > 0 && <span>Autores: {b.authors.map((author) => author.name).join(', ')}</span>}
+                            {b.genres.length > 0 && <span>Gêneros: {b.genres.map((genre) => genre.name).join(', ')}</span>}
+                            <span>Ano: {b.published_date ? new Date(b.published_date).getFullYear() : '—'}</span>
+                            <span>Cadastro: {b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-2 py-3 text-center">
@@ -1011,14 +1017,14 @@ export function BooksPage() {
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="w-[1%] max-w-[190px] px-3 py-3">
+                      <td className="hidden w-[1%] max-w-[190px] px-3 py-3 2xl:table-cell">
                         <OverflowTags items={b.authors} tone="info" maxVisibleFallback={2} itemMaxWidthClass="max-w-[170px]" className="w-full max-w-none min-w-0 justify-start" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setAuthorFilter(String(item.id)); setPage(1); announce(`Filtrando por autor ${item.name}`, 'polite') }} />
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="hidden px-2 py-2 2xl:table-cell">
                         <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} maxVisible={1} itemMaxWidthClass="max-w-[140px]" className="w-full max-w-none min-w-0 justify-start" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setGenreFilter(String(item.id)); setPage(1); announce(`Filtrando por gênero ${item.name}`, 'polite') }} />
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</td>
-                      <td className="px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td className="hidden px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300 2xl:table-cell">{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</td>
+                      <td className="hidden px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300 2xl:table-cell">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
