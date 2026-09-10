@@ -113,6 +113,9 @@ export function BooksPage() {
   }, [location.state])
 
   const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => defaultViewForRole(user?.role))
+  const [compactTable, setCompactTable] = useState(false)
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
   const hydratedPreference = useRef(false)
 
   useEffect(() => {
@@ -254,6 +257,30 @@ export function BooksPage() {
 
   const gridItems = gridData?.pages.flatMap((p) => p.items) ?? []
   const gridTotal = gridData?.pages[0]?.total ?? 0
+
+  useLayoutEffect(() => {
+    if (viewMode !== 'table') return
+    const container = tableContainerRef.current
+    const table = tableRef.current
+    if (!container || !table) return
+
+    const measure = () => {
+      setCompactTable(table.scrollWidth > container.clientWidth + 1)
+    }
+    const remeasure = () => {
+      if (compactTable) setCompactTable(false)
+      else measure()
+    }
+    const observer = new ResizeObserver(remeasure)
+    observer.observe(container)
+    const fontObserver = new MutationObserver(remeasure)
+    fontObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-font-size'] })
+    if (!compactTable) measure()
+    return () => {
+      observer.disconnect()
+      fontObserver.disconnect()
+    }
+  }, [compactTable, viewMode, data?.items, pageSize])
   const [searchPlaceholder, setSearchPlaceholder] = useState('Ex.: título de um livro do acervo')
   const placeholderTitles = useMemo(
     () => (viewMode === 'table' ? data?.items ?? [] : gridData?.pages.flatMap((pageData) => pageData.items) ?? [])
@@ -926,30 +953,30 @@ export function BooksPage() {
 
         {data && viewMode === 'table' && (
           <>
-            {isDesktop ? <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <table className="w-full text-sm table-auto">
+            {isDesktop ? <div ref={tableContainerRef} className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <table ref={tableRef} className={`${compactTable ? 'w-full table-fixed' : 'w-max table-auto'} min-w-full text-sm`}>
                 <caption className="sr-only">Tabela de livros com capa, título e descrição, exemplares, autores, gêneros, ano e data de cadastro</caption>
                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-left">
                   <tr>
-                    <th scope="col" className="px-3 py-3 font-semibold w-14 text-center">
+                    <th scope="col" className="w-[clamp(3.75rem,calc(var(--text-base)*3),6rem)] px-3 py-3 font-semibold text-center">
                       Capa
                     </th>
-                    <th scope="col" className="px-2 py-2 font-semibold w-[42%] 2xl:w-[28%]">
+                    <th scope="col" className={`${compactTable ? 'w-[calc(68%-clamp(3.75rem,calc(var(--text-base)*3),6rem))]' : 'w-[28%]'} px-2 py-2 font-semibold`}>
                       Título
                     </th>
-                    <th scope="col" className="px-5 py-3 font-semibold whitespace-nowrap w-[90px] text-center">
+                    <th scope="col" className={`${compactTable ? 'w-[32%] whitespace-normal' : 'w-[90px] whitespace-nowrap'} px-5 py-3 font-semibold text-center`}>
                       Disponibilidade
                     </th>
-                    <th scope="col" className="hidden w-[1%] max-w-[190px] px-3 py-3 font-semibold text-center 2xl:table-cell">
+                    <th scope="col" className={`${compactTable ? 'hidden' : 'table-cell'} w-[1%] max-w-[190px] px-3 py-3 font-semibold text-center`}>
                       Autores
                     </th>
-                    <th scope="col" className="hidden w-[1%] max-w-[150px] px-2 py-2 font-semibold text-center 2xl:table-cell">
+                    <th scope="col" className={`${compactTable ? 'hidden' : 'table-cell'} w-[1%] max-w-[150px] px-2 py-2 font-semibold text-center`}>
                       Gêneros
                     </th>
-                    <th scope="col" className="hidden px-2 py-3 font-semibold whitespace-nowrap w-[64px] text-center 2xl:table-cell">
+                    <th scope="col" className={`${compactTable ? 'hidden' : 'table-cell'} px-2 py-3 font-semibold whitespace-nowrap w-[64px] text-center`}>
                       Ano
                     </th>
-                    <th scope="col" className="hidden px-2 py-3 font-semibold whitespace-nowrap w-[110px] text-center 2xl:table-cell">
+                    <th scope="col" className={`${compactTable ? 'hidden' : 'table-cell'} px-2 py-3 font-semibold whitespace-nowrap w-[110px] text-center`}>
                       Cadastro
                     </th>
                   </tr>
@@ -970,7 +997,7 @@ export function BooksPage() {
                       aria-label={`Abrir livro ${b.title}`}
                       className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-[-2px]"
                     >
-                      <td className="w-[1%] max-w-[150px] px-2 py-2">
+                      <td className={`${compactTable ? 'w-[clamp(3.75rem,calc(var(--text-base)*3),6rem)]' : 'w-[1%] max-w-[150px]'} p-3`}>
                         {b.cover_url ? (
                           <CoverImage
                             src={b.cover_url}
@@ -978,19 +1005,19 @@ export function BooksPage() {
                             alt={`Capa de ${b.title}`}
                             width={72}
                             height={108}
-                            className="h-12 w-9 mx-auto rounded-md border border-slate-200 dark:border-slate-600"
+                            className="mx-auto aspect-[4/3] h-auto max-w-full w-[clamp(3.75rem,calc(var(--text-base)*3),6rem)] rounded-md border border-slate-200 dark:border-slate-600"
                             sizes="36px"
                           />
                         ) : (
                           <div
-                            className="w-9 h-12 rounded overflow-hidden flex items-center justify-center shadow-sm mx-auto border border-slate-200 dark:border-slate-600"
+                            className="mx-auto flex aspect-[4/3] h-auto max-w-full w-[clamp(3.75rem,calc(var(--text-base)*3),6rem)] items-center justify-center overflow-hidden rounded border border-slate-200 shadow-sm dark:border-slate-600"
                             style={{ background: getBookCoverGradient(b.title) }}
                           >
                             <BookOpen className="h-5 w-5 text-white/80 drop-shadow-sm" aria-hidden="true" />
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-2 w-[42%] 2xl:w-[28%]">
+                      <td className={`${compactTable ? 'w-[calc(68%-clamp(3.75rem,calc(var(--text-base)*3),6rem))]' : 'w-[28%]'} px-2 py-2`}>
                         <div className="flex flex-col gap-1 min-w-0">
                           <span className="line-clamp-2 break-words font-medium text-slate-900 dark:text-slate-100" title={b.title}>
                             {b.title}
@@ -1002,7 +1029,7 @@ export function BooksPage() {
                           ) : (
                             <span className="text-xs text-slate-400">—</span>
                           )}
-                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 2xl:hidden">
+                          <div className={`${compactTable ? 'flex' : 'hidden'} mt-2 flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400`}>
                             {b.authors.length > 0 && <span>Autores: {b.authors.map((author) => author.name).join(', ')}</span>}
                             {b.genres.length > 0 && <span>Gêneros: {b.genres.map((genre) => genre.name).join(', ')}</span>}
                             <span>Ano: {b.published_date ? new Date(b.published_date).getFullYear() : '—'}</span>
@@ -1012,19 +1039,19 @@ export function BooksPage() {
                       </td>
                       <td className="px-2 py-3 text-center">
                         {typeof b.total_copies === 'number' ? (
-                          <div className="flex flex-col items-center justify-center gap-1"><span className="whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-200">{availabilityText(b)}</span><Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); if (!isGuest) { setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') } }} onKeyDown={(e: any) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1) } }} role={!isGuest ? 'button' : undefined} tabIndex={!isGuest ? 0 : undefined} title={isGuest ? publicBookStateLabel(b.derived_state) : `Filtrar por ${bookStateLabel(b.derived_state)}`}>{isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}</Badge></div>
+                          <div className="flex flex-col items-center justify-center gap-1"><span className={`${compactTable ? 'whitespace-normal break-words' : 'whitespace-nowrap'} text-sm font-medium text-slate-700 dark:text-slate-200`}>{availabilityText(b)}</span><Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} onClick={(e: any) => { e.stopPropagation(); if (!isGuest) { setStateFilter(b.derived_state); setPage(1); announce(`Filtrando por ${bookStateLabel(b.derived_state)}`, 'polite') } }} onKeyDown={(e: any) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); setStateFilter(b.derived_state); setPage(1) } }} role={!isGuest ? 'button' : undefined} tabIndex={!isGuest ? 0 : undefined} title={isGuest ? publicBookStateLabel(b.derived_state) : `Filtrar por ${bookStateLabel(b.derived_state)}`}>{isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}</Badge></div>
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="hidden w-[1%] max-w-[190px] px-3 py-3 2xl:table-cell">
+                      <td className={`${compactTable ? 'hidden' : 'table-cell'} w-[1%] max-w-[190px] px-3 py-3`}>
                         <OverflowTags items={b.authors} tone="info" maxVisibleFallback={2} itemMaxWidthClass="max-w-[170px]" className="w-full max-w-none min-w-0 justify-start" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setAuthorFilter(String(item.id)); setPage(1); announce(`Filtrando por autor ${item.name}`, 'polite') }} />
                       </td>
-                      <td className="hidden px-2 py-2 2xl:table-cell">
+                      <td className={`${compactTable ? 'hidden' : 'table-cell'} px-2 py-2`}>
                         <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} maxVisible={1} itemMaxWidthClass="max-w-[140px]" className="w-full max-w-none min-w-0 justify-start" onItemClick={(item) => { setQuery(item.name); setQueryQ(item.name); setGenreFilter(String(item.id)); setPage(1); announce(`Filtrando por gênero ${item.name}`, 'polite') }} />
                       </td>
-                      <td className="hidden px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300 2xl:table-cell">{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</td>
-                      <td className="hidden px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300 2xl:table-cell">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td className={`${compactTable ? 'hidden' : 'table-cell'} px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300`}>{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</td>
+                      <td className={`${compactTable ? 'hidden' : 'table-cell'} px-3 py-3 whitespace-nowrap text-center dark:bg-slate-700/20 text-xs font-medium text-slate-600 dark:text-slate-300`}>{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
