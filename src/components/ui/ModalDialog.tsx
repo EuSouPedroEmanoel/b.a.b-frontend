@@ -29,7 +29,7 @@ export function ModalDialog({
   const titleId = labelledBy ?? `modal-title-${generatedTitleId}`
   const widthClassName = variant === 'form'
     ? 'max-w-[min(48rem,calc(100vw-2rem))]'
-    : 'max-w-md'
+    : 'max-w-[min(30rem,calc(100vw-2rem))]'
 
   useEffect(() => {
     const html = document.documentElement

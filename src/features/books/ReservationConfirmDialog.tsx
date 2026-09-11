@@ -82,13 +82,14 @@ export function ReservationConfirmDialog({
 
   return (
     <ModalDialog
+      variant="compact"
       title={<><span>Confirmar reserva</span><span className="sr-only"> para {bookTitle}</span></>}
       onClose={() => { if (!pending) onClose() }}
       labelledBy={titleId}
       describedBy={errorMessage ? `${descriptionId} ${errorId}` : descriptionId}
       contentRef={dialogRef}
       contentTabIndex={-1}
-      contentClassName="max-w-md outline-none"
+      contentClassName="outline-none"
     >
             <p id={descriptionId} className="text-sm leading-6 text-slate-600 dark:text-slate-300">
               Este livro não possui exemplares disponíveis no momento. Ao confirmar, você entrará na fila de espera. Quando um exemplar ficar disponível e chegar a sua vez, sua reserva ficará pronta para retirada. Você pode acompanhar o andamento pela página de Reservas.
@@ -98,11 +99,11 @@ export function ReservationConfirmDialog({
                 {errorMessage}
               </p>
             )}
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button type="button" variant="secondary" onClick={onClose} disabled={pending} ref={cancelRef}>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+              <Button type="button" variant="secondary" className="shrink-0" onClick={onClose} disabled={pending} ref={cancelRef}>
                 Cancelar
               </Button>
-              <Button type="button" variant="primary" onClick={onConfirm} disabled={pending} aria-busy={pending} ref={confirmRef}>
+              <Button type="button" variant="primary" className="shrink-0" onClick={onConfirm} disabled={pending} aria-busy={pending} ref={confirmRef}>
                 {pending ? 'Confirmando…' : 'Confirmar reserva'}
               </Button>
             </div>
