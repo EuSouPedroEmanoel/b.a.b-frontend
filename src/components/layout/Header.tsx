@@ -396,7 +396,7 @@ export function Header() {
           </div>
         </div>
 
-        <div ref={desktopMeasurementRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 -z-10 w-max opacity-0">
+        <div ref={desktopMeasurementRef} aria-hidden="true" className="pointer-events-none fixed right-0 top-0 -z-10 w-max opacity-0">
           <DesktopNavigationMeasurement
             isAuthenticated={isAuthenticated}
             isGuest={isGuest}

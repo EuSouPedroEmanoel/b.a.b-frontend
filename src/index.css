@@ -71,6 +71,18 @@ html[data-font-size='200'] {
 .accessibility-increase-label { font-size: 1em; }
 html[data-font-size='200'] .accessibility-decrease-label { font-size: 0.8em; }
 
+@media (hover: hover) and (pointer: fine) {
+  .accessibility-trigger:hover {
+    width: 10rem;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+  }
+  .accessibility-trigger:hover .accessibility-trigger-label {
+    max-width: 10rem;
+    opacity: 1;
+  }
+}
+
 .accessibility-font-slider {
   height: 1.5rem;
   margin: 0;
