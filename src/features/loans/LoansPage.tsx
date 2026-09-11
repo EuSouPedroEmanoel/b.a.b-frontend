@@ -190,6 +190,10 @@ export function LoansPage() {
 }
 
 function OperationalLoansPage() {
+  const [copyPlaceholder] = useState(() => {
+    const number = Math.floor(Math.random() * 1000) + 1
+    return `EX-${String(number).padStart(6, '0')}`
+  })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(() => {
     const saved = localStorage.getItem('emprestimos:pageSize')
@@ -323,6 +327,20 @@ function OperationalLoansPage() {
     },
   })
 
+  useEffect(() => {
+    if (operation !== 'borrow') return
+    const code = internalCode.trim()
+    if (code.length <= 2) {
+      setCopyLookupCode('')
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setCopyInputError(undefined)
+      setCopyLookupCode(code)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [internalCode, operation])
+
   const copyMatchesInput = copyLookupCode === internalCode.trim()
   const userMatchesInput = userLookupCpf === cpf
   const copy = copyMatchesInput && copyQuery.data?.kind === 'copy' ? copyQuery.data.copy : undefined
@@ -331,7 +349,7 @@ function OperationalLoansPage() {
 
   const userQuery = useQuery({
     queryKey: ['loan-user-preview', userLookupCpf, borrowSchoolId],
-    enabled: !!userLookupCpf && !!copy,
+    enabled: !!userLookupCpf,
     retry: false,
     queryFn: async (): Promise<User> => {
       const { data } = await api.get<Paginated<User>>('/users/', { params: { cpf: userLookupCpf, size: 1, ...(borrowSchoolId ? { school_id: borrowSchoolId } : {}) } })
@@ -339,6 +357,20 @@ function OperationalLoansPage() {
       return data.items[0]
     },
   })
+
+  useEffect(() => {
+    if (operation !== 'borrow' || pickupReservation) return
+    const value = onlyDigits(cpf)
+    if (value.length !== 11) {
+      setUserLookupCpf('')
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setUserInputError(undefined)
+      setUserLookupCpf(value)
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [copy, cpf, operation, pickupReservation])
 
   const user = userMatchesInput ? userQuery.data : undefined
   const sameSchool = !!copy && !!user && copy.school_id === user.school_id
@@ -358,7 +390,7 @@ function OperationalLoansPage() {
     ?? (!copyMatchesPickupReservation ? 'Este exemplar está reservado para outro atendimento.' : undefined)
     ?? (copyMatchesInput && copy && !copyAvailable && !pickupReservation ? 'Este exemplar não está disponível para empréstimo.' : undefined)
     ?? (copyMatchesInput && copyQuery.isError ? 'Exemplar não encontrado. Verifique o código e tente novamente.' : undefined)
-  const userError = userInputError ?? (userMatchesInput && (userQuery.isError || (!!user && !reader)) ? 'Leitor não encontrado. Verifique o CPF e tente novamente.' : undefined)
+  const userError = userInputError ?? (userMatchesInput && (userQuery.isError || (!!copy && !!user && !reader)) ? 'Leitor não encontrado. Verifique o CPF e tente novamente.' : undefined)
 
   const returnKind = returnLookupKind(returnLookup)
   const returnValue = returnKind === 'user' ? onlyDigits(returnLookup) : returnLookup.trim()
@@ -480,6 +512,15 @@ function OperationalLoansPage() {
     announcedCopyKey.current = null
     focusCodeAfterLookup.current = moveFocus
     focusCpfAfterLookup.current = moveFocus
+    if (code === copyLookupCode && copyQuery.data) {
+      if (moveFocus && copyQuery.data.kind === 'copy') {
+        window.setTimeout(() => {
+          if (pickupReservation) confirmLoanRef.current?.focus()
+          else cpfRef.current?.focus()
+        }, 150)
+      }
+      return
+    }
     if (code === copyLookupCode) void copyQuery.refetch()
     else setCopyLookupCode(code)
   }
@@ -498,6 +539,10 @@ function OperationalLoansPage() {
   const identifyUser = () => {
     setUserInputError(undefined)
     if (!copy || !copyEligible || !copyBelongsToSelectedBook) {
+      if (internalCode.trim() && (!copyMatchesInput || !copyQuery.data)) {
+        identifyCopy(true)
+        return
+      }
       const message = 'Identifique um exemplar disponível antes de informar o CPF do leitor.'
       setUserInputError(message)
       announce(message, 'assertive')
@@ -514,8 +559,11 @@ function OperationalLoansPage() {
     announcedUserKey.current = null
     focusCodeAfterLookup.current = true
     focusConfirmAfterLookup.current = true
-    if (cpf === userLookupCpf) void userQuery.refetch()
-    else setUserLookupCpf(cpf)
+    if (cpf === userLookupCpf && (userQuery.data || userQuery.isError || userQuery.isFetching)) {
+      if (userQuery.data && userEligible) setLoanConfirmationOpen(true)
+      return
+    }
+    setUserLookupCpf(cpf)
   }
 
   const closeLoanConfirmation = () => {
@@ -736,11 +784,11 @@ function OperationalLoansPage() {
     </CardHeader><CardBody>
       {operation === 'borrow' ? <form onSubmit={(event) => { event.preventDefault(); if (!copy) { identifyCopy(false); return }; if (!reader) { identifyUser(); return }; if (canCreate) setLoanConfirmationOpen(true) }} className="flex flex-col gap-4">
       <div className="flex flex-col sm:flex-row gap-3 items-start">
-          <div className="flex-1 w-full"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para avançar ao CPF.'} aria-describedby="copy-identification" required autoComplete="off" /></div>
+          <div className="flex-1 w-full"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para avançar ao CPF.'} aria-describedby="copy-identification" required autoComplete="off" placeholder={`Ex: ${copyPlaceholder}`} /></div>
           <div className="flex-1 w-full">{pickupReservation ? <Input id="loan-reserved-reader" label="Leitor da reserva" value={pickupReservation.reserver_username} readOnly tabIndex={-1} hint={`${roleLabel(pickupReservation.reserver_role)}. Leitor já identificado pela reserva; o CPF não precisa ser informado novamente.`} /> : <Input ref={cpfRef} id="loan-cpf" label="CPF do leitor" type="password" inputMode="numeric" value={formatCpfInput(cpf)} onChange={(event) => { setCpf(onlyDigits(event.target.value)); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyUser() } }} error={userError} hint="O CPF permanece oculto. Digite e pressione Enter para identificar o leitor." aria-describedby="user-identification" required autoComplete="off" placeholder="000.000.000-00" />}</div>
           <div className="flex w-full flex-col gap-1.5 sm:w-auto">
             <span className="invisible text-sm font-medium leading-5" aria-hidden="true">Ação</span>
-            <Button ref={confirmLoanRef} type="submit" variant={canCreate ? 'primary' : 'secondary'} disabled={!canCreate || createMut.isPending} className="loan-confirmation-button w-full sm:w-auto" aria-describedby="loan-confirmation-status">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
+            <Button ref={confirmLoanRef} type="submit" variant={canCreate ? 'primary' : 'secondary'} disabled={(!internalCode.trim() && !cpf) || createMut.isPending} className="loan-confirmation-button w-full sm:w-auto" aria-describedby="loan-confirmation-status">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
           </div>
         </div>
         {reservationId && reservationQuery.isError && <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-300">A reserva não está disponível para retirada.</p>}
