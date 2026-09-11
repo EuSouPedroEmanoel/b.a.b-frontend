@@ -33,23 +33,6 @@
 
 /* Escala tipográfica da acessibilidade. Espaçamentos e dimensões permanecem
  * baseados nos tokens próprios de spacing do Tailwind. */
-html[data-font-size='125'] {
-  --leading-page-description: 1.6875rem;
-  --text-xs: 0.9375rem;
-  --text-sm: 1.09375rem;
-  --text-base: 1.25rem;
-  --text-lg: 1.40625rem;
-  --text-xl: 1.5625rem;
-  --text-2xl: 1.875rem;
-  --text-3xl: 2.34375rem;
-  --text-4xl: 2.8125rem;
-  --text-5xl: 3.75rem;
-  --text-6xl: 4.5rem;
-  --text-7xl: 5.625rem;
-  --text-8xl: 7.5rem;
-  --text-9xl: 10rem;
-}
-
 html[data-font-size='150'] {
   --leading-page-description: 1.875rem;
   --text-xs: 1.125rem;
@@ -65,23 +48,6 @@ html[data-font-size='150'] {
   --text-7xl: 6.75rem;
   --text-8xl: 9rem;
   --text-9xl: 12rem;
-}
-
-html[data-font-size='175'] {
-  --leading-page-description: 2.125rem;
-  --text-xs: 1.3125rem;
-  --text-sm: 1.53125rem;
-  --text-base: 1.75rem;
-  --text-lg: 1.96875rem;
-  --text-xl: 2.1875rem;
-  --text-2xl: 2.625rem;
-  --text-3xl: 3.28125rem;
-  --text-4xl: 3.9375rem;
-  --text-5xl: 5.25rem;
-  --text-6xl: 6.3rem;
-  --text-7xl: 7.875rem;
-  --text-8xl: 10.5rem;
-  --text-9xl: 14rem;
 }
 
 html[data-font-size='200'] {
@@ -103,7 +69,6 @@ html[data-font-size='200'] {
 
 .accessibility-decrease-label { font-size: 0.9em; }
 .accessibility-increase-label { font-size: 1em; }
-html[data-font-size='175'] .accessibility-decrease-label,
 html[data-font-size='200'] .accessibility-decrease-label { font-size: 0.8em; }
 
 .accessibility-font-slider {

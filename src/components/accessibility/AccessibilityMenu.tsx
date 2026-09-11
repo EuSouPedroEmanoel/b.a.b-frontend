@@ -11,7 +11,7 @@ type StoredPreference = {
 }
 
 const STORAGE_KEY = 'bab-accessibility-preferences'
-const FONT_SIZE_LEVELS = [100, 125, 150, 175, 200] as const
+const FONT_SIZE_LEVELS = [100, 150, 200] as const
 type FontSizeLevel = typeof FONT_SIZE_LEVELS[number]
 const DEFAULT_SCALE: FontSizeLevel = 100
 const BUTTON_SIZE = 48
@@ -64,6 +64,8 @@ export function AccessibilityMenu() {
   const [suppressExpansion, setSuppressExpansion] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const confirmScaleRef = useRef<HTMLButtonElement>(null)
+  const scaleSliderRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const [panelHeight, setPanelHeight] = useState(0)
   const animationRef = useRef(0)
@@ -129,13 +131,27 @@ export function AccessibilityMenu() {
     if (open) closeRef.current?.focus()
   }, [open])
 
+  const closeMenu = () => {
+    setOpen(false)
+    requestAnimationFrame(() => buttonRef.current?.focus())
+  }
+
+  useEffect(() => {
+    if (!open) return undefined
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open])
+
   useEffect(() => {
     if (!open) return undefined
     const handlePointerDownOutside = (event: PointerEvent) => {
       const target = event.target
       if (!(target instanceof Node)) return
       if (panelRef.current?.contains(target) || buttonRef.current?.contains(target)) return
-      setOpen(false)
+      closeMenu()
     }
     document.addEventListener('pointerdown', handlePointerDownOutside)
     return () => document.removeEventListener('pointerdown', handlePointerDownOutside)
@@ -241,6 +257,12 @@ export function AccessibilityMenu() {
     dragRef.current.pointerId = -1
   }
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    setOpen((current) => !current)
+  }
+
   const moveSide = () => {
     const nextSide = side === 'left' ? 'right' : 'left'
     setSide(nextSide)
@@ -249,7 +271,10 @@ export function AccessibilityMenu() {
 
   const updateScale = (next: FontSizeLevel) => setPreviewScale(next)
   const previewIndex = FONT_SIZE_LEVELS.indexOf(previewScale)
-  const applyPreviewScale = () => setTextScale(previewScale)
+  const applyPreviewScale = () => {
+    setTextScale(previewScale)
+    requestAnimationFrame(() => scaleSliderRef.current?.focus())
+  }
 
   const startSnap = (nextSide: Side, nextTop: number, speed: number) => {
     const button = buttonRef.current
@@ -276,6 +301,7 @@ export function AccessibilityMenu() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onKeyDown={handleKeyDown}
         onLostPointerCapture={() => {
           if (dragRef.current.pointerId !== -1) setDragging(false)
         }}
@@ -310,7 +336,7 @@ export function AccessibilityMenu() {
         >
           <div className="flex items-start justify-between gap-3">
             <h2 id="accessibility-panel-title" className="text-lg font-semibold">Acessibilidade</h2>
-            <button ref={closeRef} type="button" aria-label="Fechar menu de acessibilidade" onClick={() => setOpen(false)} className="rounded-md p-1 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]">
+            <button ref={closeRef} type="button" aria-label="Fechar menu de acessibilidade" onClick={closeMenu} className="rounded-md p-1 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]">
               <X aria-hidden="true" className="h-5 w-5" />
             </button>
           </div>
@@ -333,14 +359,21 @@ export function AccessibilityMenu() {
                       {FONT_SIZE_LEVELS.map((level) => <span key={level} className={`h-3 w-3 rounded-full border-2 ${previewScale === level ? 'border-blue-700 bg-blue-700 dark:border-blue-300 dark:bg-blue-300' : 'border-slate-400 bg-white dark:border-slate-400 dark:bg-slate-800'}`} />)}
                     </div>
                     <input
+                      ref={scaleSliderRef}
                       type="range"
-                      min="100"
-                      max="200"
-                      step="25"
-                      value={previewScale}
+                      min="0"
+                      max={FONT_SIZE_LEVELS.length - 1}
+                      step="1"
+                      value={previewIndex}
                       aria-label="Tamanho do texto"
                       aria-valuetext={`${previewScale} por cento`}
-                      onChange={(event) => setPreviewScale(Number(event.target.value) as FontSizeLevel)}
+                      onChange={(event) => setPreviewScale(FONT_SIZE_LEVELS[Number(event.target.value)])}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          confirmScaleRef.current?.focus()
+                        }
+                      }}
                       className="accessibility-font-slider relative z-10 w-full"
                     />
                   </div>
@@ -357,7 +390,7 @@ export function AccessibilityMenu() {
                   A+
                 </button>
               </div>
-              <button type="button" onClick={applyPreviewScale} disabled={previewScale === textScale} className="mt-3 w-full rounded-xl border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-blue-700 dark:text-white dark:hover:bg-blue-800">
+              <button ref={confirmScaleRef} type="button" onClick={applyPreviewScale} disabled={previewScale === textScale} className="mt-3 w-full rounded-xl border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-blue-700 dark:text-white dark:hover:bg-blue-800">
                 Confirmar tamanho
               </button>
             </fieldset>
