@@ -188,7 +188,6 @@ export function Header() {
     if (!destination) return
     pointerNavigationRef.current = destination
     registerMouseNavigation(destination)
-    if (!desktopNavVisible) setOpen(false)
   }
 
   const handleHeaderNavigationClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -196,6 +195,7 @@ export function Header() {
     if (!destination) return
     if (pointerNavigationRef.current === destination) {
       pointerNavigationRef.current = null
+      if (!desktopNavVisible) setOpen(false)
       return
     }
     pendingNavigationFocusRef.current = {

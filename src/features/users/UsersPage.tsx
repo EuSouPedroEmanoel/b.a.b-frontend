@@ -534,7 +534,7 @@ export function UsersPage() {
                           const readOnly = !canEditUser(u)
                           return (
                             <tr key={u.id} className={readOnly ? 'opacity-60' : undefined}>
-                              <td className="px-4 py-3 font-medium">{u.name || u.username}</td>
+                              <td className="px-4 py-3 font-medium">{u.name || u.username}{currentUser?.id === u.id && <span className="ml-2 text-sm font-normal text-slate-600 dark:text-slate-300">(EU)</span>}</td>
                               <td className="px-4 py-3 font-mono text-xs">{u.username}</td>
                               <td className="px-4 py-3">{u.email ?? '—'}</td>
                               {sec.showCpf && <td className="px-4 py-3 font-mono text-xs">{u.cpf_masked ?? '—'}</td>}
