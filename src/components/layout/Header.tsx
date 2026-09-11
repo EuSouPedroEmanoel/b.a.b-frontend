@@ -263,7 +263,10 @@ export function Header() {
     if (!row || !measurement) return undefined
     const updateLayout = () => {
       const hasDesktopViewport = window.innerWidth >= 768
-      setDesktopNavVisible(hasDesktopViewport && measurement.getBoundingClientRect().width <= row.clientWidth)
+      const requiredWidth = measurement.getBoundingClientRect().width
+      const availableWidth = row.clientWidth
+      const comfortableWidth = requiredWidth + 16
+      setDesktopNavVisible(hasDesktopViewport && comfortableWidth <= availableWidth)
     }
     updateLayout()
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updateLayout)
@@ -283,7 +286,7 @@ export function Header() {
   return (
     <header data-app-navbar onPointerDown={handleHeaderPointerDown} onMouseDown={handleHeaderMouseDown} onClick={handleHeaderNavigationClick} className="relative sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-lg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div ref={headerRowRef} className="flex h-16 items-center justify-between gap-4">
+        <div ref={headerRowRef} className="flex min-h-16 items-center justify-between gap-4 py-2">
           <div className="flex min-w-0 items-center gap-6">
             <Link to="/" className="flex items-center shrink-0" aria-label="Base de Acesso Bibliotecário — página inicial">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#0f4c75] dark:bg-white dark:text-slate-900 font-bold text-lg shadow-sm" aria-hidden="true">

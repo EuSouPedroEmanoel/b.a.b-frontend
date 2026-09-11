@@ -311,25 +311,25 @@ export function StudentsPage() {
               autoComplete="off"
               hint="A primeira senha do aluno será a data de nascimento como números (ddmmaaaa)."
             />
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Turma — número"
-                value={createForm.turmaNumero}
-                onChange={(e) => setCreateForm((f) => ({ ...f, turmaNumero: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) }))}
-                placeholder="ex: 7"
-                required
-                inputMode="numeric"
-                autoComplete="off"
-              />
-              <Input
-                label="Turma — letra"
-                value={createForm.turmaLetra}
-                onChange={(e) => setCreateForm((f) => ({ ...f, turmaLetra: e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) }))}
-                placeholder="ex: A"
-                required
-                maxLength={1}
-                autoComplete="off"
-              />
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
+              <div className="min-w-0"><Input
+                  label="Turma — número"
+                  value={createForm.turmaNumero}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, turmaNumero: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) }))}
+                  placeholder="ex: 7"
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                /></div>
+              <div className="min-w-0"><Input
+                  label="Turma — letra"
+                  value={createForm.turmaLetra}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, turmaLetra: e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) }))}
+                  placeholder="ex: A"
+                  required
+                  maxLength={1}
+                  autoComplete="off"
+                /></div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="secondary" onClick={() => { setCreateError(''); setShowCreate(false) }}>
@@ -356,23 +356,23 @@ export function StudentsPage() {
             }}
             className="grid gap-4"
           >
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Turma — número"
-                value={editForm.turmaNumero}
-                onChange={(e) => setEditForm((f) => ({ ...f, turmaNumero: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) }))}
-                required
-                inputMode="numeric"
-                autoComplete="off"
-              />
-              <Input
-                label="Turma — letra"
-                value={editForm.turmaLetra}
-                onChange={(e) => setEditForm((f) => ({ ...f, turmaLetra: e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) }))}
-                required
-                maxLength={1}
-                autoComplete="off"
-              />
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
+              <div className="min-w-0"><Input
+                  label="Turma — número"
+                  value={editForm.turmaNumero}
+                  onChange={(e) => setEditForm((f) => ({ ...f, turmaNumero: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) }))}
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                /></div>
+              <div className="min-w-0"><Input
+                  label="Turma — letra"
+                  value={editForm.turmaLetra}
+                  onChange={(e) => setEditForm((f) => ({ ...f, turmaLetra: e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) }))}
+                  required
+                  maxLength={1}
+                  autoComplete="off"
+                /></div>
             </div>
             <Input
               label="Nascimento"
