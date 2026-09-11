@@ -14,6 +14,7 @@ import { Select } from '@/components/ui/Select'
 import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
+import { ModalDialog } from '@/components/ui/ModalDialog'
 
 type AppUser = {
   id: number
@@ -582,7 +583,7 @@ export function UsersPage() {
       )}
 
       {showCreate && (
-        <Dialog title="Criar usuário" onClose={() => { setCreateError(''); setShowCreate(false) }}>
+        <ModalDialog title="Criar usuário" onClose={() => { setCreateError(''); setShowCreate(false) }}>
           <form onSubmit={submitCreate} className="grid gap-4">
             {createError && (
               <p role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-200">
@@ -632,11 +633,11 @@ export function UsersPage() {
               </Button>
             </div>
           </form>
-        </Dialog>
+        </ModalDialog>
       )}
 
       {editing && (
-        <Dialog title={`Editar usuário — ${editing.name || editing.username}`} onClose={closeEdit}>
+        <ModalDialog title={`Editar usuário — ${editing.name || editing.username}`} onClose={closeEdit}>
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -700,37 +701,8 @@ export function UsersPage() {
               </Button>
             </div>
           </form>
-        </Dialog>
+        </ModalDialog>
       )}
-    </div>
-  )
-}
-
-function Dialog({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="w-full max-w-md rounded-xl bg-white dark:bg-slate-800 shadow-xl">
-        <CardHeader>
-          <h2 className="text-lg font-semibold">{title}</h2>
-        </CardHeader>
-        <CardBody>{children}</CardBody>
-      </div>
     </div>
   )
 }

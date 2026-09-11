@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type RefObject } from 'react'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ModalDialog } from '@/components/ui/ModalDialog'
 
 type ReservationConfirmDialogProps = {
   open: boolean
@@ -81,30 +81,15 @@ export function ReservationConfirmDialog({
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !pending) onClose()
-      }}
+    <ModalDialog
+      title={<><span>Confirmar reserva</span><span className="sr-only"> para {bookTitle}</span></>}
+      onClose={() => { if (!pending) onClose() }}
+      labelledBy={titleId}
+      describedBy={errorMessage ? `${descriptionId} ${errorId}` : descriptionId}
+      contentRef={dialogRef}
+      contentTabIndex={-1}
+      contentClassName="max-w-md outline-none"
     >
-      <section
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={errorMessage ? `${descriptionId} ${errorId}` : descriptionId}
-        tabIndex={-1}
-        className="w-full max-w-md rounded-xl bg-white shadow-xl outline-none dark:bg-slate-800"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <Card className="border-0 shadow-none dark:shadow-none">
-          <CardHeader>
-            <h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-white">
-              Confirmar reserva
-              <span className="sr-only"> para {bookTitle}</span>
-            </h2>
-          </CardHeader>
-          <CardBody>
             <p id={descriptionId} className="text-sm leading-6 text-slate-600 dark:text-slate-300">
               Este livro não possui exemplares disponíveis no momento. Ao confirmar, você entrará na fila de espera. Quando um exemplar ficar disponível e chegar a sua vez, sua reserva ficará pronta para retirada. Você pode acompanhar o andamento pela página de Reservas.
             </p>
@@ -121,9 +106,6 @@ export function ReservationConfirmDialog({
                 {pending ? 'Confirmando…' : 'Confirmar reserva'}
               </Button>
             </div>
-          </CardBody>
-        </Card>
-      </section>
-    </div>
+    </ModalDialog>
   )
 }

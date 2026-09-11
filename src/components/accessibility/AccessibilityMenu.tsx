@@ -315,7 +315,7 @@ export function AccessibilityMenu() {
           dragRef.current.pointerId = -1
         }}
         onPointerLeave={() => setSuppressExpansion(false)}
-        className={`group fixed z-50 flex h-12 w-12 aspect-square touch-none select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full border border-blue-900 bg-blue-800 text-white leading-none shadow-md outline-none transition-[top,left,right,width,border-radius,transform,background-color,box-shadow,opacity] duration-200 hover:bg-blue-900 hover:text-white active:bg-blue-900 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white ${open ? 'pointer-events-none invisible opacity-0' : ''} ${side === 'left' ? 'flex-row-reverse' : ''} ${dragging ? '!cursor-grabbing gap-0 transition-none' : suppressExpansion || snapping ? '!cursor-pointer gap-0' : '!cursor-pointer gap-0 hover:w-40 hover:gap-2 focus-visible:w-40 focus-visible:gap-2 hover:rounded-xl focus-visible:rounded-xl'}`}
+        className={`group fixed z-[60] flex h-12 w-12 aspect-square touch-none select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full border border-blue-900 bg-blue-800 text-white leading-none shadow-md outline-none transition-[top,left,right,width,border-radius,transform,background-color,box-shadow,opacity] duration-200 hover:bg-blue-900 hover:text-white active:bg-blue-900 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white ${open ? 'pointer-events-none opacity-0' : ''} ${side === 'left' ? 'flex-row-reverse' : ''} ${dragging ? '!cursor-grabbing gap-0 transition-none' : suppressExpansion || snapping ? '!cursor-pointer gap-0' : '!cursor-pointer gap-0 hover:w-40 hover:gap-2 focus-visible:w-40 focus-visible:gap-2 hover:rounded-xl focus-visible:rounded-xl'}`}
         style={dragging ? { top, left } : { top, [side]: VIEWPORT_MARGIN }}
       >
         <PersonStanding aria-hidden="true" className="block h-8 w-8 shrink-0" strokeWidth={2.5} />
@@ -331,7 +331,7 @@ export function AccessibilityMenu() {
           ref={panelRef}
           id="accessibility-panel"
           aria-labelledby="accessibility-panel-title"
-          className={`fixed z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-slate-300 bg-white p-4 text-slate-900 shadow-xl dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 ${side === 'left' ? 'left-4' : 'right-4'}`}
+          className={`fixed z-[70] w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-slate-300 bg-white p-4 text-slate-900 shadow-xl dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 ${side === 'left' ? 'left-4' : 'right-4'}`}
           style={{ top: Math.min(top, Math.max(VIEWPORT_MARGIN, window.innerHeight - (panelHeight || 310) - VIEWPORT_MARGIN)) }}
         >
           <div className="flex items-start justify-between gap-3">

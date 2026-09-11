@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { PageDescription } from '@/components/ui/PageDescription'
+import { ModalDialog } from '@/components/ui/ModalDialog'
 
 type Student = {
   id: number
@@ -279,7 +280,7 @@ export function StudentsPage() {
       )}
 
       {showCreate && (
-        <Dialog title="Cadastrar aluno" onClose={() => { setCreateError(''); setShowCreate(false) }}>
+        <ModalDialog title="Cadastrar aluno" onClose={() => { setCreateError(''); setShowCreate(false) }}>
           <form onSubmit={submitCreate} className="grid gap-4">
             {createError && (
               <p role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-200">
@@ -339,11 +340,11 @@ export function StudentsPage() {
               </Button>
             </div>
           </form>
-        </Dialog>
+        </ModalDialog>
       )}
 
       {editing && (
-        <Dialog title={`Editar aluno — ${editing.username.replace(/\./g, ' ')}`} onClose={closeEdit}>
+        <ModalDialog title={`Editar aluno — ${editing.username.replace(/\./g, ' ')}`} onClose={closeEdit}>
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -396,37 +397,8 @@ export function StudentsPage() {
               </Button>
             </div>
           </form>
-        </Dialog>
+        </ModalDialog>
       )}
-    </div>
-  )
-}
-
-function Dialog({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="w-full max-w-md rounded-xl bg-white dark:bg-slate-800 shadow-xl">
-        <CardHeader>
-          <h2 className="text-lg font-semibold">{title}</h2>
-        </CardHeader>
-        <CardBody>{children}</CardBody>
-      </div>
     </div>
   )
 }

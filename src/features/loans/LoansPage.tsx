@@ -15,6 +15,7 @@ import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocompl
 import { CoverImage } from '@/components/ui/CoverImage'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
+import { ModalDialog } from '@/components/ui/ModalDialog'
 import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { useAuth } from '@/hooks/useAuth'
@@ -741,9 +742,7 @@ function OperationalLoansPage() {
       </form>}
     </CardBody></Card>}
 
-    {loanConfirmationOpen && copy && reader && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={closeLoanConfirmation}>
-      <section role="dialog" aria-modal="true" aria-labelledby="loan-final-confirmation-title" aria-describedby="loan-final-confirmation-description" className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800" onMouseDown={(event) => event.stopPropagation()}>
-        <h2 id="loan-final-confirmation-title" className="text-lg font-semibold">Confirmar empréstimo?</h2>
+    {loanConfirmationOpen && copy && reader && <ModalDialog title="Confirmar empréstimo?" onClose={closeLoanConfirmation} describedBy="loan-final-confirmation-description">
         <p id="loan-final-confirmation-description" className="mt-2 text-sm text-slate-600 dark:text-slate-300">Revise os dados antes de concluir o empréstimo.</p>
         <dl className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
           <div><dt className="font-medium">Livro</dt><dd>{copy.book.title}</dd></div>
@@ -755,8 +754,7 @@ function OperationalLoansPage() {
           <Button ref={cancelLoanConfirmationRef} type="button" variant="secondary" className="hover:!bg-slate-200 hover:!text-slate-900 dark:hover:!bg-slate-600 dark:hover:!text-white" onClick={closeLoanConfirmation} aria-label="Cancelar confirmação do empréstimo">Cancelar</Button>
           <Button ref={acceptLoanConfirmationRef} type="button" disabled={createMut.isPending} aria-busy={createMut.isPending} onClick={() => { setLoanConfirmationError(null); createMut.mutate() }} aria-label="Confirmar empréstimo">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
         </div>
-      </section>
-    </div>}
+    </ModalDialog>}
 
     {loans && <LoansList loans={loans} pageSize={pageSize} setPageSize={setPageSize} setPage={setPage} situation={situation} setSituation={(value) => { setSituation(value); setPage(1) }} navigate={navigate} onReturn={handleReturn} returnPending={returnMut.isPending} returningLoanId={returningLoanId} readOnly={isSuperAdmin} />}
   </div>
