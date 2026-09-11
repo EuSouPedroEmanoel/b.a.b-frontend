@@ -139,10 +139,13 @@ export function AccessibilityMenu() {
   useEffect(() => {
     if (!open) return undefined
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeMenu()
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      closeMenu()
     }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
+    document.addEventListener('keydown', handleEscape, true)
+    return () => document.removeEventListener('keydown', handleEscape, true)
   }, [open])
 
   useEffect(() => {
@@ -331,7 +334,7 @@ export function AccessibilityMenu() {
           ref={panelRef}
           id="accessibility-panel"
           aria-labelledby="accessibility-panel-title"
-          className={`fixed z-[70] w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-slate-300 bg-white p-4 text-slate-900 shadow-xl dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 ${side === 'left' ? 'left-4' : 'right-4'}`}
+          className={`fixed z-[70] w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-slate-500 bg-white p-4 text-slate-900 shadow-xl dark:border-slate-400 dark:bg-slate-800 dark:text-slate-100 ${side === 'left' ? 'left-4' : 'right-4'}`}
           style={{ top: Math.min(top, Math.max(VIEWPORT_MARGIN, window.innerHeight - (panelHeight || 310) - VIEWPORT_MARGIN)) }}
         >
           <div className="flex items-start justify-between gap-3">

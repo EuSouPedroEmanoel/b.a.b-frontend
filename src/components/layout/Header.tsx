@@ -219,6 +219,19 @@ export function Header() {
     })
   }, [location.pathname, location.search])
 
+  useEffect(() => {
+    if (!open || desktopNavVisible) return undefined
+    const handlePointerDownOutside = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (mobileNavRef.current?.contains(target) || mobileMenuButtonRef.current?.contains(target)) return
+      setOpen(false)
+      window.requestAnimationFrame(() => mobileMenuButtonRef.current?.focus())
+    }
+    document.addEventListener('pointerdown', handlePointerDownOutside)
+    return () => document.removeEventListener('pointerdown', handlePointerDownOutside)
+  }, [desktopNavVisible, open])
+
   useLayoutEffect(() => {
     const row = headerRowRef.current
     const measurement = desktopMeasurementRef.current
@@ -290,7 +303,6 @@ export function Header() {
           >
             <span className="hidden lg:block mx-1 h-6 w-px bg-white/20 dark:bg-slate-600" aria-hidden="true" />
             <button
-              ref={mobileMenuButtonRef}
               type="button"
               onClick={handleToggle}
               aria-label={resolved === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
@@ -343,6 +355,7 @@ export function Header() {
               {resolved === 'dark' ? <Sun className="h-5 w-5" aria-hidden="true" /> : <Moon className="h-5 w-5" aria-hidden="true" />}
             </button>
             <button
+              ref={mobileMenuButtonRef}
               type="button"
               aria-expanded={open}
               aria-controls="mobile-nav"
@@ -371,16 +384,16 @@ export function Header() {
         {open && !desktopNavVisible && (
           <MobileNavigationPanel ref={mobileNavRef}>
             <ActiveNavIndicator navRef={mobileNavRef} activeKey={location.pathname} mobile />
-            <ul className="flex flex-col gap-1 list-none m-0 p-0">
-              <li><Link to={homePath} aria-current={isActivePath(homePath) ? 'page' : undefined} className={navItemCls(homePath)}>Início</Link></li>
-              <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
-              {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
-              {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
-              {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
-              {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
-              {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
-              {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
-              {!isGuest && <li><Link to="/minha-conta" aria-current={isActivePath('/minha-conta') ? 'page' : undefined} className={navItemCls('/minha-conta')}>Ver perfil</Link></li>}
+            <ul className="flex flex-col gap-1 list-none m-0 p-0 [&>li>a:hover]:!bg-transparent [&>li>a:hover]:!text-inherit dark:[&>li>a:hover]:!bg-transparent dark:[&>li>a:hover]:!text-inherit">
+              <li><Link to={homePath} aria-current={isActivePath(homePath) ? 'page' : undefined} className={`${navItemCls(homePath)} w-full justify-start hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit`}>Início</Link></li>
+              <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={`${navItemCls('/acervo')} w-full justify-start hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit`}>Acervo</Link></li>
+              {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={`${navItemCls('/emprestimos')} w-full justify-start`}>Empréstimos</Link></li>}
+              {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={`${navItemCls('/reservas')} w-full justify-start`}>Reservas</Link></li>}
+              {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={`${navItemCls('/alunos')} w-full justify-start`}>Alunos</Link></li>)}
+              {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={`${navItemCls('/usuarios')} w-full justify-start`}>Usuários</Link></li>)}
+              {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={`${navItemCls('/gerenciar-escola')} w-full justify-start`}>Gerenciar escola</Link></li>)}
+              {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={`${navItemCls('/escolas')} w-full justify-start`}>Escolas</Link></li>)}
+              {!isGuest && <li><Link to="/minha-conta" aria-current={isActivePath('/minha-conta') ? 'page' : undefined} className={`${navItemCls('/minha-conta')} w-full justify-start`}>Ver perfil</Link></li>}
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">
               {isGuest ? (
