@@ -583,7 +583,7 @@ export function UsersPage() {
       )}
 
       {showCreate && (
-        <ModalDialog title="Criar usuário" onClose={() => { setCreateError(''); setShowCreate(false) }}>
+        <ModalDialog variant="form" title="Criar usuário" onClose={() => { setCreateError(''); setShowCreate(false) }}>
           <form onSubmit={submitCreate} className="grid gap-4">
             {createError && (
               <p role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-200">
@@ -637,7 +637,7 @@ export function UsersPage() {
       )}
 
       {editing && (
-        <ModalDialog title={`Editar usuário — ${editing.name || editing.username}`} onClose={closeEdit}>
+        <ModalDialog variant="form" title={`Editar usuário — ${editing.name || editing.username}`} onClose={closeEdit}>
           <form
             onSubmit={(e) => {
               e.preventDefault()
