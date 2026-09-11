@@ -681,7 +681,7 @@ function OperationalLoansPage() {
 
     {!isSuperAdmin && <Card><CardHeader>
       <h2 className="sr-only">Atendimento de empréstimos</h2>
-      <div role="group" aria-label="Operação do atendimento" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
+      <div role="group" aria-label="Operação do atendimento" className="inline-flex gap-[calc(var(--text-sm)*0.3)] rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800">
         <Button type="button" size="sm" variant={operation === 'borrow' ? 'primary' : 'secondary'} aria-pressed={operation === 'borrow'} onClick={() => setOperation('borrow')} aria-label="Operação emprestar" className={`gap-1.5 ${operation === 'borrow' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}>Emprestar</Button>
         <Button type="button" size="sm" variant={operation === 'return' ? 'primary' : 'secondary'} aria-pressed={operation === 'return'} onClick={() => setOperation('return')} aria-label="Operação devolver" className={`gap-1.5 ${operation === 'return' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}>Devolver</Button>
       </div>

@@ -347,9 +347,9 @@ export function AccessibilityMenu() {
                 <button
                   type="button"
                   aria-label="Diminuir fonte"
-                  onClick={() => updateScale(FONT_SIZE_LEVELS[previewIndex - 1])}
-                  disabled={previewIndex === 0}
-                  className="accessibility-decrease-label inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-300 font-semibold transition-colors hover:border-blue-600 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-500 dark:hover:border-blue-300 dark:hover:bg-slate-700 dark:hover:text-blue-200 dark:active:bg-slate-600 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+                  aria-disabled={previewIndex === 0}
+                  onClick={() => { if (previewIndex > 0) updateScale(FONT_SIZE_LEVELS[previewIndex - 1]) }}
+                  className="accessibility-decrease-label inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-300 font-semibold transition-colors hover:border-blue-600 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:border-slate-500 dark:hover:border-blue-300 dark:hover:bg-slate-700 dark:hover:text-blue-200 dark:active:bg-slate-600 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
                 >
                   A−
                 </button>
@@ -383,9 +383,9 @@ export function AccessibilityMenu() {
                 <button
                   type="button"
                   aria-label="Aumentar fonte"
-                  onClick={() => updateScale(FONT_SIZE_LEVELS[previewIndex + 1])}
-                  disabled={previewIndex === FONT_SIZE_LEVELS.length - 1}
-                  className="accessibility-increase-label inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-300 font-semibold transition-colors hover:border-blue-600 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-500 dark:hover:border-blue-300 dark:hover:bg-slate-700 dark:hover:text-blue-200 dark:active:bg-slate-600 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
+                  aria-disabled={previewIndex === FONT_SIZE_LEVELS.length - 1}
+                  onClick={() => { if (previewIndex < FONT_SIZE_LEVELS.length - 1) updateScale(FONT_SIZE_LEVELS[previewIndex + 1]) }}
+                  className="accessibility-increase-label inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-300 font-semibold transition-colors hover:border-blue-600 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:border-slate-500 dark:hover:border-blue-300 dark:hover:bg-slate-700 dark:hover:text-blue-200 dark:active:bg-slate-600 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
                 >
                   A+
                 </button>
