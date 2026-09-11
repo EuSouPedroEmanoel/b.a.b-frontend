@@ -8,7 +8,7 @@ export function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Bem-vindo{user ? `, ${user.name || user.username}` : ''}</h1>
+        <h1 className="min-w-0 text-3xl font-bold tracking-tight [overflow-wrap:anywhere]">Bem-vindo{user ? `, ${user.name || user.username}` : ''}</h1>
         <PageDescription className="max-w-3xl">
           Sistema de gestão da Base de Acesso Bibliotecário — catálogo, exemplares, empréstimos e reservas. Interface responsiva e acessível (WCAG 2.2 AA, HTML semântico, navegação por teclado).
         </PageDescription>

@@ -49,6 +49,12 @@ function initialLeft(side: Side) {
   return side === 'left' ? VIEWPORT_MARGIN : window.innerWidth - BUTTON_SIZE - VIEWPORT_MARGIN
 }
 
+function clampLeft(left: number, width = BUTTON_SIZE) {
+  const minimumLeft = VIEWPORT_MARGIN
+  const maximumLeft = Math.max(minimumLeft, window.innerWidth - width - VIEWPORT_MARGIN)
+  return Math.min(Math.max(left, minimumLeft), maximumLeft)
+}
+
 export function AccessibilityMenu() {
   const { user } = useAuth()
   const preferenceKey = user?.id ? `${STORAGE_KEY}:user:${user.id}` : `${STORAGE_KEY}:guest`
@@ -67,7 +73,9 @@ export function AccessibilityMenu() {
   const confirmScaleRef = useRef<HTMLButtonElement>(null)
   const scaleSliderRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLElement>(null)
+  const panelHeaderRef = useRef<HTMLDivElement>(null)
   const [panelHeight, setPanelHeight] = useState(0)
+  const [stackPanelHeader, setStackPanelHeader] = useState(false)
   const animationRef = useRef(0)
   const snapAnimationRef = useRef<Animation | null>(null)
   const loadedPreferenceKey = useRef(preferenceKey)
@@ -125,6 +133,36 @@ export function AccessibilityMenu() {
     return () => {
       observer?.disconnect()
       window.removeEventListener('resize', update)
+    }
+  }, [open, textScale])
+
+  useLayoutEffect(() => {
+    if (!open || !panelHeaderRef.current || !panelRef.current) return undefined
+    const updateHeaderLayout = () => {
+      const header = panelHeaderRef.current
+      const title = document.querySelector<HTMLElement>('#accessibility-panel-title')
+      const close = closeRef.current
+      if (!header || !title || !close) return
+      const previousWhiteSpace = title.style.whiteSpace
+      const previousWidth = title.style.width
+      const previousFlex = title.style.flex
+      title.style.whiteSpace = 'nowrap'
+      title.style.width = 'max-content'
+      title.style.flex = 'none'
+      const titleWidth = title.getBoundingClientRect().width
+      title.style.whiteSpace = previousWhiteSpace
+      title.style.width = previousWidth
+      title.style.flex = previousFlex
+      const requiredWidth = titleWidth + close.getBoundingClientRect().width + 8
+      setStackPanelHeader(requiredWidth > header.clientWidth)
+    }
+    updateHeaderLayout()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updateHeaderLayout)
+    observer?.observe(panelRef.current)
+    window.addEventListener('resize', updateHeaderLayout)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', updateHeaderLayout)
     }
   }, [open, textScale])
 
@@ -234,7 +272,7 @@ export function AccessibilityMenu() {
     drag.lastY = event.clientY
     drag.speed = Math.min(MAX_DRAG_SPEED, Math.hypot(event.clientX - previousX, event.clientY - previousY) / Math.max(now - previousTime, 1))
     drag.lastTime = now
-    const nextLeft = drag.startLeft + event.clientX - drag.startX
+    const nextLeft = clampLeft(drag.startLeft + event.clientX - drag.startX, buttonRef.current?.getBoundingClientRect().width ?? BUTTON_SIZE)
     const nextTop = clampTop(drag.startTop + event.clientY - drag.startY)
     const button = buttonRef.current
     if (button) {
@@ -346,19 +384,23 @@ export function AccessibilityMenu() {
           ref={panelRef}
           id="accessibility-panel"
           aria-labelledby="accessibility-panel-title"
-          className={`fixed z-[70] max-h-[calc(100dvh-1.5rem)] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-xl border border-slate-500 bg-white p-4 text-slate-900 shadow-xl dark:border-slate-400 dark:bg-slate-800 dark:text-slate-100 ${side === 'left' ? 'left-4' : 'right-4'}`}
-          style={{ top: Math.min(top, Math.max(VIEWPORT_MARGIN, window.innerHeight - (panelHeight || 310) - VIEWPORT_MARGIN)) }}
+          className="accessibility-panel fixed z-[70] min-w-0 max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-0.75rem)] overflow-y-auto overscroll-contain rounded-xl border border-slate-500 bg-white px-1 py-2 text-slate-900 shadow-xl sm:p-4 dark:border-slate-400 dark:bg-slate-800 dark:text-slate-100"
+          style={{
+            top: Math.min(top, Math.max(VIEWPORT_MARGIN, window.innerHeight - (panelHeight || 310) - VIEWPORT_MARGIN)),
+            [side]: 'clamp(0.25rem, 2vw, 1rem)',
+            width: 'min(32rem, calc(100vw - clamp(0.25rem, 2vw, 0.5rem)))',
+          }}
         >
-          <div className="flex items-start justify-between gap-3">
-            <h2 id="accessibility-panel-title" className="text-lg font-semibold">Acessibilidade</h2>
-            <button ref={closeRef} type="button" aria-label="Fechar menu de acessibilidade" onClick={closeMenu} className="rounded-md p-1 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]">
-              <X aria-hidden="true" className="h-5 w-5" />
+          <div ref={panelHeaderRef} className={`accessibility-panel-header flex ${stackPanelHeader ? 'flex-col gap-1' : 'flex-row items-start justify-between gap-2'}`}>
+            <h2 id="accessibility-panel-title" className={`accessibility-panel-title min-w-0 break-words text-lg font-semibold leading-tight [text-wrap:balance] ${stackPanelHeader ? 'w-full' : 'flex-1'}`}>Acessibilidade</h2>
+            <button ref={closeRef} type="button" aria-label="Fechar menu de acessibilidade" onClick={closeMenu} className={`accessibility-panel-close shrink-0 rounded-md p-1 text-base focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${stackPanelHeader ? 'order-first self-end' : 'self-start'}`}>
+              <X aria-hidden="true" className="h-[1.25em] w-[1.25em]" />
             </button>
           </div>
-          <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-600">
+          <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-600">
             <fieldset>
-              <legend className="font-medium">Tamanho do texto</legend>
-              <div className="mt-3 flex items-start gap-2 text-sm font-semibold">
+              <legend className="text-base font-medium">Tamanho do texto</legend>
+              <div className="mt-2 flex min-w-0 flex-wrap items-start justify-center gap-2 text-sm font-semibold">
                 <button
                   type="button"
                   aria-label="Diminuir fonte"
@@ -368,7 +410,7 @@ export function AccessibilityMenu() {
                 >
                   A−
                 </button>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[8rem] flex-[1_1_8rem]">
                   <div className="relative flex min-h-12 items-center px-1">
                     <div aria-hidden="true" className="pointer-events-none absolute left-3 right-3 top-1/2 flex -translate-y-1/2 justify-between">
                       {FONT_SIZE_LEVELS.map((level) => <span key={level} className={`h-3 w-3 rounded-full border-2 ${previewScale === level ? 'border-blue-700 bg-blue-700 dark:border-blue-300 dark:bg-blue-300' : 'border-slate-400 bg-white dark:border-slate-400 dark:bg-slate-800'}`} />)}
@@ -405,12 +447,12 @@ export function AccessibilityMenu() {
                   A+
                 </button>
               </div>
-              <button ref={confirmScaleRef} type="button" onClick={applyPreviewScale} disabled={previewScale === textScale} className="mt-3 w-full rounded-xl border border-blue-700 bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-blue-700 dark:text-white dark:hover:bg-blue-800">
+              <button ref={confirmScaleRef} type="button" onClick={applyPreviewScale} disabled={previewScale === textScale} className="mt-2 w-full rounded-xl border border-blue-700 bg-blue-700 px-2 py-1 text-sm font-semibold leading-tight text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-blue-700 dark:text-white dark:hover:bg-blue-800">
                 Confirmar tamanho
               </button>
             </fieldset>
           </div>
-          <button type="button" onClick={moveSide} className="mt-4 w-full rounded-md border px-3 py-2 text-left text-sm font-medium">
+          <button type="button" onClick={moveSide} className="mt-3 w-full rounded-md border px-3 py-1 text-left text-sm font-medium leading-tight">
             Mover botão para a {side === 'left' ? 'direita' : 'esquerda'}
           </button>
         </section>
