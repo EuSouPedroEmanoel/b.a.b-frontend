@@ -11,6 +11,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { ModalDialog } from '@/components/ui/ModalDialog'
+import { UndoSnackbar } from '@/components/feedback/UndoSnackbar'
 
 type Reservation = { id: number; book_id: number; user_id: number; school_id: number; status: string; created_at: string; book_title?: string; book_cover_url?: string | null; reserver_username?: string; queue_position?: number; queue_total?: number; copy_id?: number | null; internal_code?: string | null; ready_at?: string | null }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
@@ -36,7 +37,9 @@ export function ReservationsPage() {
   const [page, setPage] = useState(1)
   const [canceling, setCanceling] = useState<Reservation | null>(null)
   const [cancelTrigger, setCancelTrigger] = useState<HTMLButtonElement | null>(null)
+  const [cancelUndo, setCancelUndo] = useState<Reservation | null>(null)
   const confirmCancelRef = useRef<HTMLButtonElement>(null)
+  const cancelUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const announce = useAnnouncer()
   const qc = useQueryClient()
   const navigate = useNavigate()
@@ -48,10 +51,26 @@ export function ReservationsPage() {
     setCanceling(null)
     requestAnimationFrame(() => cancelTrigger?.focus())
   }, [cancelTrigger])
+  const clearCancelUndo = useCallback(() => {
+    if (cancelUndoTimer.current) clearTimeout(cancelUndoTimer.current)
+    cancelUndoTimer.current = null
+    setCancelUndo(null)
+  }, [])
+  const showCancelUndo = useCallback((reservation: Reservation) => {
+    if (cancelUndoTimer.current) clearTimeout(cancelUndoTimer.current)
+    setCancelUndo(reservation)
+    cancelUndoTimer.current = setTimeout(() => {
+      cancelUndoTimer.current = null
+      setCancelUndo(null)
+    }, 5 * 60 * 1000)
+  }, [])
   const myReservationsQuery = useQuery({ queryKey: ['reservations', 'me', page], queryFn: async () => (await api.get<Paginated<Reservation>>(`/reservations/me?page=${page}&size=10`)).data, enabled: !canManage && !!user })
   const readyQuery = useQuery({ queryKey: ['reservations', 'ready'], queryFn: async () => (await api.get<Paginated<Reservation>>('/reservations/?status=ready')).data, enabled: canViewOperationalQueue })
   const activeQuery = useQuery({ queryKey: ['reservations', 'active'], queryFn: async () => (await api.get<Paginated<Reservation>>('/reservations/?status=active')).data, enabled: canViewOperationalQueue })
-  const cancelMut = useMutation({ mutationFn: async (id: number) => api.delete(`/reservations/${id}`), onSuccess: () => { const reservation = canceling; setCanceling(null); announce(`Reserva${reservation?.book_title ? ` de ${reservation.book_title}` : ''} cancelada`, 'polite'); void qc.invalidateQueries({ queryKey: ['reservations'] }); requestAnimationFrame(() => cancelTrigger?.focus()) }, onError: (error: unknown) => announce(`Não foi possível cancelar a reserva. ${getErrorMessage(error, 'Tente novamente.')}`, 'assertive') })
+  const cancelMut = useMutation({ mutationFn: async (id: number) => api.delete(`/reservations/${id}`), onSuccess: () => { const reservation = canceling; setCanceling(null); if (reservation) showCancelUndo(reservation); announce(`Reserva${reservation?.book_title ? ` de ${reservation.book_title}` : ''} cancelada`, 'polite'); void qc.invalidateQueries({ queryKey: ['reservations'] }); requestAnimationFrame(() => cancelTrigger?.focus()) }, onError: (error: unknown) => announce(`Não foi possível cancelar a reserva. ${getErrorMessage(error, 'Tente novamente.')}`, 'assertive') })
+  const restoreMut = useMutation({ mutationFn: async (id: number) => api.post(`/reservations/${id}/restore`), onSuccess: () => { clearCancelUndo(); announce('Reserva restaurada.', 'polite'); void qc.invalidateQueries({ queryKey: ['reservations'] }) }, onError: (error: unknown) => announce(`Não foi possível desfazer o cancelamento. ${getErrorMessage(error, 'Tente novamente.')}`, 'assertive') })
+
+  useEffect(() => () => clearCancelUndo(), [clearCancelUndo])
 
   useEffect(() => {
     if (!canceling) return
@@ -66,10 +85,10 @@ export function ReservationsPage() {
   if (canViewOperationalQueue) {
     const ready = readyQuery.data?.items ?? []
     const active = activeQuery.data?.items ?? []
-    return <div className="flex flex-col gap-6"><header><h1 className="text-2xl font-bold sm:text-3xl">Reservas</h1><PageDescription>Fila operacional de reservas da biblioteca.</PageDescription></header>{isSuperAdmin && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">Você está consultando as reservas em modo somente leitura. Apenas bibliotecários e administradores escolares podem iniciar empréstimos ou cancelar reservas.</p>}{(readyQuery.isError || activeQuery.isError) && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">Não foi possível carregar as reservas. Atualize a página para tentar novamente.</div>}{(readyQuery.isLoading || activeQuery.isLoading) && <p role="status" className="text-sm text-slate-500">Carregando reservas…</p>}<ReservationSection title="Prontas para retirada" description="Reservas com um exemplar disponível para atendimento." empty="Não há reservas prontas para retirada." reservations={ready} kind="ready" onStart={canManage ? (reservation) => navigate(`/emprestimos?reservation_id=${reservation.id}`) : undefined} onDetails={(reservation) => navigate(`/acervo/${reservation.book_id}`)} onCancel={canManage ? (reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) } : undefined} readOnly={isSuperAdmin} /><ReservationSection title="Aguardando exemplar" description="Reservas em fila, aguardando a disponibilidade de um exemplar." empty="Não há reservas aguardando exemplar." reservations={active} kind="active" onDetails={(reservation) => navigate(`/acervo/${reservation.book_id}`)} onCancel={canManage ? (reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) } : undefined} readOnly={isSuperAdmin} />{canceling && <CancelDialog reservation={canceling} pending={cancelMut.isPending} confirmRef={confirmCancelRef} onClose={closeCancelDialog} onConfirm={() => cancelMut.mutate(canceling.id)} />}</div>
+    return <div className="flex flex-col gap-6"><header><h1 className="text-2xl font-bold sm:text-3xl">Reservas</h1><PageDescription>Fila operacional de reservas da biblioteca.</PageDescription></header>{isSuperAdmin && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">Você está consultando as reservas em modo somente leitura. Apenas bibliotecários e administradores escolares podem iniciar empréstimos ou cancelar reservas.</p>}{(readyQuery.isError || activeQuery.isError) && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">Não foi possível carregar as reservas. Atualize a página para tentar novamente.</div>}{(readyQuery.isLoading || activeQuery.isLoading) && <p role="status" className="text-sm text-slate-500">Carregando reservas…</p>}<ReservationSection title="Prontas para retirada" description="Reservas com um exemplar disponível para atendimento." empty="Não há reservas prontas para retirada." reservations={ready} kind="ready" onStart={canManage ? (reservation) => navigate(`/emprestimos?reservation_id=${reservation.id}`) : undefined} onDetails={(reservation) => navigate(`/acervo/${reservation.book_id}`)} onCancel={canManage ? (reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) } : undefined} readOnly={isSuperAdmin} /><ReservationSection title="Aguardando exemplar" description="Reservas em fila, aguardando a disponibilidade de um exemplar." empty="Não há reservas aguardando exemplar." reservations={active} kind="active" onDetails={(reservation) => navigate(`/acervo/${reservation.book_id}`)} onCancel={canManage ? (reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) } : undefined} readOnly={isSuperAdmin} />{canceling && <CancelDialog reservation={canceling} pending={cancelMut.isPending} confirmRef={confirmCancelRef} onClose={closeCancelDialog} onConfirm={() => cancelMut.mutate(canceling.id)} />}{cancelUndo && <UndoSnackbar message={`Reserva${cancelUndo.book_title ? ` de ${cancelUndo.book_title}` : ''} cancelada.`} onUndo={() => restoreMut.mutate(cancelUndo.id)} onClose={clearCancelUndo} />}</div>
   }
   const data = myReservationsQuery.data
-  return <><PersonalReservationsView query={myReservationsQuery} data={data} onPageChange={setPage} onCancel={(reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) }} />{canceling && <CancelDialog personal reservation={canceling} pending={cancelMut.isPending} confirmRef={confirmCancelRef} onClose={closeCancelDialog} onConfirm={() => cancelMut.mutate(canceling.id)} />}</>
+  return <><PersonalReservationsView query={myReservationsQuery} data={data} onPageChange={setPage} onCancel={(reservation, trigger) => { setCancelTrigger(trigger); setCanceling(reservation) }} />{canceling && <CancelDialog personal reservation={canceling} pending={cancelMut.isPending} confirmRef={confirmCancelRef} onClose={closeCancelDialog} onConfirm={() => cancelMut.mutate(canceling.id)} />}{cancelUndo && <UndoSnackbar message={`Reserva${cancelUndo.book_title ? ` de ${cancelUndo.book_title}` : ''} cancelada.`} onUndo={() => restoreMut.mutate(cancelUndo.id)} onClose={clearCancelUndo} />}</>
 }
 
 function PersonalReservationsView({ query, data, onPageChange, onCancel }: { query: { isLoading: boolean; isError: boolean }; data?: Paginated<Reservation>; onPageChange: (page: number) => void; onCancel: (reservation: Reservation, trigger: HTMLButtonElement) => void }) {
@@ -92,5 +111,10 @@ function ReservationSection({ title, description, empty, reservations, kind, onS
 function CancelDialog({ reservation, pending, confirmRef, onClose, onConfirm, personal = false }: { reservation: Reservation; pending: boolean; confirmRef: RefObject<HTMLButtonElement | null>; onClose: () => void; onConfirm: () => void; personal?: boolean }) {
   const title = reservation.book_title ?? `livro ${reservation.book_id}`
   const reader = reservation.reserver_username ?? 'este leitor'
-  return <ModalDialog variant="compact" title="Cancelar reserva?" onClose={() => { if (!pending) onClose() }} describedBy="cancel-reservation-description"><p id="cancel-reservation-description" className="text-sm text-slate-600 dark:text-slate-300">{personal ? `Cancelar sua reserva para ${title}?` : `Cancelar a reserva de ${reader} para ${title}?`}</p><div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end"><Button type="button" variant="secondary" className="shrink-0" onClick={onClose} disabled={pending}>Manter reserva</Button><Button ref={confirmRef} type="button" variant="danger" className="shrink-0" onClick={onConfirm} disabled={pending} aria-busy={pending}>{pending ? 'Cancelando…' : 'Cancelar reserva'}</Button></div></ModalDialog>
+  const impact = reservation.status === 'ready'
+    ? 'O exemplar reservado será liberado para o próximo leitor da fila.'
+    : personal
+      ? 'Ao cancelar, você sairá da fila de espera desta obra e perderá seu lugar atual.'
+      : 'Ao remover esta reserva, o aluno sairá da fila de espera desta obra e perderá seu lugar atual.'
+  return <ModalDialog variant="compact" title="Cancelar reserva?" onClose={() => { if (!pending) onClose() }} describedBy="cancel-reservation-description"><div id="cancel-reservation-description" className="space-y-2 text-sm text-slate-600 dark:text-slate-300"><p>{personal ? `Cancelar sua reserva para ${title}?` : `Cancelar a reserva de ${reader} para ${title}?`}</p><p>{personal ? impact : reservation.status === 'ready' ? `A reserva de ${reader} está pronta para retirada. ${impact}` : impact}</p></div><div className="mt-6 flex flex-wrap gap-3"><Button type="button" variant="blue-secondary" className="min-w-max flex-1" onClick={onClose} disabled={pending}>Manter reserva</Button><Button ref={confirmRef} type="button" variant="danger-secondary" className="min-w-max flex-1" onClick={onConfirm} disabled={pending} aria-busy={pending}>{pending ? 'Cancelando…' : 'Cancelar reserva'}</Button></div></ModalDialog>
 }

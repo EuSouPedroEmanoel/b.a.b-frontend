@@ -99,11 +99,11 @@ export function ReservationConfirmDialog({
                 {errorMessage}
               </p>
             )}
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-              <Button type="button" variant="secondary" className="shrink-0" onClick={onClose} disabled={pending} ref={cancelRef}>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button type="button" variant="secondary" className="min-w-max flex-1" onClick={onClose} disabled={pending} ref={cancelRef}>
                 Cancelar
               </Button>
-              <Button type="button" variant="primary" className="shrink-0" onClick={onConfirm} disabled={pending} aria-busy={pending} ref={confirmRef}>
+              <Button type="button" variant="primary" className="min-w-max flex-1" onClick={onConfirm} disabled={pending} aria-busy={pending} ref={confirmRef}>
                 {pending ? 'Confirmando…' : 'Confirmar reserva'}
               </Button>
             </div>

@@ -750,9 +750,9 @@ function OperationalLoansPage() {
           <div><dt className="font-medium">Leitor</dt><dd>{reader.username}</dd></div>
         </dl>
         {loanConfirmationError && <p aria-hidden="true" className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm font-medium text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">{loanConfirmationError}</p>}
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-          <Button ref={cancelLoanConfirmationRef} type="button" variant="secondary" className="shrink-0 hover:!bg-slate-200 hover:!text-slate-900 dark:hover:!bg-slate-600 dark:hover:!text-white" onClick={closeLoanConfirmation} aria-label="Cancelar confirmação do empréstimo">Cancelar</Button>
-          <Button ref={acceptLoanConfirmationRef} type="button" className="shrink-0" disabled={createMut.isPending} aria-busy={createMut.isPending} onClick={() => { setLoanConfirmationError(null); createMut.mutate() }} aria-label="Confirmar empréstimo">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button ref={cancelLoanConfirmationRef} type="button" variant="secondary" className="min-w-max flex-1 hover:!bg-slate-200 hover:!text-slate-900 dark:hover:!bg-slate-600 dark:hover:!text-white" onClick={closeLoanConfirmation} aria-label="Cancelar confirmação do empréstimo">Cancelar</Button>
+          <Button ref={acceptLoanConfirmationRef} type="button" className="min-w-max flex-1" disabled={createMut.isPending} aria-busy={createMut.isPending} onClick={() => { setLoanConfirmationError(null); createMut.mutate() }} aria-label="Confirmar empréstimo">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
         </div>
     </ModalDialog>}
 
