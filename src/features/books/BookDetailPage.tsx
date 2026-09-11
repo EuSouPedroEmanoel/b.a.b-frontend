@@ -680,21 +680,21 @@ export function BookDetailPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Autores</dt>
-                  <dd className="col-span-2 flex flex-wrap items-center gap-1.5">
+                  <dd className="col-span-2 min-w-0 flex flex-wrap items-center gap-1.5">
                     {book.authors?.length ? book.authors.map((a) => {
                       const bg = isDark ? stringToHsl(a.name, 65, 28) : stringToHsl(a.name, 65, 82)
                       const color = isDark ? '#fff' : stringToHsl(a.name, 65, 22)
                       const border = isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(a.name, 65, 70)
-                      return <span key={a.id} aria-describedby={`book-author-tooltip-${a.id}`} style={{ background: bg, color, borderColor: border }} className="group relative inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?author_id=${a.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?author_id=${a.id}`) } }}>{a.name}<Tooltip id={`book-author-tooltip-${a.id}`} variant="category">{a.name}</Tooltip></span>
+                      return <span key={a.id} aria-describedby={`book-author-tooltip-${a.id}`} style={{ background: bg, color, borderColor: border }} className="group relative inline-flex min-h-6 max-w-full min-w-0 items-center justify-center rounded-full border px-3 py-1 text-xs font-medium leading-snug [overflow-wrap:anywhere] transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?author_id=${a.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?author_id=${a.id}`) } }}>{a.name}<Tooltip id={`book-author-tooltip-${a.id}`} variant="category">{a.name}</Tooltip></span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <dt className={isDark ? 'text-white/60' : 'text-slate-500'}>Gêneros</dt>
-                  <dd className="col-span-2 flex flex-wrap items-center gap-1.5">
+                  <dd className="col-span-2 min-w-0 flex flex-wrap items-center gap-1.5">
                     {book.genres?.length ? book.genres.map((g) => {
                       const bg = isDark ? stringToHsl(g.name, 75, 32) : stringToHsl(g.name, 75, 45)
-                      return <span key={g.id} aria-describedby={`book-genre-tooltip-${g.id}`} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="group relative inline-flex items-center justify-center h-6 px-3 rounded-full text-xs font-medium leading-none whitespace-nowrap border shrink-0 transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?genre_id=${g.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?genre_id=${g.id}`) } }}>{g.name}<Tooltip id={`book-genre-tooltip-${g.id}`} variant="category">{g.name}</Tooltip></span>
+                      return <span key={g.id} aria-describedby={`book-genre-tooltip-${g.id}`} style={{ background: bg, color: '#fff', borderColor: isDark ? 'rgba(255,255,255,0.15)' : stringToHsl(g.name, 75, 30) }} className="group relative inline-flex min-h-6 max-w-full min-w-0 items-center justify-center rounded-full border px-3 py-1 text-xs font-medium leading-snug [overflow-wrap:anywhere] transition-colors duration-200 hover:brightness-110 hover:shadow-sm cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?genre_id=${g.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?genre_id=${g.id}`) } }}>{g.name}<Tooltip id={`book-genre-tooltip-${g.id}`} variant="category">{g.name}</Tooltip></span>
                     }) : <span className={isDark ? 'text-white/50' : 'text-slate-400'}>—</span>}
                   </dd>
                 </div>

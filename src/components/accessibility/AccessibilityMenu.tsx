@@ -399,7 +399,7 @@ export function AccessibilityMenu() {
           </div>
           <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-600">
             <fieldset>
-              <legend className="text-base font-medium">Tamanho do texto</legend>
+              <legend className="text-xs font-medium">Tamanho do texto</legend>
               <div className="mt-2 flex min-w-0 flex-wrap items-start justify-center gap-2 text-sm font-semibold">
                 <button
                   type="button"
