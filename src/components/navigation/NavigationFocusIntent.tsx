@@ -26,11 +26,16 @@ export function NavigationFocusIntentProvider({ children }: { children: ReactNod
 
   const consumeOperationalFocus = useCallback((destination: string) => {
     const pending = pendingRef.current
-    pendingRef.current = null
-    return !!pending
-      && pending.expiresAt >= Date.now()
-      && pending.destination === pathnameOf(destination)
+    if (!pending) return false
+    if (pending.expiresAt < Date.now()) {
+      pendingRef.current = null
+      return false
+    }
+    const matches = pending.destination === pathnameOf(destination)
       && pending.destination === location.pathname
+    if (!matches) return false
+    pendingRef.current = null
+    return true
   }, [location.pathname])
 
   useEffect(() => {

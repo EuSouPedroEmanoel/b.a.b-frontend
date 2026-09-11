@@ -16,6 +16,7 @@ import { CoverImage } from '@/components/ui/CoverImage'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ModalDialog } from '@/components/ui/ModalDialog'
+import { UndoSnackbar } from '@/components/feedback/UndoSnackbar'
 import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { useAuth } from '@/hooks/useAuth'
@@ -210,6 +211,8 @@ function OperationalLoansPage() {
   const [loanConfirmationOpen, setLoanConfirmationOpen] = useState(false)
   const [loanConfirmationError, setLoanConfirmationError] = useState<string | null>(null)
   const [loanSuccessMessage, setLoanSuccessMessage] = useState<string | null>(null)
+  const [returnConfirmation, setReturnConfirmation] = useState<{ request: ReturnRequest; loan: Loan } | null>(null)
+  const [returnUndo, setReturnUndo] = useState<Loan | null>(null)
   const focusCpfAfterLookup = useRef(false)
   const focusCodeAfterLookup = useRef(false)
   const focusConfirmAfterLookup = useRef(false)
@@ -219,6 +222,9 @@ function OperationalLoansPage() {
   const cancelLoanConfirmationRef = useRef<HTMLButtonElement>(null)
   const acceptLoanConfirmationRef = useRef<HTMLButtonElement>(null)
   const returnLookupRef = useRef<HTMLInputElement>(null)
+  const returnCancelRef = useRef<HTMLButtonElement>(null)
+  const returnConfirmRef = useRef<HTMLButtonElement>(null)
+  const returnUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const focusReturnAfterId = useRef<number | null>(null)
   const announcedCopyKey = useRef<string | null>(null)
   const announcedUserKey = useRef<string | null>(null)
@@ -275,18 +281,19 @@ function OperationalLoansPage() {
 
   useEffect(() => {
     if (!initialFocusDecisionRef.current) {
-      initialFocusDecisionRef.current = true
       if (!consumeOperationalFocus('/emprestimos')) return
+      initialFocusDecisionRef.current = true
     } else if (previousOperationRef.current === operation) {
       return
     }
     previousOperationRef.current = operation
 
-    const timer = window.setTimeout(() => {
+    const focusInput = () => {
       const input = operation === 'borrow' ? codeRef.current : returnLookupRef.current
       input?.focus()
-    }, 0)
-    return () => window.clearTimeout(timer)
+    }
+    const timers = [0, 100, 300].map((delay) => window.setTimeout(focusInput, delay))
+    return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [consumeOperationalFocus, operation])
 
   useEffect(() => { localStorage.setItem('emprestimos:pageSize', String(pageSize)) }, [pageSize])
@@ -587,6 +594,10 @@ function OperationalLoansPage() {
   const returnMut = useMutation({
     mutationFn: async ({ id }: ReturnRequest) => (await api.post<Loan>(`/loans/${id}/return`)).data,
     onSuccess: (loan, request) => {
+      setReturnConfirmation(null)
+      setReturnUndo(loan)
+      if (returnUndoTimer.current) clearTimeout(returnUndoTimer.current)
+      returnUndoTimer.current = setTimeout(() => setReturnUndo(null), 5 * 60 * 1000)
       announce(`Devolução concluída. Atraso: ${loan.late_days} dia(s).`, 'polite')
       qc.setQueriesData<Paginated<Loan>>({ queryKey: ['loans'] }, (current) => {
         if (!current) return current
@@ -613,6 +624,36 @@ function OperationalLoansPage() {
       announce(getErrorMessage(error, 'Erro ao concluir a devolução.'), 'assertive')
     },
   })
+
+  const undoReturnMut = useMutation({
+    mutationFn: async (id: number) => (await api.post<Loan>(`/loans/${id}/undo-return`)).data,
+    onSuccess: (loan) => {
+      if (returnUndoTimer.current) clearTimeout(returnUndoTimer.current)
+      returnUndoTimer.current = null
+      setReturnUndo(null)
+      qc.setQueriesData<Paginated<Loan>>({ queryKey: ['loans'] }, (current) => current ? { ...current, items: current.items.map((item) => item.id === loan.id ? loan : item) } : current)
+      void qc.invalidateQueries({ queryKey: ['loans'] }); void qc.invalidateQueries({ queryKey: ['copies'] }); void qc.invalidateQueries({ queryKey: ['books'] })
+      announce('Devolução desfeita. O empréstimo voltou a ficar ativo.', 'polite')
+    },
+    onError: (error: unknown) => announce(getErrorMessage(error, 'Não foi possível desfazer a devolução.'), 'assertive'),
+  })
+
+  useEffect(() => () => { if (returnUndoTimer.current) clearTimeout(returnUndoTimer.current) }, [])
+
+  useEffect(() => {
+    if (!returnConfirmation) return
+    returnConfirmRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setReturnConfirmation(null); return }
+      if (event.key !== 'Tab') return
+      const first = returnCancelRef.current
+      const last = returnConfirmRef.current
+      if (first && last && event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (first && last && !event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [returnConfirmation])
 
   const returningLoanId = returnMut.isPending ? returnMut.variables?.id : undefined
 
@@ -673,11 +714,17 @@ function OperationalLoansPage() {
     announce(`Leitor identificado: ${returnUserResult.user.username}. ${result}`, 'polite')
   }, [announce, operation, returnCopyResult, returnQuery.isFetching, returnUserResult])
 
-  const handleReturn = (request: ReturnRequest) => returnMut.mutate(request)
+  const handleReturn = (request: ReturnRequest) => {
+    const loan = loans?.items.find((item) => item.id === request.id)
+      ?? (returnCopyResult?.loan.id === request.id ? returnCopyResult.loan : undefined)
+      ?? (returnUserQuery.data?.kind === 'user' ? returnUserQuery.data.loans.find((item) => item.id === request.id) : undefined)
+    if (loan) setReturnConfirmation({ request, loan })
+  }
 
   return <div className="flex flex-col gap-6">
     <header><h1 className="text-2xl sm:text-3xl font-bold">Empréstimos</h1><PageDescription>Empreste e devolva livros com atendimento rápido no balcão.</PageDescription></header>
     {loanSuccessMessage && <div aria-hidden="true" className="fixed right-4 top-4 z-50 max-w-md rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-950 shadow-lg dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">{loanSuccessMessage}</div>}
+    {returnUndo && <UndoSnackbar message={`Devolução de ${returnUndo.book_title} concluída.`} onUndo={() => undoReturnMut.mutate(returnUndo.id)} onClose={() => { if (returnUndoTimer.current) clearTimeout(returnUndoTimer.current); returnUndoTimer.current = null; setReturnUndo(null) }} />}
     {isSuperAdmin && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">Você está consultando os empréstimos em modo somente leitura. Apenas bibliotecários e administradores escolares podem emprestar ou devolver livros.</p>}
 
     {!isSuperAdmin && <Card><CardHeader>
@@ -754,6 +801,11 @@ function OperationalLoansPage() {
           <Button ref={cancelLoanConfirmationRef} type="button" variant="secondary" className="min-w-max flex-1 hover:!bg-slate-200 hover:!text-slate-900 dark:hover:!bg-slate-600 dark:hover:!text-white" onClick={closeLoanConfirmation} aria-label="Cancelar confirmação do empréstimo">Cancelar</Button>
           <Button ref={acceptLoanConfirmationRef} type="button" className="min-w-max flex-1" disabled={createMut.isPending} aria-busy={createMut.isPending} onClick={() => { setLoanConfirmationError(null); createMut.mutate() }} aria-label="Confirmar empréstimo">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
         </div>
+    </ModalDialog>}
+
+    {returnConfirmation && <ModalDialog variant="compact" title="Confirmar devolução?" onClose={() => setReturnConfirmation(null)} describedBy="return-confirmation-description">
+      <div id="return-confirmation-description" className="space-y-2 text-sm text-slate-600 dark:text-slate-300"><p>Confirmar a devolução de <strong>{returnConfirmation.loan.book_title}</strong>, exemplar <span className="font-mono">{returnConfirmation.loan.internal_code}</span>?</p><p>O empréstimo será encerrado e o exemplar ficará disponível para o próximo atendimento. Se houver uma reserva na fila, ela poderá ser promovida para retirada.</p></div>
+      <div className="mt-6 flex flex-wrap gap-3"><Button ref={returnCancelRef} type="button" variant="blue-secondary" className="min-w-max flex-1" onClick={() => setReturnConfirmation(null)}>Manter empréstimo</Button><Button ref={returnConfirmRef} type="button" variant="blue-secondary" className="min-w-max flex-1" onClick={() => returnMut.mutate(returnConfirmation.request)} disabled={returnMut.isPending} aria-busy={returnMut.isPending}>{returnMut.isPending ? 'Devolvendo…' : 'Confirmar devolução'}</Button></div>
     </ModalDialog>}
 
     {loans && <LoansList loans={loans} pageSize={pageSize} setPageSize={setPageSize} setPage={setPage} situation={situation} setSituation={(value) => { setSituation(value); setPage(1) }} navigate={navigate} onReturn={handleReturn} returnPending={returnMut.isPending} returningLoanId={returningLoanId} readOnly={isSuperAdmin} />}

@@ -379,7 +379,9 @@ export function BooksPage() {
 
   useEffect(() => {
     if (hasSearchQuery || !consumeOperationalFocus('/acervo')) return
-    window.requestAnimationFrame(() => searchInputRef.current?.focus())
+    const focusSearch = () => searchInputRef.current?.focus()
+    const timers = [0, 100, 300].map((delay) => window.setTimeout(focusSearch, delay))
+    return () => timers.forEach((timer) => window.clearTimeout(timer))
   }, [consumeOperationalFocus, hasSearchQuery])
 
   useEffect(() => {

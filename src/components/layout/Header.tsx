@@ -190,12 +190,37 @@ export function Header() {
     registerMouseNavigation(destination)
   }
 
+  const handleHeaderMouseDown = (event: React.MouseEvent<HTMLElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    const destination = getNavigationDestination(event.target)
+    if (!destination) return
+    pointerNavigationRef.current = destination
+    registerMouseNavigation(destination)
+  }
+
+  const focusMouseNavigationDestination = (destination: string) => {
+    const inputId = destination === '/emprestimos'
+      ? 'loan-internal-code'
+      : destination === '/acervo'
+        ? 'book-search'
+        : null
+    if (!inputId) return
+    ;[0, 100, 300].forEach((delay) => {
+      window.setTimeout(() => {
+        if (window.location.pathname === destination) {
+          document.getElementById(inputId)?.focus()
+        }
+      }, delay)
+    })
+  }
+
   const handleHeaderNavigationClick = (event: React.MouseEvent<HTMLElement>) => {
     const destination = getNavigationDestination(event.target)
     if (!destination) return
     if (pointerNavigationRef.current === destination) {
       pointerNavigationRef.current = null
       if (!desktopNavVisible) setOpen(false)
+      focusMouseNavigationDestination(destination)
       return
     }
     pendingNavigationFocusRef.current = {
@@ -256,7 +281,7 @@ export function Header() {
   }, [isAuthenticated, isGuest, isLibrarian, isUsersManager, profileLabel, user?.role, user?.school_code, user?.school_name])
 
   return (
-    <header data-app-navbar onPointerDown={handleHeaderPointerDown} onClick={handleHeaderNavigationClick} className="relative sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-lg pt-[env(safe-area-inset-top)]">
+    <header data-app-navbar onPointerDown={handleHeaderPointerDown} onMouseDown={handleHeaderMouseDown} onClick={handleHeaderNavigationClick} className="relative sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-lg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div ref={headerRowRef} className="flex h-16 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-6">
