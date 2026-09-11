@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Funnel } from 'lucide-react'
 import api from '@/lib/api'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
+import { useNavigationFocusIntent } from '@/components/navigation/useNavigationFocusIntent'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -238,6 +239,7 @@ function OperationalLoansPage() {
   const preselectedBookId = pickupReservation?.book_id
     ?? (Number.isSafeInteger(bookIdParam) && bookIdParam > 0 ? bookIdParam : undefined)
   const announce = useAnnouncer()
+  const { consumeOperationalFocus } = useNavigationFocusIntent()
   const qc = useQueryClient()
   const { user: currentUser } = useAuth()
   const isSuperAdmin = currentUser?.role === 'super_admin'
@@ -267,13 +269,24 @@ function OperationalLoansPage() {
     data: school,
   }))
 
+  const initialFocusDecisionRef = useRef(false)
+  const previousOperationRef = useRef(operation)
+
   useEffect(() => {
+    if (!initialFocusDecisionRef.current) {
+      initialFocusDecisionRef.current = true
+      if (!consumeOperationalFocus('/emprestimos')) return
+    } else if (previousOperationRef.current === operation) {
+      return
+    }
+    previousOperationRef.current = operation
+
     const timer = window.setTimeout(() => {
       const input = operation === 'borrow' ? codeRef.current : returnLookupRef.current
       input?.focus()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [canManageLoans, operation])
+  }, [consumeOperationalFocus, operation])
 
   useEffect(() => { localStorage.setItem('emprestimos:pageSize', String(pageSize)) }, [pageSize])
 
@@ -675,7 +688,7 @@ function OperationalLoansPage() {
     </CardHeader><CardBody>
       {operation === 'borrow' ? <form onSubmit={(event) => { event.preventDefault(); if (!copy) { identifyCopy(false); return }; if (!reader) { identifyUser(); return }; if (canCreate) setLoanConfirmationOpen(true) }} className="flex flex-col gap-4">
       <div className="flex flex-col sm:flex-row gap-3 items-start">
-          <div className="flex-1 w-full"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setCopyInputError(undefined); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para avançar ao CPF.'} aria-describedby="copy-identification" required autoComplete="off" autoFocus /></div>
+          <div className="flex-1 w-full"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para avançar ao CPF.'} aria-describedby="copy-identification" required autoComplete="off" /></div>
           <div className="flex-1 w-full">{pickupReservation ? <Input id="loan-reserved-reader" label="Leitor da reserva" value={pickupReservation.reserver_username} readOnly tabIndex={-1} hint={`${roleLabel(pickupReservation.reserver_role)}. Leitor já identificado pela reserva; o CPF não precisa ser informado novamente.`} /> : <Input ref={cpfRef} id="loan-cpf" label="CPF do leitor" type="password" inputMode="numeric" value={formatCpfInput(cpf)} onChange={(event) => { setCpf(onlyDigits(event.target.value)); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyUser() } }} error={userError} hint="O CPF permanece oculto. Digite e pressione Enter para identificar o leitor." aria-describedby="user-identification" required autoComplete="off" placeholder="000.000.000-00" />}</div>
           <div className="flex w-full flex-col gap-1.5 sm:w-auto">
             <span className="invisible text-sm font-medium leading-5" aria-hidden="true">Ação</span>

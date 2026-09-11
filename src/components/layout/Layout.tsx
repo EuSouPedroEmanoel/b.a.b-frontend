@@ -2,10 +2,11 @@ import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { SkipLink } from './SkipLink'
 import { AccessibilityMenu } from '../accessibility/AccessibilityMenu'
+import { NavigationFocusIntentProvider } from '../navigation/NavigationFocusIntent'
 
 export function Layout() {
   return (
-    <>
+    <NavigationFocusIntentProvider>
       <SkipLink />
       <AccessibilityMenu />
       <div className="min-h-dvh flex flex-col">
@@ -24,6 +25,6 @@ export function Layout() {
           </div>
         </footer>
       </div>
-    </>
+    </NavigationFocusIntentProvider>
   )
 }

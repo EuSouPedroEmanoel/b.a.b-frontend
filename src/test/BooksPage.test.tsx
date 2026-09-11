@@ -85,6 +85,7 @@ describe('BooksPage responsive result structure', () => {
     localStorage.clear()
     configureViewport(true)
     vi.stubGlobal('IntersectionObserver', class { observe() {}; disconnect() {} })
+    vi.stubGlobal('ResizeObserver', class { observe() {}; disconnect() {} })
     fixtures.get.mockImplementation((url: string) => {
       if (url.startsWith('/genres/')) return Promise.resolve({ data: { items: [] } })
       return Promise.resolve({ data: { items: [book], total: 1, page: 1, size: 10, pages: 1 } })

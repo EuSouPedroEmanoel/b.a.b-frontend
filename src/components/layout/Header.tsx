@@ -1,10 +1,11 @@
 import { Moon, Sun, Menu, X } from 'lucide-react'
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { MobileNavigationPanel } from './MobileNavigationPanel'
+import { useNavigationFocusIntent } from '../navigation/useNavigationFocusIntent'
 
 function ActiveNavIndicator({ navRef, activeKey, mobile = false }: { navRef: RefObject<HTMLElement | null>; activeKey: string; mobile?: boolean }) {
   const [position, setPosition] = useState({ left: 0, top: 0, width: 0, height: 0 })
@@ -127,6 +128,7 @@ export function Header() {
   const announce = useAnnouncer()
   const navigate = useNavigate()
   const location = useLocation()
+  const { registerMouseNavigation } = useNavigationFocusIntent()
   const [open, setOpen] = useState(false)
   const [desktopNavVisible, setDesktopNavVisible] = useState(() => window.innerWidth >= 768)
 
@@ -168,8 +170,54 @@ export function Header() {
   const profileLabel = user?.name ?? user?.username ?? 'Meu perfil'
   const desktopNavRef = useRef<HTMLElement>(null)
   const mobileNavRef = useRef<HTMLElement>(null)
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const headerRowRef = useRef<HTMLDivElement>(null)
   const desktopMeasurementRef = useRef<HTMLDivElement>(null)
+  const pendingNavigationFocusRef = useRef<{ surface: 'desktop' | 'mobile'; destination: string } | null>(null)
+  const pointerNavigationRef = useRef<string | null>(null)
+
+  const getNavigationDestination = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return null
+    const link = target.closest<HTMLAnchorElement>('nav a[href]')
+    return link ? new URL(link.href).pathname : null
+  }
+
+  const handleHeaderPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    const destination = getNavigationDestination(event.target)
+    if (!destination) return
+    pointerNavigationRef.current = destination
+    registerMouseNavigation(destination)
+    if (!desktopNavVisible) setOpen(false)
+  }
+
+  const handleHeaderNavigationClick = (event: React.MouseEvent<HTMLElement>) => {
+    const destination = getNavigationDestination(event.target)
+    if (!destination) return
+    if (pointerNavigationRef.current === destination) {
+      pointerNavigationRef.current = null
+      return
+    }
+    pendingNavigationFocusRef.current = {
+      surface: desktopNavVisible ? 'desktop' : 'mobile',
+      destination,
+    }
+    if (!desktopNavVisible) setOpen(false)
+  }
+
+  useEffect(() => {
+    const pendingFocus = pendingNavigationFocusRef.current
+    if (!pendingFocus) return
+    pendingNavigationFocusRef.current = null
+    if (pendingFocus.destination !== location.pathname) return
+    window.requestAnimationFrame(() => {
+      if (pendingFocus.surface === 'mobile') {
+        mobileMenuButtonRef.current?.focus()
+        return
+      }
+      desktopNavRef.current?.querySelector<HTMLElement>('a[aria-current="page"]')?.focus()
+    })
+  }, [location.pathname, location.search])
 
   useLayoutEffect(() => {
     const row = headerRowRef.current
@@ -195,7 +243,7 @@ export function Header() {
   }, [isAuthenticated, isGuest, isLibrarian, isUsersManager, profileLabel, user?.role, user?.school_code, user?.school_name])
 
   return (
-    <header data-app-navbar className="relative sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-lg pt-[env(safe-area-inset-top)]">
+    <header data-app-navbar onPointerDown={handleHeaderPointerDown} onClick={handleHeaderNavigationClick} className="relative sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-lg pt-[env(safe-area-inset-top)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div ref={headerRowRef} className="flex h-16 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-6">
@@ -242,6 +290,7 @@ export function Header() {
           >
             <span className="hidden lg:block mx-1 h-6 w-px bg-white/20 dark:bg-slate-600" aria-hidden="true" />
             <button
+              ref={mobileMenuButtonRef}
               type="button"
               onClick={handleToggle}
               aria-label={resolved === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}

@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid
 import api from '@/lib/api'
 import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
+import { useNavigationFocusIntent } from '@/components/navigation/useNavigationFocusIntent'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -97,6 +98,7 @@ export function BooksPage() {
   const [tableTime, setTableTime] = useState<number | null>(null)
   const [gridTime, setGridTime] = useState<number | null>(null)
   const announce = useAnnouncer()
+  const { consumeOperationalFocus } = useNavigationFocusIntent()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -376,9 +378,9 @@ export function BooksPage() {
   const hasSearchQuery = searchParams.has('q')
 
   useEffect(() => {
-    if (hasSearchQuery) return
-    searchInputRef.current?.focus()
-  }, [hasSearchQuery])
+    if (hasSearchQuery || !consumeOperationalFocus('/acervo')) return
+    window.requestAnimationFrame(() => searchInputRef.current?.focus())
+  }, [consumeOperationalFocus, hasSearchQuery])
 
   useEffect(() => {
     if (!filterMenuOpen) return
