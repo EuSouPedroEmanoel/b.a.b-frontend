@@ -31,7 +31,7 @@ function availabilityText(book: Book): string {
   return `${available} de ${total} ${available === 1 ? 'disponível' : 'disponíveis'}`
 }
 
-const responsiveBookGridClasses = 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,12rem),1fr))]'
+const responsiveBookGridClasses = 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(9rem_+_var(--text-sm)_*_3.5)),1fr))]'
 
 function defaultViewForRole(role?: string): 'table' | 'grid' {
   return role === 'student' || role === 'teacher' || role === 'guest' ? 'grid' : 'table'
