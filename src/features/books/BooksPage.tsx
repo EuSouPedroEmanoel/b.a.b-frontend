@@ -1087,14 +1087,14 @@ export function BooksPage() {
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-2">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
+                        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors">
                           {b.title}
                         </h3>
-                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 text-[11px] px-2 py-0.5" title={isGuest ? publicBookStateLabel(b.derived_state) : `Estado: ${bookStateLabel(b.derived_state)}`}>
+                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 text-xs px-2 py-0.5" title={isGuest ? publicBookStateLabel(b.derived_state) : `Estado: ${bookStateLabel(b.derived_state)}`}>
                           {isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}
                         </Badge>
                       </div>
-                      <p className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="flex items-center gap-1.5 font-mono text-xs text-slate-500 dark:text-slate-400">
                         <Hash className="h-3 w-3 opacity-60" aria-hidden="true" />
                         <span className="truncate">{b.isbn ?? 'Sem ISBN'}</span>
                       </p>
@@ -1122,8 +1122,8 @@ export function BooksPage() {
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500">
                           <Calendar className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                         </span>
-                        <span className="flex flex-col leading-none">
-                          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Ano</span>
+                        <span className="flex flex-col leading-tight">
+                          <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Ano</span>
                           <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</span>
                         </span>
                       </span>
@@ -1132,8 +1132,8 @@ export function BooksPage() {
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500">
                           <Clock className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                         </span>
-                        <span className="flex flex-col leading-none">
-                          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Cadastro</span>
+                        <span className="flex flex-col leading-tight">
+                          <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Cadastro</span>
                           <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</span>
                         </span>
                       </span>

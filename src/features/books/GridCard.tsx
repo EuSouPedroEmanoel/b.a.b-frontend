@@ -182,7 +182,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
 
       <Badge
         tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)}
-        className="absolute right-2 top-2 z-20 min-h-11 min-w-11 cursor-pointer justify-center shadow text-[10px] px-2 py-0.5 backdrop-blur-sm"
+        className="absolute right-2 top-2 z-20 min-h-11 min-w-11 cursor-pointer justify-center shadow text-xs px-2 py-0.5 backdrop-blur-sm"
         role="button"
         tabIndex={0}
         title={isGuest ? stateLabel : `Buscar por estado: ${stateLabel}`}
@@ -227,7 +227,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
             <div className="flex flex-col gap-1">
               <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
-              <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
+              <span className="truncate text-xs font-medium leading-snug text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
             </div>
             <div className="flex min-w-0 flex-wrap gap-1">
               <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /></span>
@@ -235,10 +235,10 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           </div>
         </div>
 
-        {/* Gêneros – badges reduzidas text-[10px] compact, linha única nowrap +N */}
+        {/* Gêneros – badges compactas em linha única com +N */}
         <div className="relative shrink-0 overflow-visible px-3.5 pb-3">
           <div className="mb-1 flex items-center gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Gêneros</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-white/60">Gêneros</span>
           </div>
           <div className="flex flex-nowrap overflow-visible">
             {book.genres.length > 0 ? (
@@ -322,7 +322,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
               <div className="flex flex-col gap-1">
                 <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
-                <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
+                <span className="truncate text-xs font-medium leading-snug text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
               </div>
               <div className="flex min-w-0 flex-wrap gap-1">
                 <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /></span>
@@ -330,7 +330,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             </div>
           </div>
           <div className="relative shrink-0 overflow-visible px-3.5 pb-3">
-            <div className="mb-1 flex items-center gap-1"><span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Gêneros</span></div>
+            <div className="mb-1 flex items-center gap-1"><span className="text-xs font-bold uppercase tracking-widest text-white/60">Gêneros</span></div>
             <div className="flex flex-nowrap overflow-visible">
               {book.genres.length > 0 ? <OverflowTags items={book.genres} variant="dark" /> : <span className="text-xs text-white/60">—</span>}
             </div>
