@@ -22,6 +22,8 @@ type Student = {
   turma_letra: string | null
   role: string
   school_id: number | null
+  school_name: string | null
+  school_code: string | null
   is_active: boolean
   created_at: string | null
   updated_at: string | null
@@ -31,6 +33,12 @@ type Paginated<T> = { items: T[]; total: number; page: number; size: number; pag
 function turmaLabel(n: number | null, l: string | null): string {
   if (n === null || !l) return '—'
   return `${n}${l.toUpperCase()}`
+}
+
+function schoolLabel(name: string | null, code: string | null): string {
+  if (name && code) return `${name} (${code})`
+  if (name) return name
+  return '—'
 }
 
 // Regra de calendário (sem ano persistido): ano letivo vai de fevereiro a janeiro.
@@ -236,11 +244,12 @@ export function StudentsPage() {
                   <caption className="sr-only">Alunos cadastrados</caption>
                   <thead className="bg-slate-50 dark:bg-slate-700/50">
                     <tr>
-                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:w-auto">Nome</th>
-                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:w-24">CPF</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:w-[42%] @max-md:px-2">Nome</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:w-[28%] @max-md:px-2">CPF</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:w-[30%] @max-md:px-2">Escola</th>
                       <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Nascimento</th>
-                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:w-20">Turma</th>
-                      <th scope="col" className="w-[1%] px-4 py-3 text-right font-semibold">Ações</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:hidden @max-lg:w-20">Turma</th>
+                      <th scope="col" className="w-12 px-2 py-3 text-right font-semibold @max-md:sticky @max-md:right-0 @max-md:bg-slate-50 @max-md:dark:bg-slate-700/50">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -248,13 +257,20 @@ export function StudentsPage() {
                       const deprecated = isDeprecatedTurma(s.updated_at)
                       return (
                         <tr key={s.id}>
-                          <td className="break-words px-4 py-3 align-top font-medium capitalize">
+                          <td className="break-words px-4 py-3 align-top font-medium capitalize @max-md:px-2">
                             <span>{s.username.replace(/\./g, ' ')}</span>
                             <span className="mt-1 hidden text-xs font-normal text-slate-600 dark:text-slate-300 @max-lg:block">
                               Nascimento: {s.birthdate ? new Date(`${s.birthdate}T00:00:00`).toLocaleDateString('pt-BR') : '—'}
                             </span>
                           </td>
-                          <td className="break-words px-4 py-3 align-top font-mono text-xs">{s.cpf_masked ?? '—'}</td>
+                          <td className="break-words [overflow-wrap:anywhere] px-4 py-3 align-top font-mono text-xs @max-md:px-2">{s.cpf_masked ?? '—'}</td>
+                          <td className="break-words px-4 py-3 align-top @max-md:px-2">
+                            <span>{schoolLabel(s.school_name, s.school_code)}</span>
+                            <span className="mt-1 hidden text-xs font-normal text-slate-600 dark:text-slate-300 @max-md:block">
+                              Turma: {turmaLabel(s.turma_numero, s.turma_letra)}
+                              {deprecated && ' · Atualizar'}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 align-top @max-lg:hidden">
                             {s.birthdate ? (
                               new Date(`${s.birthdate}T00:00:00`).toLocaleDateString('pt-BR')
@@ -262,13 +278,13 @@ export function StudentsPage() {
                               '—'
                             )}
                           </td>
-                          <td className="px-4 py-3 align-top">
+                          <td className="px-4 py-3 align-top @max-md:hidden">
                             <span className="flex items-center gap-2">
                               <span className="font-mono font-medium">{turmaLabel(s.turma_numero, s.turma_letra)}</span>
                               {deprecated && <Badge tone="warning">Atualizar</Badge>}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right align-top">
+                          <td className="px-2 py-3 text-right align-top @max-md:sticky @max-md:right-0 @max-md:bg-white @max-md:dark:bg-slate-800">
                             <Button
                               size="sm"
                               variant="secondary"
