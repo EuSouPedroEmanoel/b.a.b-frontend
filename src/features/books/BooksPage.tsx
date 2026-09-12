@@ -31,6 +31,8 @@ function availabilityText(book: Book): string {
   return `${available} de ${total} ${available === 1 ? 'disponível' : 'disponíveis'}`
 }
 
+const responsiveBookGridClasses = 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,12rem),1fr))]'
+
 function defaultViewForRole(role?: string): 'table' | 'grid' {
   return role === 'student' || role === 'teacher' || role === 'guest' ? 'grid' : 'table'
 }
@@ -937,7 +939,7 @@ export function BooksPage() {
           </div>
         )}
         {isGridLoading && viewMode === 'grid' && (
-          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6" aria-busy="true" aria-live="polite">
+          <div className={responsiveBookGridClasses} aria-busy="true" aria-live="polite">
             {Array.from({ length: GRID_SIZE }).map((_, i) => (
               <div key={i} className="aspect-[2/3] rounded-xl border border-slate-200 dark:border-slate-700 animate-pulse bg-slate-100 dark:bg-slate-800" />
             ))}
@@ -1157,7 +1159,7 @@ export function BooksPage() {
         )}
         {viewMode === 'grid' && gridData && (
           <>
-            <div role="grid" aria-label="Grade de livros" className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div role="grid" aria-label="Grade de livros" className={responsiveBookGridClasses}>
               {gridItems.map((b, index) => (
                 <GridCard key={b.id} book={b as any} index={index} isGuest={isGuest} />
               ))}
