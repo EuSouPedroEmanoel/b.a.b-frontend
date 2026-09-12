@@ -23,6 +23,12 @@ type Paginated<T> = { items: T[] }
 
 const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const weekNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const calendarGridClasses = 'grid min-w-0 gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(7_*_max(38px,calc(1rem_+_1.5_*_var(--text-sm)))_+_3rem)),26rem))]'
+
+function calendarMinimumWidth(textSize: number) {
+  const cellWidth = Math.max(38, 16 + textSize * 1.5)
+  return cellWidth * 7 + 48
+}
 
 function isoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -79,6 +85,9 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const calendarHeadingRef = useRef<HTMLHeadingElement>(null)
   const nonWorkingHeadingRef = useRef<HTMLHeadingElement>(null)
+  const calendarGridRef = useRef<HTMLDivElement>(null)
+  const [singleMonthMode, setSingleMonthMode] = useState(false)
+  const [visibleMonth, setVisibleMonth] = useState(0)
   const isSuperAdmin = user?.role === 'super_admin'
   const isManager = user?.role === 'school_admin' || (user?.role === 'librarian' && user.administrative_capabilities?.includes('manage_library_calendar'))
   const effectiveSchoolId = schoolIdOverride ?? (isSuperAdmin ? schoolId : String(user?.school_id ?? ''))
@@ -115,6 +124,28 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
     })
     return Array.from(groups.entries())
   }, [days])
+
+  useEffect(() => {
+    const grid = calendarGridRef.current
+    if (!grid) return
+    const updateMode = () => {
+      const rootStyle = getComputedStyle(document.documentElement)
+      const textSizeValue = rootStyle.getPropertyValue('--text-sm').trim()
+      const textSize = textSizeValue.endsWith('rem')
+        ? Number.parseFloat(textSizeValue) * Number.parseFloat(rootStyle.fontSize)
+        : Number.parseFloat(textSizeValue) || 14
+      const minimum = calendarMinimumWidth(textSize)
+      setSingleMonthMode(grid.getBoundingClientRect().width < minimum * 2 + 16)
+    }
+    updateMode()
+    const observer = new ResizeObserver(updateMode)
+    observer.observe(grid)
+    return () => observer.disconnect()
+  }, [effectiveSchoolId])
+
+  useEffect(() => {
+    if (!singleMonthMode) setVisibleMonth(0)
+  }, [singleMonthMode])
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['library-calendar', effectiveSchoolId, year] })
   const setDaysCache = (nextDays: NonWorkingDay[]) => {
@@ -288,8 +319,13 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
       {effectiveSchoolId && <p aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">{isManager ? 'Você pode gerenciar os dias não úteis.' : 'Modo de consulta: somente leitura.'}</p>}
       {effectiveSchoolId && <div className="flex flex-wrap gap-3 text-sm" aria-label="Legenda do calendário"><span className="rounded-md border border-slate-300 px-2 py-1 dark:border-slate-600">Dia útil</span><span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600 dark:bg-slate-700/50 dark:text-slate-300">Fim de semana</span><span className={`inline-flex items-center gap-1 rounded-md border-2 px-2 py-1 font-semibold ${calendarMarkedOutlineClasses}`}><X className="h-4 w-4" aria-hidden="true" /><span>Dia não útil</span></span></div>}
       {undoAvailable && <UndoSnackbar message="Todos os dias não úteis foram removidos." onUndo={() => void undoRemoveAll()} onClose={clearUndo} />}
-      {effectiveSchoolId && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {monthNames.map((monthName, month) => { const { offset, days: total } = monthDays(year, month); const weekdays = Array.from({ length: total }, (_, index) => index + 1).filter((day) => !isWeekend(year, month, day)); const markedWeekdays = weekdays.filter((day) => dayMap.has(isoDate(year, month, day))).length; const complete = markedWeekdays === weekdays.length; return <Card key={monthName} className={isSuperAdmin ? 'opacity-60' : ''}><CardHeader className="flex items-center justify-between gap-2"><h2 className="font-semibold">{monthName}</h2>{isManager && <Button variant="secondary" size="sm" className="shrink-0 !px-2.5 !py-1.5 text-xs" onClick={(event) => { monthDialogTrigger.current = event.currentTarget; openMonthAction(month, complete ? 'remove' : 'select') }} aria-label={complete ? `Desmarcar os dias não úteis de ${monthName.toLowerCase()} de ${year}` : `Marcar todos os dias úteis de ${monthName.toLowerCase()} de ${year} como não úteis`}>{complete ? 'Desmarcar mês' : 'Selecionar mês'}</Button>}</CardHeader><CardBody className="p-3"><div className="grid grid-cols-7 gap-1 text-center text-xs text-slate-500" aria-hidden="true">{weekNames.map((name) => <span key={name}>{name}</span>)}</div><div className="mt-1 grid grid-cols-7 gap-1" role="grid" aria-label={`${monthName} de ${year}`}>
+      {effectiveSchoolId && singleMonthMode && <div className="flex flex-wrap items-center justify-between gap-3" aria-label="Navegação mensal">
+        <Button variant="secondary" size="sm" onClick={() => setVisibleMonth((month) => Math.max(0, month - 1))} disabled={visibleMonth === 0} aria-label="Mês anterior"><ChevronLeft aria-hidden="true" /> Mês anterior</Button>
+        <p className="font-semibold" aria-live="polite" aria-atomic="true">Mês exibido: {monthNames[visibleMonth]} de {year}</p>
+        <Button variant="secondary" size="sm" onClick={() => setVisibleMonth((month) => Math.min(monthNames.length - 1, month + 1))} disabled={visibleMonth === monthNames.length - 1} aria-label="Próximo mês">Próximo mês <ChevronRight aria-hidden="true" /></Button>
+      </div>}
+      {effectiveSchoolId && <div ref={calendarGridRef} className={`${calendarGridClasses} ${singleMonthMode ? 'justify-center' : 'justify-start'}`}>
+        {(singleMonthMode ? [visibleMonth] : monthNames.map((_, month) => month)).map((month) => { const monthName = monthNames[month]; const { offset, days: total } = monthDays(year, month); const weekdays = Array.from({ length: total }, (_, index) => index + 1).filter((day) => !isWeekend(year, month, day)); const markedWeekdays = weekdays.filter((day) => dayMap.has(isoDate(year, month, day))).length; const complete = markedWeekdays === weekdays.length; return <Card key={monthName} className={`min-w-0 ${isSuperAdmin ? 'opacity-60' : ''}`}><CardHeader className="flex flex-wrap items-center justify-between gap-2"><h2 className="min-w-0 font-semibold">{monthName}</h2>{isManager && <Button variant="secondary" size="sm" className="shrink-0 !px-2.5 !py-1.5 text-xs" onClick={(event) => { monthDialogTrigger.current = event.currentTarget; openMonthAction(month, complete ? 'remove' : 'select') }} aria-label={complete ? `Desmarcar os dias não úteis de ${monthName.toLowerCase()} de ${year}` : `Marcar todos os dias úteis de ${monthName.toLowerCase()} de ${year} como não úteis`}>{complete ? 'Desmarcar mês' : 'Selecionar mês'}</Button>}</CardHeader><CardBody className="p-3 min-w-0"><div className="grid min-w-0 grid-cols-7 gap-1 text-center text-xs text-slate-500" aria-hidden="true">{weekNames.map((name) => <span key={name} className="min-w-0 break-words">{name}</span>)}</div><div className="mt-1 grid min-w-0 grid-cols-7 gap-1" role="grid" aria-label={`${monthName} de ${year}`}>
           {Array.from({ length: offset }).map((_, index) => <span key={`empty-${index}`} aria-hidden="true" />)}
           {Array.from({ length: total }, (_, index) => { const day = index + 1; const date = isoDate(year, month, day); const marked = dayMap.has(date); const weekend = isWeekend(year, month, day); const status = marked ? 'Dia não útil' : weekend ? 'Fim de semana' : 'Dia útil'; const action = marked ? 'pressione para tornar útil' : weekend ? 'fim de semana' : 'dia útil, pressione para marcar como não útil'; return <button key={date} type="button" role="gridcell" aria-label={`${day} de ${monthName} de ${year}, ${marked ? 'dia não útil, pressione para tornar útil' : action}`} aria-pressed={marked} disabled={!isManager || weekend} onClick={() => { if (marked) void removeDay.mutateAsync(date); else void addDay.mutateAsync(date) }} className={`group relative min-h-[38px] rounded-md border text-sm focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${marked ? `cursor-pointer border-2 ${calendarMarkedOutlineClasses}` : weekend ? 'border-transparent bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300' : 'border-transparent bg-slate-100 text-slate-900 hover:bg-blue-100 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600'}`}>{marked ? <UnavailableDayMark>{day}</UnavailableDayMark> : day}<Tooltip><strong className="text-base leading-5">{day}</strong><span>{status}</span></Tooltip></button> })}
         </div></CardBody></Card> })}
