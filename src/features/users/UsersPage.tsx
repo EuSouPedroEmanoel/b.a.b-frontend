@@ -15,6 +15,7 @@ import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocompl
 import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ModalDialog } from '@/components/ui/ModalDialog'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 type AppUser = {
   id: number
@@ -506,26 +507,24 @@ export function UsersPage() {
             .filter((sec) => sec.items.length > 0)
             .map((sec) => (
               <Card key={sec.key} className={isSuperAdmin && sec.items.every((u) => !canEditUser(u)) ? 'opacity-60' : ''}>
-                <CardHeader className="flex items-center justify-between">
+                <CardHeader className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="font-semibold flex items-center gap-2">
                     <Users className="h-5 w-5" aria-hidden="true" /> {sec.title}
                   </h2>
                   <Badge tone="info">{`${sec.items.length} registro(s)`}</Badge>
                 </CardHeader>
                 <CardBody className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                  <div className="@container max-w-full overflow-x-auto overscroll-x-contain">
+                    <table className="w-full table-fixed border-spacing-0 min-w-0 text-sm">
                       <caption className="sr-only">{sec.title}</caption>
                       <thead className="bg-slate-50 dark:bg-slate-700/50">
                         <tr>
-                          <th scope="col" className="px-4 py-3 text-left font-semibold">Nome</th>
-                          <th scope="col" className="px-4 py-3 text-left font-semibold">Usuário</th>
-                          <th scope="col" className="px-4 py-3 text-left font-semibold">E-mail</th>
-                          {sec.showCpf && <th scope="col" className="px-4 py-3 text-left font-semibold">CPF</th>}
-                          {sec.showSchool && <th scope="col" className="px-4 py-3 text-left font-semibold">Escola</th>}
-                          {sec.showNascimento && <th scope="col" className="px-4 py-3 text-left font-semibold">Nascimento</th>}
-                          {sec.showTurma && <th scope="col" className="px-4 py-3 text-left font-semibold">Turma</th>}
-                          <th scope="col" className="px-4 py-3 text-right font-semibold">Ações</th>
+                          <th scope="col" className="px-4 py-3 text-left font-semibold">Identificação</th>
+                          {sec.showCpf && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">CPF</th>}
+                          {sec.showSchool && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Escola</th>}
+                          {sec.showNascimento && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Nascimento</th>}
+                          {sec.showTurma && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Turma</th>}
+                          <th scope="col" className="w-32 break-words [overflow-wrap:anywhere] px-4 py-3 text-right font-semibold @max-[72rem]:w-20">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -534,33 +533,45 @@ export function UsersPage() {
                           const readOnly = !canEditUser(u)
                           return (
                             <tr key={u.id} className={readOnly ? 'opacity-60' : undefined}>
-                              <td className="px-4 py-3 font-medium">{u.name || u.username}{currentUser?.id === u.id && <span className="ml-2 text-sm font-normal text-slate-600 dark:text-slate-300">(EU)</span>}</td>
-                              <td className="px-4 py-3 font-mono text-xs">{u.username}</td>
-                              <td className="px-4 py-3">{u.email ?? '—'}</td>
-                              {sec.showCpf && <td className="px-4 py-3 font-mono text-xs">{u.cpf_masked ?? '—'}</td>}
+                              <td className="break-words [overflow-wrap:anywhere] px-4 py-3 align-top font-medium">
+                                <span>{u.name || u.username}</span>
+                                {currentUser?.id === u.id && <span className="ml-2 text-sm font-normal text-slate-600 dark:text-slate-300">(EU)</span>}
+                                <div className="mt-1 space-y-0.5 text-xs font-normal text-slate-600 dark:text-slate-300">
+                                  <p className="break-words font-mono">{u.username}</p>
+                                  <p className="break-words">{u.email ?? 'Sem e-mail'}</p>
+                                  {sec.showCpf && <p className="hidden font-mono @max-lg:block">CPF: {u.cpf_masked ?? '—'}</p>}
+                                  {sec.showSchool && <p className="hidden break-words @max-lg:block">Escola: {schoolLabel(u.school_name, u.school_code)}</p>}
+                                  {sec.showNascimento && <p className="hidden @max-lg:block">Nascimento: {formatDate(u.birthdate)}</p>}
+                                  {sec.showTurma && <p className="hidden @max-lg:block">Turma: {turmaLabel(u.turma_numero, u.turma_letra)}{deprecated ? ' · Atualizar' : ''}</p>}
+                                </div>
+                              </td>
+                              {sec.showCpf && <td className="break-words px-4 py-3 align-top font-mono text-xs @max-lg:hidden">{u.cpf_masked ?? '—'}</td>}
                               {sec.showSchool && (
-                                <td className="px-4 py-3">{schoolLabel(u.school_name, u.school_code)}</td>
+                                <td className="break-words px-4 py-3 align-top @max-lg:hidden">{schoolLabel(u.school_name, u.school_code)}</td>
                               )}
                               {sec.showNascimento && (
-                                <td className="px-4 py-3">{formatDate(u.birthdate)}</td>
+                                <td className="px-4 py-3 align-top @max-lg:hidden">{formatDate(u.birthdate)}</td>
                               )}
                               {sec.showTurma && (
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3 align-top @max-lg:hidden">
                                   <span className="flex items-center gap-2">
                                     {turmaLabel(u.turma_numero, u.turma_letra)}
                                     {deprecated && <Badge tone="warning">Atualizar</Badge>}
                                   </span>
                                 </td>
                               )}
-                              <td className="px-4 py-3 text-right">
+                              <td className="px-4 py-3 text-right align-top">
                                 <Button
                                   size="sm"
                                   variant="secondary"
                                   onClick={() => openEdit(u)}
                                   disabled={readOnly}
-                                  className={readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}
+                                  aria-label={`Editar usuário ${u.name || u.username}`}
+                                  className={`relative group ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}`}
                                 >
-                                  <Pencil className="h-4 w-4 mr-1" aria-hidden="true" /> Editar
+                                  <Pencil className="h-5 w-5 @max-lg:mr-0 @max-[80rem]:mr-0 mr-1" aria-hidden="true" />
+                                  <span className="@max-lg:sr-only @max-[80rem]:sr-only">Editar</span>
+                                  <Tooltip className="left-1/2 right-auto -translate-x-1/2">Editar</Tooltip>
                                 </Button>
                               </td>
                             </tr>
