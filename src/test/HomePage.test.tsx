@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HomePage } from '@/features/home/HomePage'
@@ -52,20 +52,20 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { name: 'Bem-vindo' })).toBeInTheDocument()
   })
 
-  it.each(['school_admin', 'librarian', 'super_admin'])('preserves the operational home for %s', (role) => {
+  it.each(['school_admin', 'librarian', 'super_admin'])('preserves the operational home for %s', async (role) => {
     authState.user = { role, name: 'Equipe' }
     renderHome()
 
-    expect(screen.getByRole('heading', { name: /Bem-vindo, Equipe/ })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Bem-vindo, Equipe/ })).toBeInTheDocument())
     expect(screen.getByRole('link', { name: /Empréstimos/ })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Descubra livros' })).not.toBeInTheDocument()
   })
 
-  it('renders the public home without administrative content for a guest', () => {
+  it('renders the public home without administrative content for a guest', async () => {
     authState.user = { role: 'guest', name: 'Visitante' }
     renderHome()
 
-    expect(screen.getByRole('heading', { name: 'Explore o acervo' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Explore o acervo' })).toBeInTheDocument())
     expect(screen.getByRole('link', { name: 'Ver acervo' })).toHaveAttribute('href', '/acervo')
     expect(screen.queryByText('Como usar')).not.toBeInTheDocument()
     expect(screen.queryByText('Empréstimos')).not.toBeInTheDocument()

@@ -90,16 +90,16 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
     if (!viewport || !measurement) return undefined
 
     measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(viewport)
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    observer?.observe(viewport)
     const measuredItem = measurement.querySelector<HTMLElement>('[data-carousel-measure-item]')
-    if (measuredItem) observer.observe(measuredItem)
-    const fontObserver = new MutationObserver(measure)
-    fontObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-font-size'] })
+    if (measuredItem) observer?.observe(measuredItem)
+    const fontObserver = typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(measure)
+    fontObserver?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-font-size'] })
     const frame = window.requestAnimationFrame(measure)
     return () => {
-      observer.disconnect()
-      fontObserver.disconnect()
+      observer?.disconnect()
+      fontObserver?.disconnect()
       window.cancelAnimationFrame(frame)
     }
   }, [circular, items.length, measure])
@@ -145,11 +145,11 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
     if (!scroller || circular) return undefined
     updateScroll()
     scroller.addEventListener('scroll', updateScroll, { passive: true })
-    const observer = new ResizeObserver(updateScroll)
-    observer.observe(scroller)
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updateScroll)
+    observer?.observe(scroller)
     return () => {
       scroller.removeEventListener('scroll', updateScroll)
-      observer.disconnect()
+      observer?.disconnect()
     }
   }, [circular, items, updateScroll])
 
