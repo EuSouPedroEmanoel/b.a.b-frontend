@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AccountOnly, Protected } from '@/app/RouteGuards'
+import { AccountOnly, Protected, StudentManagementOnly } from '@/app/RouteGuards'
 
 const authState = vi.hoisted(() => ({
   user: null as { role: string } | null,
@@ -67,5 +67,41 @@ describe('Guest route guards', () => {
 
     expect(screen.queryByText('Conteúdo protegido')).not.toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/entrar')
+  })
+})
+
+describe('Student management route guard', () => {
+  afterEach(cleanup)
+
+  it.each(['librarian', 'school_admin'])('allows %s into the students route', (role) => {
+    authState.user = { role }
+    authState.isAuthenticated = true
+    authState.loading = false
+
+    render(
+      <MemoryRouter initialEntries={['/alunos']}>
+        <StudentManagementOnly><p>Gestão de alunos</p></StudentManagementOnly>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Gestão de alunos')).toBeInTheDocument()
+  })
+
+  it.each(['super_admin', 'teacher', 'student'])('redirects %s away from the students route', (role) => {
+    authState.user = { role }
+    authState.isAuthenticated = true
+    authState.loading = false
+
+    render(
+      <MemoryRouter initialEntries={['/alunos']}>
+        <Routes>
+          <Route path="/alunos" element={<StudentManagementOnly><p>Gestão de alunos</p></StudentManagementOnly>} />
+          <Route path="/" element={<LocationText />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText('Gestão de alunos')).not.toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/')
   })
 })

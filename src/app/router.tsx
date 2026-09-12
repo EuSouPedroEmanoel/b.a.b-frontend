@@ -4,7 +4,7 @@ import { Layout } from '@/components/layout/Layout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
 import { HomePage, DiscoveryHome } from '@/features/home/HomePage'
-import { AccountOnly, Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
+import { AccountOnly, Protected, PublicOnly, RedirectBookCopies, StudentManagementOnly } from './RouteGuards'
 
 const AccountPage = lazy(() => import('@/features/account/AccountPage').then((module) => ({ default: module.AccountPage })))
 const AccountManagementPage = lazy(() => import('@/features/account/AccountManagementPage').then((module) => ({ default: module.AccountManagementPage })))
@@ -119,9 +119,9 @@ export const router = createBrowserRouter([
       {
         path: '/alunos',
         element: (
-          <AccountOnly>
+          <StudentManagementOnly>
             <LazyRoute><StudentsPage /></LazyRoute>
-          </AccountOnly>
+          </StudentManagementOnly>
         ),
       },
       {

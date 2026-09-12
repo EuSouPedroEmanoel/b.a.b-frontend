@@ -157,6 +157,7 @@ export function Header() {
   const isUsersManager =
     !!user && (user.role === 'super_admin' || user.role === 'school_admin')
   const isLibrarian = user?.role === 'librarian'
+  const isStudentManager = user?.role === 'librarian' || user?.role === 'school_admin'
   const isGuest = user?.role === 'guest'
   const homePath = user && ['student', 'teacher', 'guest'].includes(user.role) ? '/inicio' : '/'
 
@@ -302,7 +303,7 @@ export function Header() {
                 <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={navItemCls('/acervo')}>Acervo</Link></li>
                 {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={navItemCls('/emprestimos')}>Empréstimos</Link></li>}
                 {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={navItemCls('/reservas')}>Reservas</Link></li>}
-                {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
+                {isStudentManager && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={navItemCls('/alunos')}>Alunos</Link></li>)}
                 {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={navItemCls('/usuarios')}>Usuários</Link></li>)}
                 {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={navItemCls('/gerenciar-escola')}>Gerenciar escola</Link></li>)}
                 {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={navItemCls('/escolas')}>Escolas</Link></li>)}
@@ -417,7 +418,7 @@ export function Header() {
               <li><Link to="/acervo" aria-current={isActivePath('/acervo') ? 'page' : undefined} className={`${navItemCls('/acervo')} w-full justify-start hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit`}>Acervo</Link></li>
               {!isGuest && <li><Link to="/emprestimos" aria-current={isActivePath('/emprestimos') ? 'page' : undefined} className={`${navItemCls('/emprestimos')} w-full justify-start`}>Empréstimos</Link></li>}
               {!isGuest && <li><Link to="/reservas" aria-current={isActivePath('/reservas') ? 'page' : undefined} className={`${navItemCls('/reservas')} w-full justify-start`}>Reservas</Link></li>}
-              {isLibrarian && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={`${navItemCls('/alunos')} w-full justify-start`}>Alunos</Link></li>)}
+              {isStudentManager && (<li><Link to="/alunos" aria-current={isActivePath('/alunos') ? 'page' : undefined} className={`${navItemCls('/alunos')} w-full justify-start`}>Alunos</Link></li>)}
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={`${navItemCls('/usuarios')} w-full justify-start`}>Usuários</Link></li>)}
               {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={`${navItemCls('/gerenciar-escola')} w-full justify-start`}>Gerenciar escola</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={`${navItemCls('/escolas')} w-full justify-start`}>Escolas</Link></li>)}

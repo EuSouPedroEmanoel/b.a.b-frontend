@@ -99,6 +99,22 @@ describe('Guest navigation', () => {
     expect(navigation).toHaveTextContent('Alunos')
   })
 
+  it('offers student management to a school admin', () => {
+    authState.user = {
+      id: 4,
+      username: 'admin-escola',
+      name: 'Admin da escola',
+      role: 'school_admin',
+    }
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Header />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('navigation', { name: 'Principal' })).toHaveTextContent('Alunos')
+  })
+
   it('keeps the reader navigation and marks the current page discreetly', () => {
     authState.user = {
       id: 5,
