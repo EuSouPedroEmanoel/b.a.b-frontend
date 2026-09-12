@@ -32,6 +32,64 @@ function yearFromDate(dateStr: string | null): string | null {
   return String(d.getFullYear())
 }
 
+const previewStatusBadgeClasses = 'inline-flex max-w-full min-w-0 items-center justify-center rounded-full bg-white px-2 py-0.5 text-center text-xs font-bold leading-snug text-slate-900 shadow-sm whitespace-nowrap'
+
+const previewStatusLabels: Record<string, { full: string; compact: string; minimal: string }> = {
+  available: { full: 'Disponível', compact: 'Livre', minimal: 'Disp.' },
+  borrowed: { full: 'Emprestado', compact: 'Em uso', minimal: 'Empr.' },
+  reserved: { full: 'Reservado', compact: 'Reserva', minimal: 'Res.' },
+  lost: { full: 'Perdido', compact: 'Perdido', minimal: 'Perd.' },
+  archived: { full: 'Arquivado', compact: 'Arquivo', minimal: 'Arq.' },
+}
+
+type PreviewStatusVariant = 'full' | 'compact' | 'minimal'
+
+function PreviewStatusLabel({ state, label, isGuest }: { state: string; label: string; isGuest: boolean }) {
+  const configuredVariants = previewStatusLabels[state] ?? { full: label, compact: label, minimal: label }
+  const variants = isGuest ? { full: label, compact: label, minimal: label } : configuredVariants
+  const measurementRef = useRef<HTMLSpanElement>(null)
+  const badgeRef = useRef<HTMLSpanElement>(null)
+  const [variant, setVariant] = useState<PreviewStatusVariant>('full')
+
+  useEffect(() => {
+    const measurementElement = measurementRef.current
+    const badgeElement = badgeRef.current?.closest('[data-preview-status-badge]')
+    const containerElement = badgeElement?.closest('.preview-status-info')
+    if (!(measurementElement instanceof HTMLElement) || !(containerElement instanceof HTMLElement)) return
+
+    const updateVariant = () => {
+      const availableWidth = containerElement.clientWidth
+      const measuredWidths = Array.from(measurementElement.children).map((element) => (element as HTMLElement).offsetWidth)
+      const nextVariant = measuredWidths[0] <= availableWidth
+        ? 'full'
+        : measuredWidths[1] <= availableWidth
+          ? 'compact'
+          : 'minimal'
+      setVariant((currentVariant) => currentVariant === nextVariant ? currentVariant : nextVariant)
+    }
+
+    updateVariant()
+    const observer = new ResizeObserver(updateVariant)
+    observer.observe(containerElement)
+    return () => observer.disconnect()
+  }, [isGuest, label, state])
+
+  return (
+    <>
+      <span className={variant === 'full' ? '' : 'hidden'} aria-hidden="true">{variants.full}</span>
+      <span className={variant === 'compact' ? '' : 'hidden'} aria-hidden="true">{variants.compact}</span>
+      <span className={variant === 'minimal' ? '' : 'hidden'} aria-hidden="true">{variants.minimal}</span>
+      <span className="sr-only">{label}</span>
+      <span ref={badgeRef} className="sr-only" aria-hidden="true" />
+      <span ref={measurementRef} className="pointer-events-none absolute h-0 overflow-visible opacity-0" aria-hidden="true">
+        <span className="inline-block whitespace-nowrap px-2 text-xs font-bold leading-snug">{variants.full}</span>
+        <span className="inline-block whitespace-nowrap px-2 text-xs font-bold leading-snug">{variants.compact}</span>
+        <span className="inline-block whitespace-nowrap px-2 text-xs font-bold leading-snug">{variants.minimal}</span>
+      </span>
+    </>
+  )
+}
+
 export function GridCard({ book, index = 0, disableHover = false, portalHover = false, isGuest = false, rankingPosition }: { book: Book; index?: number; disableHover?: boolean; portalHover?: boolean; isGuest?: boolean; rankingPosition?: number }) {
   return <GridCardContent book={book} index={index} disableHover={disableHover} portalHover={portalHover} isGuest={isGuest} rankingPosition={rankingPosition} />
 }
@@ -166,13 +224,13 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           <div className="relative w-16 aspect-[2/3] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
             <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
           </div>
-          <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
+          <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
             <div className="flex flex-col gap-1">
               <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
               <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
             </div>
-            <div className="flex flex-wrap gap-1">
-              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm">{stateLabel}</span>
+            <div className="flex min-w-0 flex-wrap gap-1">
+              <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /></span>
             </div>
           </div>
         </div>
@@ -261,13 +319,13 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             <div className="relative w-16 aspect-[2/3] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
               <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
             </div>
-            <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
+            <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
               <div className="flex flex-col gap-1">
                 <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
                 <span className="truncate text-[11px] font-medium leading-none text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
               </div>
-              <div className="flex flex-wrap gap-1">
-                <span className="inline-flex items-center whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-bold leading-none text-slate-900 shadow-sm">{stateLabel}</span>
+              <div className="flex min-w-0 flex-wrap gap-1">
+                <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /></span>
               </div>
             </div>
           </div>

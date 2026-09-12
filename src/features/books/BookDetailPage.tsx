@@ -48,6 +48,8 @@ type Loan = { id: number; copy_id: number; user_id: number; school_id: number; s
 type Reservation = { id: number; book_id: number; status: string; created_at?: string; ready_at?: string | null; internal_code?: string | null; copy_id?: number | null; queue_position?: number; queue_total?: number }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 
+const responsiveStatusBadgeClasses = 'min-h-6 max-w-full min-w-0 whitespace-normal !px-2 !py-0.5 text-xs font-medium leading-normal [overflow-wrap:anywhere]'
+
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const id = Number(bookId)
@@ -656,7 +658,7 @@ export function BookDetailPage() {
               </h2>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <h1 className={`text-xl sm:text-2xl font-bold leading-tight ${isDark ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]' : 'text-slate-900'}`}>{book.title}</h1>
-                <Badge tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)} className={isGuest ? undefined : 'cursor-pointer'} role={isGuest ? undefined : 'button'} tabIndex={isGuest ? undefined : 0} onClick={() => { if (!isGuest) openCatalogQuery(`/acervo?state=${book.derived_state}`) }} onKeyDown={(e) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCatalogQuery(`/acervo?state=${book.derived_state}`) } }} title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por ${bookStateLabel(book.derived_state)}`}>
+                <Badge tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)} className={`${responsiveStatusBadgeClasses} ${isGuest ? '' : 'cursor-pointer'}`} role={isGuest ? undefined : 'button'} tabIndex={isGuest ? undefined : 0} onClick={() => { if (!isGuest) openCatalogQuery(`/acervo?state=${book.derived_state}`) }} onKeyDown={(e) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCatalogQuery(`/acervo?state=${book.derived_state}`) } }} title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por ${bookStateLabel(book.derived_state)}`}>
                   {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
                 </Badge>
               </div>
@@ -737,13 +739,13 @@ export function BookDetailPage() {
                   </dl>
                   <ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
                     {copies.map((c) => (
-                      <li key={c.id} className="flex items-center justify-between py-2.5 text-sm">
+                      <li key={c.id} className="flex flex-wrap items-center justify-start gap-2 py-2.5 text-sm">
                         <span className={`font-mono ${isDark ? 'text-white/90' : 'text-slate-700'}`}>{c.code}</span>
-                        <span className="flex items-center gap-2">
-                          <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'} className="cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`) } }} title={`Buscar por ${bookConditionLabel(c.condition)}`}>
+                        <span className="flex min-w-0 flex-wrap items-center gap-2">
+                          <Badge tone={c.condition === 'new' ? 'success' : c.condition === 'bad' ? 'danger' : c.condition === 'fair' || c.condition === 'poor' ? 'warning' : 'neutral'} className={`${responsiveStatusBadgeClasses} cursor-pointer`} role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?q=${encodeURIComponent(bookConditionLabel(c.condition))}`) } }} title={`Buscar por ${bookConditionLabel(c.condition)}`}>
                             {bookConditionLabel(c.condition)}
                           </Badge>
-                          <Badge tone={bookStateTone(c.state)} className="cursor-pointer" role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?state=${c.state}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?state=${c.state}`) } }} title={`Buscar por ${bookStateLabel(c.state)}`}>
+                          <Badge tone={bookStateTone(c.state)} className={`${responsiveStatusBadgeClasses} cursor-pointer`} role="button" tabIndex={0} onClick={() => openCatalogQuery(`/acervo?state=${c.state}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCatalogQuery(`/acervo?state=${c.state}`) } }} title={`Buscar por ${bookStateLabel(c.state)}`}>
                             {bookStateLabel(c.state)}
                           </Badge>
                         </span>
@@ -792,7 +794,7 @@ export function BookDetailPage() {
           <div className={`absolute inset-0 pointer-events-none ${isDark ? 'bg-black/10' : 'bg-white/20'}`} aria-hidden="true" />
           <CardHeader className={`relative ${isDark ? 'border-white/15' : 'border-slate-200'}`}><h2 className="font-semibold flex items-center gap-2"><Undo2 className="h-5 w-5" aria-hidden="true" /> Meus empréstimos e devoluções</h2></CardHeader>
           <CardBody className="relative"><ul className={`divide-y ${isDark ? 'divide-white/15' : 'divide-slate-200'}`} role="list">
-            {myLoans.map((loan) => <li key={loan.id} className="py-3 text-sm"><p><Badge tone={loan.status === 'returned' ? 'neutral' : 'warning'}>{loan.status === 'returned' ? 'Devolvido' : 'Em andamento'}</Badge></p><p className="mt-1 text-xs opacity-75">Emprestado em {new Date(loan.borrowed_at).toLocaleDateString('pt-BR')} · {loan.returned_at ? `Devolvido em ${new Date(loan.returned_at).toLocaleDateString('pt-BR')}` : `Devolução prevista em ${new Date(loan.due_date).toLocaleDateString('pt-BR')}`}</p></li>)}
+            {myLoans.map((loan) => <li key={loan.id} className="py-3 text-sm"><p><Badge tone={loan.status === 'returned' ? 'neutral' : 'warning'} className={responsiveStatusBadgeClasses}>{loan.status === 'returned' ? 'Devolvido' : 'Em andamento'}</Badge></p><p className="mt-1 text-xs opacity-75">Emprestado em {new Date(loan.borrowed_at).toLocaleDateString('pt-BR')} · {loan.returned_at ? `Devolvido em ${new Date(loan.returned_at).toLocaleDateString('pt-BR')}` : `Devolução prevista em ${new Date(loan.due_date).toLocaleDateString('pt-BR')}`}</p></li>)}
           </ul></CardBody>
         </Card>
       )}
