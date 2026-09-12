@@ -1075,7 +1075,7 @@ export function BooksPage() {
                       const origin = createCatalogOrigin(`${location.pathname}${location.search}`, viewMode)
                       if (origin) saveCatalogSnapshot(origin, window.scrollY)
                     }}
-                    className="flex min-w-0 flex-col items-start gap-3 p-3 focus-visible:outline-none @min-[16rem]:flex-row"
+                    className="flex min-w-0 flex-col items-center gap-3 p-3 focus-visible:outline-none @min-[18rem]:flex-row @min-[18rem]:items-start"
                     aria-label={`Ver detalhes de ${b.title}`}
                   >
                     <CoverImage
@@ -1087,18 +1087,18 @@ export function BooksPage() {
                       className="h-28 w-20 shrink-0 rounded-xl border border-slate-200 dark:border-slate-600"
                       sizes="80px"
                     />
-                    <div className="flex w-full min-w-0 flex-col gap-2 @min-[16rem]:flex-1">
-                      <div className="flex min-w-0 flex-col items-start gap-2 @min-[24rem]:flex-row @min-[24rem]:justify-between">
-                        <h3 className="w-full min-w-0 break-words text-sm font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors @min-[24rem]:w-0 @min-[24rem]:flex-1">
+                    <div className="flex w-full min-w-0 flex-col items-center gap-2 @min-[18rem]:flex-1 @min-[18rem]:items-stretch">
+                      <div className="flex min-w-0 flex-col items-center gap-2 @min-[18rem]:items-start @min-[24rem]:flex-row @min-[24rem]:justify-between">
+                        <h3 className="w-full min-w-0 break-words text-center text-sm font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors @min-[18rem]:text-left @min-[24rem]:w-0 @min-[24rem]:flex-1">
                           {b.title}
                         </h3>
-                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 self-start text-xs px-2 py-0.5 @min-[24rem]:self-auto" title={isGuest ? publicBookStateLabel(b.derived_state) : `Estado: ${bookStateLabel(b.derived_state)}`}>
+                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 self-center text-xs px-2 py-0.5 @min-[18rem]:self-start @min-[24rem]:self-auto" title={isGuest ? publicBookStateLabel(b.derived_state) : `Estado: ${bookStateLabel(b.derived_state)}`}>
                           {isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}
                         </Badge>
                       </div>
-                      <p className="flex min-w-0 items-start gap-1.5 font-mono text-xs text-slate-500 dark:text-slate-400">
+                      <p className="flex min-w-0 max-w-full items-start justify-center gap-1.5 text-center font-mono text-xs text-slate-500 dark:text-slate-400 @min-[18rem]:justify-start @min-[18rem]:text-left">
                         <Hash className="h-3 w-3 opacity-60" aria-hidden="true" />
-                        <span className="min-w-0 break-words">{b.isbn ?? 'Sem ISBN'}</span>
+                        <span className="min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{b.isbn ?? 'Sem ISBN'}</span>
                       </p>
                     </div>
                   </Link>
