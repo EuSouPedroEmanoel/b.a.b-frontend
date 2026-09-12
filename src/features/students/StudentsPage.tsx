@@ -231,16 +231,16 @@ export function StudentsPage() {
             {data.items.length === 0 ? (
               <p className="text-sm text-slate-500 p-6">Nenhum aluno cadastrado nesta escola.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="@container max-w-full overflow-x-auto overscroll-x-contain">
+                <table className="w-full min-w-0 text-sm @max-lg:table-fixed">
                   <caption className="sr-only">Alunos cadastrados</caption>
                   <thead className="bg-slate-50 dark:bg-slate-700/50">
                     <tr>
-                      <th scope="col" className="px-4 py-3 text-left font-semibold">Nome</th>
-                      <th scope="col" className="px-4 py-3 text-left font-semibold">CPF</th>
-                      <th scope="col" className="px-4 py-3 text-left font-semibold">Nascimento</th>
-                      <th scope="col" className="px-4 py-3 text-left font-semibold">Turma</th>
-                      <th scope="col" className="px-4 py-3 text-right font-semibold">Ações</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:w-auto">Nome</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:w-24">CPF</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Nascimento</th>
+                      <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:w-20">Turma</th>
+                      <th scope="col" className="w-[1%] px-4 py-3 text-right font-semibold">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -248,24 +248,36 @@ export function StudentsPage() {
                       const deprecated = isDeprecatedTurma(s.updated_at)
                       return (
                         <tr key={s.id}>
-                          <td className="px-4 py-3 font-medium capitalize">{s.username.replace(/\./g, ' ')}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{s.cpf_masked ?? '—'}</td>
-                          <td className="px-4 py-3">
+                          <td className="break-words px-4 py-3 align-top font-medium capitalize">
+                            <span>{s.username.replace(/\./g, ' ')}</span>
+                            <span className="mt-1 hidden text-xs font-normal text-slate-600 dark:text-slate-300 @max-lg:block">
+                              Nascimento: {s.birthdate ? new Date(`${s.birthdate}T00:00:00`).toLocaleDateString('pt-BR') : '—'}
+                            </span>
+                          </td>
+                          <td className="break-words px-4 py-3 align-top font-mono text-xs">{s.cpf_masked ?? '—'}</td>
+                          <td className="px-4 py-3 align-top @max-lg:hidden">
                             {s.birthdate ? (
                               new Date(`${s.birthdate}T00:00:00`).toLocaleDateString('pt-BR')
                             ) : (
                               '—'
                             )}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 align-top">
                             <span className="flex items-center gap-2">
                               <span className="font-mono font-medium">{turmaLabel(s.turma_numero, s.turma_letra)}</span>
                               {deprecated && <Badge tone="warning">Atualizar</Badge>}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <Button size="sm" variant="secondary" onClick={() => openEdit(s)}>
-                              <Pencil className="h-4 w-4 mr-1" aria-hidden="true" /> Editar
+                          <td className="px-4 py-3 text-right align-top">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => openEdit(s)}
+                              aria-label={`Editar aluno ${s.username.replace(/\./g, ' ')}`}
+                              title={`Editar aluno ${s.username.replace(/\./g, ' ')}`}
+                            >
+                              <Pencil className="h-4 w-4 @max-lg:mr-0 mr-1" aria-hidden="true" />
+                              <span className="@max-lg:sr-only">Editar</span>
                             </Button>
                           </td>
                         </tr>
