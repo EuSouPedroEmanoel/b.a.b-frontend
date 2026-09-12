@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -49,6 +49,8 @@ type Reservation = { id: number; book_id: number; status: string; created_at?: s
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 
 const responsiveStatusBadgeClasses = 'min-h-6 max-w-full min-w-0 whitespace-normal !px-2 !py-0.5 text-xs font-medium leading-normal [overflow-wrap:anywhere]'
+const recommendationPreferredWidthClasses = 'w-[min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85))] max-w-full basis-[min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85))] shrink-0 grow-0'
+const recommendationItemClasses = 'w-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85)))] max-w-full basis-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85)))] shrink-0 grow-0'
 
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()
@@ -88,6 +90,8 @@ export function BookDetailPage() {
   const reservationConfirmRef = useRef<HTMLButtonElement>(null)
   const reservationLinkRef = useRef<HTMLAnchorElement>(null)
   const availabilityNoticeRef = useRef<HTMLParagraphElement>(null)
+  const indicatorsGridRef = useRef<HTMLDListElement>(null)
+  const [indicatorColumns, setIndicatorColumns] = useState(1)
   const shouldFocusReservationLinkRef = useRef(false)
   const shouldFocusAvailabilityRef = useRef(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -129,7 +133,7 @@ export function BookDetailPage() {
     resetLightbox()
   }, [resetLightbox])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
   }, [id])
 
@@ -263,6 +267,34 @@ export function BookDetailPage() {
   const copies = copiesPage?.items ?? []
   const available = availableCopies.length
   const borrowed = copies.filter((c) => c.state === 'borrowed').length
+
+  useLayoutEffect(() => {
+    const grid = indicatorsGridRef.current
+    if (!grid) return
+
+    const measureColumns = () => {
+      const lastIndicator = grid.children[2] as HTMLElement | undefined
+      const previousGridColumn = lastIndicator?.style.gridColumn
+      lastIndicator?.style.setProperty('grid-column', 'auto')
+      const columns = getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+      if (lastIndicator) {
+        if (previousGridColumn) lastIndicator.style.setProperty('grid-column', previousGridColumn)
+        else lastIndicator.style.removeProperty('grid-column')
+      }
+      if (columns === 0) return
+      setIndicatorColumns((current) => current === columns ? current : columns)
+    }
+
+    measureColumns()
+    const observer = new ResizeObserver(measureColumns)
+    observer.observe(grid)
+    const fontObserver = new MutationObserver(measureColumns)
+    fontObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-font-size'] })
+    return () => {
+      observer.disconnect()
+      fontObserver.disconnect()
+    }
+  }, [copies.length])
   const currentReservation = useMemo(
     () => reservationsPage?.items.find((reservation) => (
       reservation.status === 'active' || reservation.status === 'ready'
@@ -723,16 +755,16 @@ export function BookDetailPage() {
                 <p className={`text-sm ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Nenhum exemplar cadastrado para este livro nesta escola.</p>
               ) : (
                 <>
-                  <dl className="grid grid-cols-3 gap-3 text-center mb-4">
-                    <div className={`rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
+                  <dl ref={indicatorsGridRef} className="mb-4 grid gap-3 text-center [grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(var(--text-sm)_*_9)),1fr))]">
+                    <div className={`min-w-0 rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-slate-500/40 bg-slate-700/40' : 'border-slate-200 bg-slate-50'}`}>
                       <dt className={`text-xs uppercase ${isDark ? 'text-white/60' : 'text-slate-500'}`}>Total</dt>
                       <dd className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{copies.length}</dd>
                     </div>
-                    <div className={`rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className={`min-w-0 rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-emerald-300/40 bg-emerald-400/10' : 'border-emerald-200 bg-emerald-50'}`}>
                       <dt className={`text-xs uppercase ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Disponíveis</dt>
                       <dd className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{available}</dd>
                     </div>
-                    <div className={`rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-slate-50'}`}>
+                    <div style={{ gridColumn: indicatorColumns === 2 ? '1 / -1' : undefined }} className={`min-w-0 rounded-lg border backdrop-blur-sm p-3 ${isDark ? 'border-violet-300/40 bg-violet-400/10' : 'border-violet-200 bg-violet-50'}`}>
                       <dt className={`text-xs uppercase ${isDark ? 'text-white/70' : 'text-slate-500'}`}>Emprestados</dt>
                       <dd className={`mt-1 text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{borrowed}</dd>
                     </div>
@@ -805,7 +837,7 @@ export function BookDetailPage() {
           <CardBody className="relative overflow-visible">
             <div className="flex gap-4 overflow-hidden" aria-busy="true" aria-live="polite">
               {Array.from({ length: 16 }).map((_, i) => (
-                <div key={i} className="w-[160px] sm:w-[180px] lg:w-[200px] shrink-0 flex flex-col gap-2">
+                <div key={i} className={`${recommendationItemClasses} flex flex-col gap-2`}>
                   <div className="aspect-[2/3] rounded-xl bg-white/20 dark:bg-white/10 animate-pulse" />
                   <div className="h-3 rounded bg-white/20 dark:bg-white/10 animate-pulse" />
                   <div className="h-3 w-2/3 rounded bg-white/20 dark:bg-white/10 animate-pulse" />
@@ -822,12 +854,13 @@ export function BookDetailPage() {
               title="Você também pode gostar"
               items={similarBooks}
               circular
+              fluidItems
               renderItem={(b, idx) => (
-                <div className="w-[160px] sm:w-[180px] lg:w-[200px] shrink-0">
+                <div className={recommendationItemClasses}>
                   <GridCard book={b as any} index={idx} portalHover isGuest={isGuest} />
                 </div>
               )}
-              measureItem={() => <div aria-hidden="true" className="h-0 w-[160px] shrink-0 sm:w-[180px] lg:w-[200px]" />}
+              measureItem={() => <div data-carousel-measure-item aria-hidden="true" className={`h-0 ${recommendationPreferredWidthClasses}`} />}
             />
           </CardBody>
         </Card>

@@ -10,7 +10,7 @@ function renderBook(book: any, index: number, ranking = false) {
 }
 
 function measureBook() {
-  return <div aria-hidden="true" className="relative h-0 w-[140px] shrink-0 sm:w-[160px] lg:w-[180px]" />
+  return <div data-carousel-measure-item aria-hidden="true" className="relative h-0 w-[140px] shrink-0 sm:w-[160px] lg:w-[180px]" />
 }
 
 export function GuestHome() {

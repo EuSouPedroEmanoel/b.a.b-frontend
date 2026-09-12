@@ -1,255 +1,224 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { useEffect } from 'react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Carousel } from '@/components/ui/Carousel'
 
-type Geometry = { clientWidth: number; scrollWidth: number; cardWidth?: number }
+type Geometry = { clientWidth: number; scrollWidth?: number; cardWidth?: number; wrapperWidth?: number }
 let resizeCallbacks: ResizeObserverCallback[] = []
 
-function renderCarousel(count: number, circular = true) {
-  return render(<Carousel title="Livros" items={Array.from({ length: count }, (_, id) => ({ id }))} circular={circular} renderItem={(item) => <article aria-label={`Livro ${item.id + 1}`}>Livro {item.id + 1}</article>} />)
+function renderCarousel(count: number, circular = true, fluidItems = false) {
+  return render(
+    <Carousel
+      title="Livros"
+      items={Array.from({ length: count }, (_, id) => ({ id }))}
+      circular={circular}
+      fluidItems={fluidItems}
+      renderItem={(item) => <article aria-label={`Livro ${item.id + 1}`} tabIndex={0}>Livro {item.id + 1}</article>}
+    />,
+  )
 }
 
 function region() {
-  return screen
-    .getAllByRole('region')
-    .find((element) => element.getAttribute('aria-roledescription') === 'carrossel') as HTMLDivElement
+  return screen.getByRole('region', { name: /Livros\. Página/i }) as HTMLDivElement
 }
-function viewport() { return region().parentElement as HTMLDivElement }
 
-function configureGeometry(geometry: Geometry, circular = true) {
-  const scroller = region()
-  const parent = viewport()
-  const measurement = circular ? parent.querySelector('[aria-hidden="true"][inert]') as HTMLDivElement | null : null
-  let scrollLeft = 0
-  Object.defineProperty(parent, 'clientWidth', { configurable: true, get: () => geometry.clientWidth })
-  if (!circular) Object.defineProperties(scroller, {
-    scrollWidth: { configurable: true, get: () => geometry.scrollWidth },
-    scrollLeft: { configurable: true, get: () => scrollLeft, set: (value: number) => { scrollLeft = value } },
-  })
-  const move = (left: number) => { scrollLeft = Math.max(0, Math.min(left, geometry.scrollWidth - geometry.clientWidth)); fireEvent.scroll(scroller) }
-  Object.defineProperty(scroller, 'scrollTo', { configurable: true, value: (options: ScrollToOptions | number) => move(typeof options === 'number' ? options : options.left ?? scrollLeft) })
-  const cards = measurement ? Array.from(measurement.children) : Array.from(scroller.children)
-  for (const card of cards) {
-    const cardWidth = geometry.cardWidth ?? 100
-    Object.defineProperty(card, 'offsetWidth', { configurable: true, get: () => cardWidth })
-    vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({ width: cardWidth, height: 180, top: 0, left: 0, right: cardWidth, bottom: 180, x: 0, y: 0, toJSON: () => ({}) } as DOMRect)
+function viewport() {
+  return region().parentElement as HTMLDivElement
+}
+
+function labels() {
+  return Array.from(region().querySelectorAll<HTMLElement>('[aria-label^="Livro"]')).map((card) => card.getAttribute('aria-label'))
+}
+
+function configureGeometry({ clientWidth, scrollWidth = 0, cardWidth = 100, wrapperWidth = 280 }: Geometry, circular = true) {
+  const carouselViewport = viewport()
+  Object.defineProperty(carouselViewport, 'clientWidth', { configurable: true, get: () => clientWidth })
+
+  if (circular) {
+    const measurement = carouselViewport.querySelector('[aria-hidden="true"][inert]') as HTMLDivElement
+    const measuredItem = measurement.querySelector('[data-carousel-measure-item]') as HTMLElement
+    Object.defineProperties(measurement, {
+      offsetWidth: { configurable: true, get: () => wrapperWidth },
+      getBoundingClientRect: { configurable: true, value: () => ({ width: wrapperWidth, height: 180, top: 0, left: 0, right: wrapperWidth, bottom: 180, x: 0, y: 0, toJSON: () => ({}) }) },
+    })
+    Object.defineProperties(measuredItem, {
+      offsetWidth: { configurable: true, get: () => cardWidth },
+      getBoundingClientRect: { configurable: true, value: () => ({ width: cardWidth, height: 180, top: 0, left: 0, right: cardWidth, bottom: 180, x: 0, y: 0, toJSON: () => ({}) }) },
+    })
+  } else {
+    const scroller = screen.getByRole('region', { name: 'Livros' }) as HTMLDivElement
+    let scrollLeft = 0
+    Object.defineProperties(scroller, {
+      clientWidth: { configurable: true, get: () => clientWidth },
+      scrollWidth: { configurable: true, get: () => scrollWidth },
+      scrollLeft: { configurable: true, get: () => scrollLeft, set: (value: number) => { scrollLeft = value } },
+      scrollTo: { configurable: true, value: ({ left }: ScrollToOptions) => { scrollLeft = left ?? scrollLeft; fireEvent.scroll(scroller) } },
+    })
   }
-  if (!circular) fireEvent.scroll(scroller)
+
   act(() => resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver)))
-  return { viewport: parent, get scrollLeft() { return scrollLeft } }
+  return carouselViewport
 }
 
-function mainCards() {
-  const currentRegion = region()
-  return Array.from(currentRegion.querySelectorAll<HTMLElement>('[aria-label^="Livro"]')).filter((card) => {
-    let node: HTMLElement | null = card
-    while (node && node !== currentRegion) { if (node.getAttribute('aria-hidden') === 'true') return false; node = node.parentElement }
-    return true
-  })
-}
-function labels() { return mainCards().map((card) => card.getAttribute('aria-label')) }
-function track() { return region().querySelector('[data-carousel-track="true"]') as HTMLElement }
-function finishTransition() { fireEvent.transitionEnd(track()) }
-function nextButton() { return screen.getAllByRole('button', { name: 'Próximo' })[0] }
-function previousButton() { return screen.getAllByRole('button', { name: 'Anterior' })[0] }
+function nextButton() { return screen.getByRole('button', { name: 'Próximo' }) }
+function previousButton() { return screen.getByRole('button', { name: 'Anterior' }) }
 
-describe('Carousel circular sem peeks', () => {
+describe('Carousel paginado e sequenciado', () => {
   beforeEach(() => {
     vi.stubGlobal('ResizeObserver', class {
       constructor(callback: ResizeObserverCallback) { resizeCallbacks.push(callback) }
       observe() {}
       disconnect() {}
     })
+    vi.stubGlobal('MutationObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   })
-  afterEach(() => { cleanup(); resizeCallbacks = []; vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-  it('mantém a estrutura do carrossel no estado vazio sem controles', () => {
+  afterEach(() => {
+    cleanup()
+    resizeCallbacks = []
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('mantém estrutura acessível no estado vazio sem controles', () => {
     renderCarousel(0)
-
-    expect(region()).toHaveAttribute('aria-roledescription', 'carrossel')
     expect(screen.getByText('Nenhum item disponível.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Próximo' })).not.toBeInTheDocument()
   })
 
-  it.each([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13])('suporta qualquer quantidade de itens (%i)', (count) => {
-    renderCarousel(count)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    expect(region()).toBeInTheDocument()
-    expect(mainCards().every((card) => !card.closest('[aria-hidden="true"]'))).toBe(true)
-  })
-
-  it('não duplica itens quando todos cabem', () => {
-    renderCarousel(3)
-    configureGeometry({ clientWidth: 700, scrollWidth: 680, cardWidth: 100 })
-    expect(mainCards()).toHaveLength(3)
-    expect(screen.getAllByRole('article')).toHaveLength(3)
-    expect(region().querySelector('[data-carousel-track="true"]')).not.toBeInTheDocument()
-    expect(previousButton()).toBeDisabled()
-    expect(nextButton()).toBeDisabled()
-  })
-
-  it('usa itens leves para medir sem chamar o renderizador pesado na medição', () => {
-    let heavyCalls = 0
-    let measureCalls = 0
+  it('mede somente um item leve e renderiza apenas a página atual', () => {
+    let measured = 0
+    let rendered = 0
     render(
       <Carousel
         title="Livros"
         items={Array.from({ length: 9 }, (_, id) => ({ id }))}
         circular
-        renderItem={(item) => {
-          heavyCalls += 1
-          return <article aria-label={`Livro pesado ${item.id}`}>Livro</article>
-        }}
-        measureItem={() => {
-          measureCalls += 1
-          return <div data-testid="light-measure-item" />
-        }}
+        renderItem={(item) => { rendered += 1; return <article aria-label={`Livro ${item.id + 1}`}>Livro</article> }}
+        measureItem={() => { measured += 1; return <div data-carousel-measure-item data-testid="measure-item" /> }}
       />,
     )
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
 
-    expect(measureCalls).toBe(9)
-    expect(heavyCalls).toBe(9)
-    expect(screen.getAllByTestId('light-measure-item')).toHaveLength(9)
-  })
-
-  it('mostra quatro cards principais completos sem peeks laterais', () => {
-    renderCarousel(9)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    expect(mainCards()).toHaveLength(4)
-    expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4'])
-    expect(region().querySelectorAll('[aria-label^="Livro"]').length).toBeGreaterThan(mainCards().length)
-  })
-
-  it('mantém clones de animação fora da árvore acessível e sem foco', () => {
-    renderCarousel(8)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    const hiddenCards = Array.from(region().querySelectorAll<HTMLElement>('[aria-hidden="true"] [aria-label^="Livro"]'))
-    expect(hiddenCards.every((card) => card.tabIndex < 0 || card.getAttribute('aria-hidden') === 'true')).toBe(true)
-    expect(mainCards().every((card) => !card.getAttribute('aria-hidden'))).toBe(true)
-  })
-
-  it('anima horizontalmente e avança/retrocede por grupo', () => {
-    renderCarousel(9)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    const initial = track().style.transform
-    fireEvent.click(nextButton())
-    expect(track().style.transform).not.toBe(initial)
-    expect(track().style.transition).toContain('transform')
-    finishTransition()
-    expect(labels()).toEqual(['Livro 5', 'Livro 6', 'Livro 7', 'Livro 8'])
-    fireEvent.click(previousButton())
-    expect(track().style.transition).toContain('transform')
-    finishTransition()
+    expect(measured).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('measure-item')).toHaveLength(1)
+    expect(rendered).toBeGreaterThanOrEqual(4)
     expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4'])
   })
 
-  it('mantém os cards em opacity e escala estáveis durante a navegação', () => {
+  it('mede o filho com a largura do card, não o wrapper absoluto', () => {
     renderCarousel(9)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    const carouselTrack = track()
-    const currentPane = Array.from(carouselTrack.children).find((pane) => pane.getAttribute('aria-hidden') !== 'true') as HTMLElement
-    const nextPane = currentPane.nextElementSibling as HTMLElement
-    const currentCard = currentPane.querySelector('[data-carousel-card="true"]') as HTMLElement
-    const nextCard = nextPane.querySelector('[data-carousel-card="true"]') as HTMLElement
+    configureGeometry({ clientWidth: 548, cardWidth: 100, wrapperWidth: 280 })
 
-    expect(currentCard.style.transform).toBe('scale(1)')
+    expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4', 'Livro 5'])
+  })
+
+  it('distribui uma diferença mínima entre cards fluídos para completar uma página', () => {
+    renderCarousel(9, true, true)
+    const carouselViewport = configureGeometry({ clientWidth: 544, cardWidth: 100 })
+
+    expect(labels()).toHaveLength(5)
+    expect(carouselViewport.style.getPropertyValue('--carousel-item-width')).toBe('99.2px')
+  })
+
+  it('calcula apenas cards completos por página, sem cards adjacentes no DOM', () => {
+    renderCarousel(9)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+
+    expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4'])
+    expect(region().querySelectorAll('[aria-label^="Livro"]')).toHaveLength(4)
+  })
+
+  it('desabilita as setas quando todos os itens cabem', () => {
+    renderCarousel(3)
+    configureGeometry({ clientWidth: 700, cardWidth: 100 })
+
+    expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3'])
+    expect(previousButton()).toBeDisabled()
+    expect(nextButton()).toBeDisabled()
+  })
+
+  it('faz loop e completa a última página com itens do início', () => {
+    renderCarousel(9)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+
     fireEvent.click(nextButton())
-
-    expect(currentCard.style.transform).toBe('scale(1)')
-    expect(currentCard.style.opacity).toBe('1')
-    expect(nextCard.style.transform).toBe('scale(1)')
-    expect(nextCard.style.opacity).toBe('1')
-    expect(carouselTrack.style.transition).toContain('280ms')
-  })
-
-  it('espelha a animação ao navegar para Anterior', () => {
-    renderCarousel(9)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    fireEvent.click(previousButton())
-    const carouselTrack = track()
-    expect(carouselTrack.style.transform).toBe('translateX(-960px)')
-    expect(carouselTrack.style.transition).toContain('280ms')
-  })
-
-  it('mantém montada a mesma instância que entrou e a reutiliza ao voltar', () => {
-    const lifecycle: string[] = []
-    function ProbeCard({ item }: { item: { id: number } }) {
-      useEffect(() => {
-        lifecycle.push(`mount:${item.id}`)
-        return () => { lifecycle.push(`unmount:${item.id}`) }
-      }, [item.id])
-      return <article aria-label={`Livro ${item.id + 1}`}>Livro {item.id + 1}</article>
-    }
-    render(<Carousel title="Livros" items={Array.from({ length: 9 }, (_, id) => ({ id }))} circular renderItem={(item) => <ProbeCard item={item} />} />)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    const carouselTrack = track()
-    const initialPane = Array.from(carouselTrack.children).find((pane) => pane.getAttribute('aria-hidden') !== 'true') as HTMLElement
-    const initialCard = initialPane.querySelector('[aria-label="Livro 1"]') as HTMLElement
-    const enteringCard = (initialPane.nextElementSibling as HTMLElement).querySelector('[aria-label="Livro 5"]') as HTMLElement
-    lifecycle.length = 0
-
-    fireEvent.click(nextButton()); finishTransition()
-    expect(enteringCard).toBeInTheDocument()
-    expect(enteringCard.closest('[aria-hidden="true"]')).toBeNull()
-    expect(lifecycle).toEqual([])
-
-    fireEvent.click(previousButton()); finishTransition()
-    expect(initialCard).toBeInTheDocument()
-    expect(initialCard.closest('[aria-hidden="true"]')).toBeNull()
-    expect(lifecycle).toEqual([])
-  })
-
-  it('remove slide e zoom quando prefers-reduced-motion está ativo', () => {
-    vi.stubGlobal('matchMedia', () => ({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }))
-    renderCarousel(9)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    fireEvent.click(nextButton())
-    const carouselTrack = track()
-    const currentCard = (carouselTrack.children[1] as HTMLElement).querySelector('[data-carousel-card="true"]') as HTMLElement
-    expect(carouselTrack.style.transition).toBe('none')
-    expect(currentCard.style.transform).toBe('scale(1)')
-    expect(currentCard.style.opacity).toBe('1')
-    expect(nextButton()).not.toBeDisabled()
     expect(labels()).toEqual(['Livro 5', 'Livro 6', 'Livro 7', 'Livro 8'])
     fireEvent.click(nextButton())
     expect(labels()).toEqual(['Livro 9', 'Livro 1', 'Livro 2', 'Livro 3'])
+    fireEvent.click(nextButton())
+    expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4'])
   })
 
-  it('circula modularmente e alcança todos os itens como principais', () => {
-    renderCarousel(7)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    const seen = new Set<string>()
-    for (let step = 0; step < 8; step += 1) { labels().forEach((label) => seen.add(label ?? '')); fireEvent.click(nextButton()); finishTransition() }
-    expect(seen).toEqual(new Set(Array.from({ length: 7 }, (_, index) => `Livro ${index + 1}`)))
-  })
-
-  it('Anterior e setas do teclado preservam o foco', () => {
-    renderCarousel(6)
-    configureGeometry({ clientWidth: 480, scrollWidth: 1400, cardWidth: 100 })
-    const currentRegion = region(); currentRegion.focus(); const initial = labels()
-    fireEvent.keyDown(currentRegion, { key: 'ArrowRight' }); finishTransition()
-    expect(document.activeElement).toBe(currentRegion)
-    expect(labels()).not.toEqual(initial)
-    fireEvent.keyDown(currentRegion, { key: 'ArrowLeft' }); finishTransition()
-    expect(document.activeElement).toBe(currentRegion)
-    expect(labels()).toEqual(initial)
-  })
-
-  it('recalcula cards completos ao redimensionar', () => {
+  it('troca a página somente depois da sequência de saída', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     renderCarousel(9)
-    const geometry = configureGeometry({ clientWidth: 400, scrollWidth: 1400, cardWidth: 100 })
-    expect(mainCards()).toHaveLength(3)
-    Object.defineProperty(geometry.viewport, 'clientWidth', { configurable: true, get: () => 480 })
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+
+    fireEvent.click(nextButton())
+
+    expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4'])
+    expect(nextButton()).toBeDisabled()
+    await waitFor(() => expect(labels()).toEqual(['Livro 5', 'Livro 6', 'Livro 7', 'Livro 8']), { timeout: 1500 })
+    await waitFor(() => expect(nextButton()).not.toBeDisabled(), { timeout: 1500 })
+  })
+
+  it('recalcula a página de quatro para cinco cards e volta sem fragmentos', () => {
+    renderCarousel(9)
+    const carouselViewport = configureGeometry({ clientWidth: 480, cardWidth: 100 })
+    expect(labels()).toHaveLength(4)
+
+    Object.defineProperty(carouselViewport, 'clientWidth', { configurable: true, get: () => 548 })
     act(() => resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver)))
-    expect(mainCards()).toHaveLength(4)
-    Object.defineProperty(geometry.viewport, 'clientWidth', { configurable: true, get: () => 400 })
+    expect(labels()).toHaveLength(5)
+
+    Object.defineProperty(carouselViewport, 'clientWidth', { configurable: true, get: () => 480 })
     act(() => resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver)))
-    expect(mainCards()).toHaveLength(3)
+    expect(labels()).toHaveLength(4)
+  })
+
+  it('restaura o foco programático para a região quando remove um card focado', () => {
+    renderCarousel(9)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+    const focusedCard = region().querySelector('[aria-label="Livro 1"]') as HTMLElement
+    focusedCard.focus()
+
+    fireEvent.click(nextButton())
+
+    expect(document.activeElement).toBe(region())
+    expect(region()).toHaveAttribute('tabindex', '-1')
+    expect(labels()).toEqual(['Livro 5', 'Livro 6', 'Livro 7', 'Livro 8'])
+  })
+
+  it('usa as setas do teclado e mantém o foco na região', () => {
+    renderCarousel(9)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+    region().focus()
+
+    fireEvent.keyDown(region(), { key: 'ArrowRight' })
+
+    expect(document.activeElement).toBe(region())
+    expect(labels()).toEqual(['Livro 5', 'Livro 6', 'Livro 7', 'Livro 8'])
+  })
+
+  it('preserva o modo não circular com rolagem e setas', () => {
+    renderCarousel(3, false)
+    const scroller = screen.getByRole('region', { name: '' }) as HTMLDivElement
+    let scrollLeft = 0
+    Object.defineProperties(scroller, {
+      clientWidth: { configurable: true, get: () => 200 },
+      scrollWidth: { configurable: true, get: () => 600 },
+      scrollLeft: { configurable: true, get: () => scrollLeft, set: (value: number) => { scrollLeft = value } },
+      scrollTo: { configurable: true, value: ({ left }: ScrollToOptions) => { scrollLeft = left ?? scrollLeft; fireEvent.scroll(scroller) } },
+    })
+    act(() => resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver)))
+
+    expect(nextButton()).not.toBeDisabled()
+    fireEvent.click(nextButton())
+    expect(previousButton()).not.toBeDisabled()
   })
 })
