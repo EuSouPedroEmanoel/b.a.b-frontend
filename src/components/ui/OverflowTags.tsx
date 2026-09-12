@@ -5,6 +5,7 @@ import { stringToHsl } from '@/lib/coverColor'
 import { useTheme } from '@/hooks/useTheme'
 
 type Item = { id: number; name: string }
+type Selection = number[]
 
 type Props = {
   items: Item[]
@@ -20,7 +21,7 @@ type Props = {
 
 export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVisibleFallback = 2, className = '', onItemClick, itemMaxWidthClass = 'max-w-[12ch]', maxVisible, hiddenLabel = 'itens adicionais' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [visibleCount, setVisibleCount] = useState<number>(() => Math.min(items.length, maxVisibleFallback))
+  const [visibleIndexes, setVisibleIndexes] = useState<Selection>(() => Array.from({ length: Math.min(items.length, maxVisibleFallback) }, (_, index) => index))
   const [expanded, setExpanded] = useState(false)
   const overflowButtonRef = useRef<HTMLButtonElement>(null)
   const measurementRef = useRef<HTMLDivElement>(null)
@@ -39,9 +40,9 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
     const el = containerRef.current
     const measurement = measurementRef.current
     if (!el || !measurement || items.length === 0) {
-      setVisibleCount((current) => {
-        const next = Math.min(items.length, maxVisibleFallback)
-        return current === next ? current : next
+      setVisibleIndexes((current) => {
+        const next = Array.from({ length: Math.min(items.length, maxVisibleFallback) }, (_, index) => index)
+        return current.length === next.length && current.every((index, position) => index === next[position]) ? current : next
       })
       return
     }
@@ -49,9 +50,9 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
     const compute = () => {
       const containerWidth = el.clientWidth
       if (containerWidth === 0) {
-        setVisibleCount((current) => {
-          const next = Math.min(items.length, maxVisibleFallback)
-          return current === next ? current : next
+        setVisibleIndexes((current) => {
+          const next = Array.from({ length: Math.min(items.length, maxVisibleFallback) }, (_, index) => index)
+          return current.length === next.length && current.every((index, position) => index === next[position]) ? current : next
         })
         return
       }
@@ -64,27 +65,55 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
       )
       const tagWidths = measuredTags.map((tag) => tag.getBoundingClientRect().width || tag.offsetWidth)
       const limit = Math.min(items.length, maxVisible ?? items.length)
-      let nextCount = 0
+      const minWidths: number[][] = Array.from({ length: items.length + 1 }, () => Array(limit + 1).fill(Number.POSITIVE_INFINITY))
+      minWidths[items.length][0] = 0
+      for (let index = items.length - 1; index >= 0; index -= 1) {
+        minWidths[index][0] = 0
+        for (let count = 1; count <= Math.min(limit, items.length - index); count += 1) {
+          minWidths[index][count] = Math.min(
+            minWidths[index + 1][count],
+            tagWidths[index] + minWidths[index + 1][count - 1],
+          )
+        }
+      }
+
+      const findEarliestSelection = (count: number, capacity: number): Selection | null => {
+        if (minWidths[0][count] > capacity) return null
+        const selection: Selection = []
+        let remaining = count
+        let used = 0
+        for (let index = 0; index < items.length && remaining > 0; index += 1) {
+          const canUse = used + tagWidths[index] + minWidths[index + 1][remaining - 1] <= capacity
+          if (canUse) {
+            selection.push(index)
+            used += tagWidths[index]
+            remaining -= 1
+          }
+        }
+        return remaining === 0 ? selection : null
+      }
+
+      let nextSelection: Selection = []
 
       for (let count = limit; count >= 0; count -= 1) {
         const hiddenCount = items.length - count
-        const tagsWidth = tagWidths.slice(0, count).reduce((total, width) => total + width, 0)
         const tagsGap = count > 1 ? (count - 1) * gap : 0
         const overflowButton = hiddenCount > 0 ? measuredOverflowButtons.get(hiddenCount) : undefined
         const overflowWidth = overflowButton?.getBoundingClientRect().width || overflowButton?.offsetWidth || 0
         const overflowGap = hiddenCount > 0 ? gap : 0
-        const requiredWidth = tagsWidth + tagsGap + overflowGap + overflowWidth
+        const capacity = containerWidth - tagsGap - overflowGap - overflowWidth
+        const selection = findEarliestSelection(count, capacity)
 
-        if (requiredWidth <= containerWidth) {
-          nextCount = count
+        if (selection) {
+          nextSelection = selection
           break
         }
       }
 
-      if (nextCount === 0 && items.length > 0 && !measuredOverflowButtons.has(items.length)) {
-        nextCount = 1
+      if (nextSelection.length === 0 && items.length > 0 && !measuredOverflowButtons.has(items.length)) {
+        nextSelection = [0]
       }
-      setVisibleCount((current) => current === nextCount ? current : nextCount)
+      setVisibleIndexes((current) => current.length === nextSelection.length && current.every((index, position) => index === nextSelection[position]) ? current : nextSelection)
     }
 
     compute()
@@ -98,8 +127,9 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
     }
   }, [items, maxVisibleFallback, maxVisible, itemMaxWidthClass, tone, variant, isDarkTheme])
 
-  const visible = items.slice(0, maxVisible ? Math.min(visibleCount, maxVisible) : visibleCount)
-  const hidden = items.slice(visible.length)
+  const visibleSet = new Set(visibleIndexes)
+  const visible = items.filter((_, index) => visibleSet.has(index))
+  const hidden = items.filter((_, index) => !visibleSet.has(index))
 
   useEffect(() => {
     if (!expanded) return
@@ -128,10 +158,11 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
   const overflowButtonClass = isDark
     ? 'group/category relative cursor-default shrink-0 whitespace-nowrap rounded-full bg-white/25 px-3 py-0.5 text-xs font-medium text-white border border-white/20 transition-colors duration-200 hover:brightness-110 hover:bg-white/30'
     : 'group/category relative cursor-default shrink-0 whitespace-nowrap rounded-full bg-slate-200 dark:bg-slate-700 px-3 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition-colors duration-200 hover:brightness-105 hover:shadow-sm'
+  const measurementMaxWidthClass = isDark ? 'max-w-[14ch]' : itemMaxWidthClass
   return (
-    <div ref={containerRef} className={`relative flex flex-nowrap gap-1 items-center overflow-visible min-w-0 ${className}`}>
+    <div ref={containerRef} className={`relative flex w-full flex-nowrap gap-1 items-center overflow-visible min-w-0 ${className}`}>
       <div ref={measurementRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 flex h-0 w-0 invisible flex-nowrap gap-1 overflow-clip whitespace-nowrap">
-        {items.map((item) => <span key={item.id} data-overflow-tag-measure={item.name} className={`shrink-0 rounded-full px-3 py-0.5 text-xs font-medium whitespace-nowrap border after:content-[attr(data-overflow-tag-measure)] ${itemMaxWidthClass}`} />)}
+        {items.map((item) => <span key={item.id} data-overflow-tag-measure={item.name} className={`shrink-0 rounded-full px-3 py-0.5 text-xs font-medium whitespace-nowrap border after:content-[attr(data-overflow-tag-measure)] ${measurementMaxWidthClass}`} />)}
         {Array.from({ length: Math.max(0, items.length - 1) }, (_, index) => {
           const hiddenCount = index + 1
           return <button key={hiddenCount} type="button" data-overflow-count={hiddenCount} className={overflowButtonClass}>+{hiddenCount}</button>
