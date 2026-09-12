@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -151,11 +151,18 @@ describe('CirculationPoliciesPage', () => {
     fireEvent.change(screen.getAllByLabelText('Empréstimos simultâneos')[0], { target: { value: '9' } })
     expect(screen.getByRole('button', { name: 'Restaurar padrões' })).toBeInTheDocument()
 
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     fireEvent.click(restoreButton)
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Restaurar regras padrão?' })).getByRole('button', { name: 'Restaurar padrões' }))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Restaurar regras padrão?' })).getByRole('button', { name: 'Restaurar padrões' }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
     expect(screen.getAllByLabelText('Empréstimos simultâneos')[0]).toHaveValue(3)
-    await waitFor(() => expect(fixtures.put).toHaveBeenCalledWith('/circulation-policies/7', expect.objectContaining({ policies: expect.arrayContaining([expect.objectContaining({ reader_role: 'student', max_active_loans: 3 })]) })))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Salvar regras' })).toBeDisabled())
+    expect(fixtures.put).toHaveBeenCalledWith('/circulation-policies/7', expect.objectContaining({ policies: expect.arrayContaining([expect.objectContaining({ reader_role: 'student', max_active_loans: 3 })]) }))
+    expect(screen.getByRole('button', { name: 'Salvar regras' })).toBeDisabled()
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
     expect(screen.queryByRole('button', { name: 'Restaurar padrões' })).not.toBeInTheDocument()
   })
 

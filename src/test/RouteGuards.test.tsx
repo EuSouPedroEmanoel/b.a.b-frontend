@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountOnly, Protected } from '@/app/RouteGuards'
 
 const authState = vi.hoisted(() => ({
@@ -19,6 +19,8 @@ function LocationText() {
 }
 
 describe('Guest route guards', () => {
+  afterEach(cleanup)
+
   beforeEach(() => {
     authState.user = { role: 'guest' }
     authState.isAuthenticated = true
@@ -38,8 +40,13 @@ describe('Guest route guards', () => {
   it('redirects a Guest away from account-only routes without rendering protected content', () => {
     render(
       <MemoryRouter initialEntries={['/emprestimos']}>
-        <AccountOnly><p>Empréstimos privados</p></AccountOnly>
-        <LocationText />
+        <Routes>
+          <Route
+            path="/emprestimos"
+            element={<AccountOnly><p>Empréstimos privados</p></AccountOnly>}
+          />
+          <Route path="/acervo" element={<LocationText />} />
+        </Routes>
       </MemoryRouter>,
     )
 
