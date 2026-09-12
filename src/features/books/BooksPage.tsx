@@ -618,7 +618,7 @@ export function BooksPage() {
         </CardHeader>
         <CardBody>
           <form onSubmit={onSearch} className="flex flex-wrap items-start gap-3" role="search" aria-label="Buscar livros">
-            <div className="order-[1] flex min-w-0 flex-[1_1_72%] flex-wrap items-start gap-3">
+            <div className="order-[1] flex min-w-0 flex-1 flex-wrap items-start gap-3">
               <div className="relative min-w-0 basis-full sm:flex-1">
                 <div>
                   <Input
@@ -815,7 +815,7 @@ export function BooksPage() {
                 className="group relative min-w-0 shrink-0 self-stretch !px-0 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
               >
                 {sortOrder === 'asc' ? <ArrowUp className="size-[calc(var(--text-sm)*1.15)]" /> : <ArrowDown className="size-[calc(var(--text-sm)*1.15)]" />}
-                <Tooltip id="sort-order-tooltip">
+                <Tooltip id="sort-order-tooltip" className="left-auto right-0 translate-x-0">
                   {sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
                 </Tooltip>
               </Button>
@@ -880,7 +880,7 @@ export function BooksPage() {
         </p>
         <div className="flex flex-wrap items-center gap-3">
           {viewMode === 'table' && (
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 text-sm">
               <label htmlFor="page-size-select" className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 Itens por página
               </label>
@@ -901,7 +901,7 @@ export function BooksPage() {
               </select>
             </div>
           )}
-          <div role="group" aria-label="Modo de visualização" className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
+          <div role="group" aria-label="Modo de visualização" className="flex max-w-full min-w-0 flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
           <Button
             size="sm"
             variant={viewMode === 'table' ? 'primary' : 'secondary'}

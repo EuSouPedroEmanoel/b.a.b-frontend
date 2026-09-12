@@ -22,7 +22,7 @@ export function Pagination({ page, pages, total, onChange }: Props) {
         >
           <span aria-hidden="true">‹</span>
         </button>
-        <span className="shrink-0 text-sm font-medium text-slate-700 dark:text-slate-200" aria-current="page">
+        <span className="min-w-0 flex-1 text-center text-sm font-medium text-slate-700 dark:text-slate-200" aria-current="page">
           Página {page} de {pages}
         </span>
         <button
