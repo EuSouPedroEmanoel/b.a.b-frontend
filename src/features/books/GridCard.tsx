@@ -81,7 +81,7 @@ function PreviewStatusLabel({ state, label, isGuest }: { state: string; label: s
       <span className={variant === 'minimal' ? '' : 'hidden'} aria-hidden="true">{variants.minimal}</span>
       <span className="sr-only">{label}</span>
       <span ref={badgeRef} className="sr-only" aria-hidden="true" />
-      <span ref={measurementRef} className="pointer-events-none absolute h-0 overflow-visible opacity-0" aria-hidden="true">
+      <span ref={measurementRef} className="pointer-events-none fixed -left-[9999px] top-0 h-0 w-0 overflow-hidden opacity-0" aria-hidden="true">
         <span className="inline-block whitespace-nowrap px-2 text-xs font-bold leading-snug">{variants.full}</span>
         <span className="inline-block whitespace-nowrap px-2 text-xs font-bold leading-snug">{variants.compact}</span>
         <span className="inline-block whitespace-nowrap px-2 text-xs font-bold leading-snug">{variants.minimal}</span>
@@ -118,6 +118,18 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
   const [portalHovered, setPortalHovered] = useState(false)
   const [portalRect, setPortalRect] = useState<DOMRect | null>(null)
   const hideTimeoutRef = useRef<number | null>(null)
+  const portalWidth = portalRect && typeof window !== 'undefined'
+    ? Math.min(portalRect.width * 1.25, window.innerWidth - 16)
+    : 0
+  const portalHeight = portalRect && typeof window !== 'undefined'
+    ? Math.min(portalRect.height * 1.25, window.innerHeight - 16)
+    : 0
+  const portalLeft = portalRect && typeof window !== 'undefined'
+    ? Math.max(8, Math.min(portalRect.left - portalWidth * 0.1, window.innerWidth - portalWidth - 8))
+    : 0
+  const portalTop = portalRect && typeof window !== 'undefined'
+    ? Math.max(8, Math.min(portalRect.top - portalHeight * 0.1, window.innerHeight - portalHeight - 8))
+    : 0
 
   useEffect(() => {
     if (!portalHover || !portalHovered) return
@@ -151,7 +163,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           hideTimeoutRef.current = window.setTimeout(() => setPortalHovered(false), 80)
         }
       }}
-        className={`group relative isolate w-full min-w-0 ${disableHover ? '' : 'hover:z-50 focus-within:z-50'}`}
+        className={`group relative isolate w-full min-w-0 ${disableHover ? '' : 'hover:z-30 focus-within:z-30'}`}
     >
       {/* Card base - tamanho fixo padrão no repouso: w-full + aspect-[2/3] garante mesma altura/largura */}
       <Link
@@ -204,7 +216,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           onClick={savePosition}
           aria-hidden="true"
           tabIndex={-1}
-          className="grid-card-hover-preview pointer-events-none invisible absolute left-1/2 top-1/2 z-40 flex w-full aspect-[2/3] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 scale-90 flex-col justify-between overflow-visible rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:scale-125 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:scale-125 group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+          className="grid-card-hover-preview pointer-events-none invisible absolute left-1/2 top-1/2 z-40 flex w-full max-w-[90vw] min-h-[20rem] max-h-[calc(100vh-1rem)] -translate-x-1/2 -translate-y-1/2 scale-100 flex-col justify-between overflow-y-auto overflow-x-hidden rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
         style={{
           background: hoverBg,
           boxShadow: '0 24px 48px rgba(0,0,0,0.38), 0 10px 20px rgba(0,0,0,0.28)',
@@ -220,8 +232,8 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           aria-hidden="true"
         />
         {/* Conteúdo superior - capa no canto superior esquerdo (reduzida) */}
-        <div className="relative flex shrink-0 gap-2 p-3">
-          <div className="relative w-16 aspect-[2/3] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
+        <div className="relative flex shrink-0 gap-2 p-3 text-sm">
+          <div className="relative h-[7.5em] w-[5em] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
             <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
           </div>
           <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
@@ -254,9 +266,9 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
 
         {/* Descrição ocupando espaço livre entre gêneros e fim do card – gap maior */}
         {book.description ? (
-          <div className="relative flex flex-1 min-h-0 overflow-hidden px-3.5 pb-3 pt-2">
-            <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm overflow-hidden">
-              <p className="truncate w-full overflow-hidden text-xs leading-relaxed text-white/90">{book.description}</p>
+          <div className="relative flex flex-1 min-h-0 overflow-y-auto px-3.5 pb-3 pt-2">
+            <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm">
+              <p className="w-full break-words whitespace-normal text-xs leading-relaxed text-white/90">{book.description}</p>
             </div>
           </div>
         ) : (
@@ -279,13 +291,13 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
               }}
               style={{
                 position: 'fixed',
-                left: `${portalRect.left - portalRect.width * 0.125}px`,
-                top: `${portalRect.top - portalRect.height * 0.125}px`,
-                width: `${portalRect.width * 1.25}px`,
-                height: `${portalRect.height * 1.25}px`,
+                left: `${portalLeft}px`,
+                top: `${portalTop}px`,
+                width: `${portalWidth}px`,
+                height: `${portalHeight}px`,
                 maxWidth: '90vw',
-                maxHeight: '90vh',
-                zIndex: 1000,
+                maxHeight: 'calc(100vh - 1rem)',
+                zIndex: 30,
                 transformOrigin: 'center center',
                 willChange: 'transform, opacity',
               }}
@@ -315,8 +327,8 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 }}
               >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60" style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.55))' }} aria-hidden="true" />
-          <div className="relative flex shrink-0 gap-2 p-3">
-            <div className="relative w-16 aspect-[2/3] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
+          <div className="relative flex shrink-0 gap-2 p-3 text-sm">
+            <div className="relative h-[7.5em] w-[5em] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
               <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
             </div>
             <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
@@ -336,9 +348,9 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             </div>
           </div>
           {book.description ? (
-            <div className="relative flex flex-1 min-h-0 overflow-hidden px-3.5 pb-3 pt-2">
-              <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm overflow-hidden">
-                <p className="truncate w-full overflow-hidden text-xs leading-relaxed text-white/90">{book.description}</p>
+            <div className="relative flex flex-1 min-h-0 overflow-y-auto px-3.5 pb-3 pt-2">
+              <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm">
+                <p className="w-full break-words whitespace-normal text-xs leading-relaxed text-white/90">{book.description}</p>
               </div>
             </div>
           ) : <div className="relative flex flex-1 min-h-0" aria-hidden="true" />}
