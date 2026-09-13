@@ -42,6 +42,19 @@ describe('Select', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('closes with Tab without selecting an option', () => {
+    const onChange = vi.fn()
+    render(<Select label="Estado" value="all" options={options} onChange={onChange} />)
+    const trigger = screen.getByRole('combobox', { name: 'Estado' })
+
+    fireEvent.click(trigger)
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.keyDown(trigger, { key: 'Tab' })
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('does not open when disabled', () => {
     render(<Select label="Estado" value="all" options={options} onChange={() => undefined} disabled />)
     const trigger = screen.getByRole('combobox', { name: 'Estado' })

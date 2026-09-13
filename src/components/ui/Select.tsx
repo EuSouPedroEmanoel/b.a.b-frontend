@@ -82,6 +82,13 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
         }}
         onKeyDown={(event) => {
           if (disabled) return
+          if (event.key === 'Tab') {
+            if (open) {
+              setOpen(false)
+              setActiveIndex(selectedIndex)
+            }
+            return
+          }
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
             if (!open) {

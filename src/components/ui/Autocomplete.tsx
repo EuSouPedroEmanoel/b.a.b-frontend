@@ -83,9 +83,10 @@ export function Autocomplete<T>({
   const inputId = id ?? `autocomplete-${generatedId}`
   const listboxId = `${inputId}-listbox`
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const listboxRef = useRef<HTMLUListElement>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(-1)
+  const [activeState, setActiveState] = useState({ index: -1, resultKey: '' })
   const selectedOption = options.find((option) => option.value === value)
   const normalizedQuery = query.trim()
   const canSearch = normalizedQuery.length >= minimumQueryLength
@@ -99,8 +100,37 @@ export function Autocomplete<T>({
       : options
   }, [filterOptions, normalizedQuery, options, query])
   const enabledOptions = filteredOptions.filter((option) => !option.disabled)
+  const filteredOptionsSignature = filteredOptions
+    .map((option) => `${option.value}:${option.disabled ? 'disabled' : 'enabled'}`)
+    .join('\u0001')
+  const resultKey = `${normalizedQuery}\u0002${filteredOptionsSignature}`
+  const hasNavigableResults = open && canSearch && enabledOptions.length > 0
+  const activeIndex = hasNavigableResults
+    && activeState.resultKey === resultKey
+    && activeState.index >= 0
+    && activeState.index < enabledOptions.length
+    ? activeState.index
+    : hasNavigableResults ? 0 : -1
   const activeOption = enabledOptions[activeIndex]
   const activeOptionIndex = activeOption ? filteredOptions.indexOf(activeOption) : -1
+
+  useEffect(() => {
+    if (!open || activeOptionIndex < 0) return
+    const listbox = listboxRef.current
+    const option = document.getElementById(`${listboxId}-option-${activeOptionIndex}`)
+    if (!listbox || !option || !listbox.contains(option)) return
+
+    const optionTop = option.offsetTop
+    const optionBottom = optionTop + option.offsetHeight
+    const visibleTop = listbox.scrollTop
+    const visibleBottom = visibleTop + listbox.clientHeight
+
+    if (optionTop < visibleTop) {
+      listbox.scrollTop = optionTop
+    } else if (optionBottom > visibleBottom) {
+      listbox.scrollTop = optionBottom - listbox.clientHeight
+    }
+  }, [activeOptionIndex, activeOption?.value, filteredOptionsSignature, listboxId, open])
 
   useEffect(() => {
     if (!open) return
@@ -114,7 +144,7 @@ export function Autocomplete<T>({
   const selectOption = (option: AutocompleteOption<T>) => {
     onChange(option.value, option)
     setQuery('')
-    setActiveIndex(-1)
+    setActiveState({ index: -1, resultKey: '' })
     setOpen(false)
   }
 
@@ -135,7 +165,11 @@ export function Autocomplete<T>({
         aria-controls={listboxId}
         aria-expanded={open && canSearch}
         aria-activedescendant={open && canSearch && activeOption ? `${listboxId}-option-${activeOptionIndex}` : undefined}
-        onFocus={() => !disabled && setOpen(true)}
+        onFocus={() => {
+          if (disabled) return
+          setActiveState({ index: -1, resultKey: '' })
+          setOpen(true)
+        }}
         onBlur={(event) => {
           if (!wrapperRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false)
         }}
@@ -143,25 +177,36 @@ export function Autocomplete<T>({
           const nextQuery = event.target.value
           if (!nextQuery && value) onChange('')
           setQuery(nextQuery)
-          setActiveIndex(-1)
+          setActiveState({ index: -1, resultKey: '' })
           setOpen(true)
         }}
         onKeyDown={(event) => {
+          if (event.key === 'Tab') {
+            setOpen(false)
+            setActiveState({ index: -1, resultKey: '' })
+            return
+          }
           if (event.key === 'Escape') {
             event.preventDefault()
             event.stopPropagation()
             setOpen(false)
-            setActiveIndex(-1)
+            setActiveState({ index: -1, resultKey: '' })
             return
           }
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
             if (!open) setOpen(true)
             if (!canSearch || !enabledOptions.length) return
-            setActiveIndex((current) => {
-              const normalizedIndex = current >= enabledOptions.length ? -1 : current
-              if (event.key === 'ArrowDown') return normalizedIndex < enabledOptions.length - 1 ? normalizedIndex + 1 : 0
-              return normalizedIndex > 0 ? normalizedIndex - 1 : enabledOptions.length - 1
+            setActiveState((current) => {
+              const currentIndex = current.resultKey === resultKey
+                && current.index >= 0
+                && current.index < enabledOptions.length
+                ? current.index
+                : 0
+              const nextIndex = event.key === 'ArrowDown'
+                ? (currentIndex + 1) % enabledOptions.length
+                : (currentIndex - 1 + enabledOptions.length) % enabledOptions.length
+              return { index: nextIndex, resultKey }
             })
             return
           }
@@ -180,34 +225,38 @@ export function Autocomplete<T>({
         </p>
       )}
       {open && canSearch && (
-        <ul
-          id={listboxId}
-          role="listbox"
-          aria-label={label}
-          className="absolute z-30 mt-1 max-h-[min(15rem,calc(100dvh-8rem))] w-full overflow-auto overscroll-contain rounded-md border border-slate-300 bg-white p-1 shadow-lg dark:border-slate-600 dark:bg-slate-800"
-        >
-          {filteredOptions.length ? filteredOptions.map((option, optionIndex) => {
-            const enabledIndex = enabledOptions.indexOf(option)
-            const active = enabledIndex === activeIndex
-            const selected = option.value === value
-            return (
-              <AutocompleteOptionItem
-                key={option.value}
-                id={`${listboxId}-option-${optionIndex}`}
-                active={active}
-                selected={selected}
-                disabled={Boolean(option.disabled)}
-                onSelect={() => selectOption(option)}
-              >
-                {renderOption ? renderOption(option, { active, selected }) : option.label}
-              </AutocompleteOptionItem>
-            )
-          }) : (
-            <li role="status" className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-slate-300 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800">
+          <ul
+            ref={listboxRef}
+            id={listboxId}
+            role="listbox"
+            aria-label={label}
+            className="max-h-[min(15rem,calc(100dvh-8rem))] overflow-auto overscroll-contain p-1"
+          >
+            {filteredOptions.map((option, optionIndex) => {
+              const enabledIndex = enabledOptions.indexOf(option)
+              const active = enabledIndex === activeIndex
+              const selected = option.value === value
+              return (
+                <AutocompleteOptionItem
+                  key={option.value}
+                  id={`${listboxId}-option-${optionIndex}`}
+                  active={active}
+                  selected={selected}
+                  disabled={Boolean(option.disabled)}
+                  onSelect={() => selectOption(option)}
+                >
+                  {renderOption ? renderOption(option, { active, selected }) : option.label}
+                </AutocompleteOptionItem>
+              )
+            })}
+          </ul>
+          {!filteredOptions.length && (
+            <p role="status" className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
               {emptyMessage}
-            </li>
+            </p>
           )}
-        </ul>
+        </div>
       )}
     </div>
   )

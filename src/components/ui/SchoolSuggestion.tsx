@@ -5,5 +5,5 @@ type SchoolSuggestionProps<T extends { name: string }> = {
 }
 
 export function SchoolSuggestion<T extends { name: string }>({ option }: SchoolSuggestionProps<T>) {
-  return <span className="block truncate">{option.label}</span>
+  return <span className="block break-words">{option.label}</span>
 }

@@ -125,4 +125,24 @@ describe('BooksPage responsive result structure', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Lista de livros' })).not.toBeInTheDocument()
   })
+
+  it('mantém a primeira sugestão ativa sem marcá-la como selecionada', async () => {
+    fixtures.get.mockImplementation((url: string) => {
+      if (url.startsWith('/books/suggest')) {
+        return Promise.resolve({ data: { items: [{ id: 2, title: 'Livro sugerido', isbn: null }] } })
+      }
+      if (url.startsWith('/authors/')) return Promise.resolve({ data: { items: [] } })
+      if (url.startsWith('/genres/')) return Promise.resolve({ data: { items: [] } })
+      return Promise.resolve({ data: { items: [book], total: 1, page: 1, size: 10, pages: 1 } })
+    })
+    renderPage()
+    const input = await screen.findByRole('combobox', { name: 'Buscar' })
+
+    fireEvent.change(input, { target: { value: 'Livro' } })
+
+    const option = await screen.findByRole('option', { name: /Livro sugerido/ })
+    expect(input).toHaveValue('Livro')
+    expect(input).toHaveAttribute('aria-activedescendant', 'book-suggest-listbox-0')
+    expect(option).not.toHaveAttribute('aria-selected')
+  })
 })

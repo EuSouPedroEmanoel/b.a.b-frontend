@@ -653,7 +653,6 @@ export function BooksPage() {
                         key={`${s.kind}-${(s as any).id ?? (s as any).state}`}
                         id={`${suggestListId}-${i}`}
                         role="option"
-                        aria-selected={i === activeIndex}
                         onPointerDown={(e) => {
                           e.preventDefault()
                           openSuggestion(s)
