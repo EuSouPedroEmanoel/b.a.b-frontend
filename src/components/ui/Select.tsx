@@ -20,7 +20,7 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
   const buttonId = id ?? `select-${label.toLowerCase().replace(/\s+/g, '-')}`
   const listId = `${buttonId}-listbox`
   const selected = options.find((o) => o.value === value)
-  const selectedIndex = Math.max(0, options.findIndex((o) => o.value === value))
+  const selectedIndex = options.length > 0 ? Math.max(0, options.findIndex((o) => o.value === value)) : -1
   const [activeIndex, setActiveIndex] = useState(selectedIndex)
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        aria-activedescendant={open ? `${listId}-option-${activeIndex}` : undefined}
+        aria-activedescendant={open && activeIndex >= 0 && activeIndex < options.length ? `${listId}-option-${activeIndex}` : undefined}
         disabled={disabled}
         onClick={() => {
           if (disabled) return
@@ -105,9 +105,9 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
             close()
           }
         }}
-        className="w-full cursor-pointer rounded-md border border-[var(--color-border)] dark:border-slate-600 px-3 py-2.5 text-sm bg-[var(--color-field)] dark:bg-slate-800 flex items-center justify-between gap-2 text-left min-h-[44px] hover:border-[var(--color-field-border-hover)] dark:hover:border-slate-500 focus-visible:border-[var(--color-focus)] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full cursor-pointer rounded-md border border-[var(--color-border)] dark:border-slate-600 px-3 py-2.5 text-sm bg-[var(--color-field)] dark:bg-slate-800 flex items-start justify-between gap-2 text-left min-h-[44px] hover:border-[var(--color-field-border-hover)] dark:hover:border-slate-500 focus-visible:border-[var(--color-focus)] focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span className="truncate">{selected ? selected.label : (placeholder ?? options[0]?.label ?? '')}</span>
+        <span className="min-w-0 flex-1 whitespace-normal break-words">{selected ? selected.label : (placeholder ?? options[0]?.label ?? '')}</span>
         <ArrowDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
       {open && (
@@ -128,9 +128,9 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
                 choose(index)
               }}
               onMouseEnter={() => setActiveIndex(index)}
-              className={`flex min-h-[44px] cursor-pointer items-center px-3 py-2.5 text-sm ${index === activeIndex ? 'bg-slate-100 dark:bg-slate-700' : ''} ${opt.value === value ? 'font-semibold text-[#0f4c75] dark:text-sky-300' : 'text-slate-800 dark:text-slate-100'}`}
+              className={`flex min-h-[44px] cursor-pointer items-start px-3 py-2.5 text-sm ${index === activeIndex ? 'bg-slate-100 dark:bg-slate-700' : ''} ${opt.value === value ? 'font-semibold text-[#0f4c75] dark:text-sky-300' : 'text-slate-800 dark:text-slate-100'}`}
             >
-              {opt.label}
+              <span className="min-w-0 flex-1 whitespace-normal break-words">{opt.label}</span>
             </li>
           ))}
         </ul>

@@ -49,4 +49,34 @@ describe('Select', () => {
     fireEvent.keyDown(trigger, { key: 'Enter' })
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
+
+  it('keeps long selected values and options available without truncation', () => {
+    const longLabel = 'Gênero com um nome suficientemente longo para ocupar várias linhas no controle'
+    render(
+      <Select
+        label="Gênero"
+        value="long"
+        options={[{ value: 'long', label: longLabel }]}
+        onChange={() => undefined}
+      />,
+    )
+
+    const trigger = screen.getByRole('combobox', { name: 'Gênero' })
+    expect(screen.getByText(longLabel)).toBeInTheDocument()
+    expect(trigger.querySelector('.truncate')).not.toBeInTheDocument()
+    expect(trigger.querySelector('.min-w-0')).toBeInTheDocument()
+
+    fireEvent.click(trigger)
+    expect(screen.getByRole('option', { name: longLabel })).toBeInTheDocument()
+    expect(screen.getByRole('option').querySelector('.min-w-0')).toBeInTheDocument()
+  })
+
+  it('does not expose an invalid active descendant when there are no options', () => {
+    render(<Select label="Gênero" value="" options={[]} onChange={() => undefined} />)
+    const trigger = screen.getByRole('combobox', { name: 'Gênero' })
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    expect(trigger).not.toHaveAttribute('aria-activedescendant')
+  })
 })
