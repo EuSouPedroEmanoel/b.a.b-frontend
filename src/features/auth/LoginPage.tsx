@@ -282,6 +282,17 @@ export function LoginPage() {
                   document.getElementById('password')?.focus()
                 }
               }}
+              rightElement={
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  aria-label="Teste do campo de usuário"
+                  onClick={() => undefined}
+                >
+                  Teste
+                </Button>
+              }
             />
             <div className="flex flex-col gap-1.5">
               <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">

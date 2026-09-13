@@ -45,4 +45,17 @@ describe('Input', () => {
     input.focus()
     expect(input).toHaveFocus()
   })
+
+  it('preserves input space and keeps the right element at natural height', () => {
+    render(<Input label="Usuário" value="valor ampliado" onChange={() => undefined} rightElement={<button type="button">Teste</button>} />)
+
+    const input = screen.getByRole('textbox', { name: 'Usuário' })
+    const inputRow = input.parentElement
+    const rightElementWrapper = input.parentElement?.lastElementChild
+
+    expect(input).toHaveClass('min-w-[min(100%,20ch)]', 'flex-[1_1_20ch]')
+    expect(inputRow).toHaveClass('flex-wrap', 'items-start')
+    expect(rightElementWrapper).toHaveClass('items-center')
+    expect(rightElementWrapper).not.toHaveClass('items-stretch')
+  })
 })
