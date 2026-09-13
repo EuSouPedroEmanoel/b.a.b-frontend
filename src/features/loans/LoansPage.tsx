@@ -887,7 +887,7 @@ function LoansList({ loans, pageSize, setPageSize, setPage, situation, setSituat
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [filterMenuOpen])
 
-  return <section aria-labelledby="loans-list-heading" className={`flex flex-col gap-6 ${readOnly ? 'opacity-60' : ''}`}>
+  return <section aria-labelledby="loans-list-heading" className="flex flex-col gap-6">
     <h2 id="loans-list-heading" className="sr-only">Lista de empréstimos</h2>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">{loans.total} {loans.total === 1 ? 'empréstimo encontrado' : 'empréstimos encontrados'}</p>
