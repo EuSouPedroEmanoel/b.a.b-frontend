@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { bookConditionLabel, bookStateLabel, bookStateTone } from '@/lib/bookStates'
-import { Card, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
 import { PageDescription } from '@/components/ui/PageDescription'
@@ -47,21 +46,21 @@ export function CopiesPage() {
 
       {data && (
         <>
-          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <table className="w-full text-sm">
+          <div className="@container max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <table className="w-full min-w-0 text-sm @max-md:table-fixed">
               <caption className="sr-only">Exemplares por código e estado</caption>
               <thead className="bg-slate-50 dark:bg-slate-700/50">
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
+                  <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:w-[34%] @max-md:px-3">
                     Código
                   </th>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
+                  <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:w-[66%] @max-md:px-3">
                     Livro
                   </th>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
+                  <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:hidden">
                     Estado
                   </th>
-                  <th scope="col" className="px-4 py-3 text-left font-semibold">
+                  <th scope="col" className="px-4 py-3 text-left font-semibold @max-md:hidden">
                     Condição
                   </th>
                 </tr>
@@ -69,14 +68,22 @@ export function CopiesPage() {
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {data.items.map((c) => (
                   <tr key={c.id}>
-                    <td className="px-4 py-3 font-mono text-sm">{c.code}</td>
-                    <td className="px-4 py-3 max-w-[28ch] truncate" title={titleById.get(c.book_id) ?? `Livro #${c.book_id}`}>
-                      {titleById.get(c.book_id) ?? `Livro #${c.book_id}`}
+                    <td className="px-4 py-3 align-top font-mono text-sm break-words [overflow-wrap:anywhere] @max-md:px-3">
+                      {c.code}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top @max-md:px-3">
+                      <p className="break-words [overflow-wrap:anywhere]" title={titleById.get(c.book_id) ?? `Livro #${c.book_id}`}>
+                        {titleById.get(c.book_id) ?? `Livro #${c.book_id}`}
+                      </p>
+                      <div className="mt-2 hidden flex-wrap gap-2 @max-md:flex" aria-label="Estado e condição">
+                        <Badge tone={bookStateTone(c.state)}>{bookStateLabel(c.state)}</Badge>
+                        <Badge tone="info">{bookConditionLabel(c.condition)}</Badge>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 @max-md:hidden">
                       <Badge tone={bookStateTone(c.state)}>{bookStateLabel(c.state)}</Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 @max-md:hidden">
                       <Badge tone="info">{bookConditionLabel(c.condition)}</Badge>
                     </td>
                   </tr>
@@ -84,26 +91,6 @@ export function CopiesPage() {
               </tbody>
             </table>
           </div>
-
-          <ul className="md:hidden grid gap-3" role="list">
-            {data.items.map((c) => (
-              <li key={c.id}>
-                <Card>
-                  <CardBody>
-                    <h3 className="font-mono font-semibold">{c.code}</h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 font-medium truncate" title={titleById.get(c.book_id)}>
-                      {titleById.get(c.book_id) ?? `Livro #${c.book_id}`}
-                    </p>
-                    <p className="text-xs text-slate-500">Escola #{c.school_id}</p>
-                    <div className="mt-2 flex gap-2">
-                      <Badge tone={bookStateTone(c.state)}>{bookStateLabel(c.state)}</Badge>
-                      <Badge>{bookConditionLabel(c.condition)}</Badge>
-                    </div>
-                  </CardBody>
-                </Card>
-              </li>
-            ))}
-          </ul>
 
           <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
         </>

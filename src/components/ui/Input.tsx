@@ -12,13 +12,13 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label,
   const inputId = id ?? `input-${label.toLowerCase().replace(/\s+/g, '-')}`
   const errId = error ? `${inputId}-error` : undefined
   const hintId = hint ? `${inputId}-hint` : undefined
-  const inputClass = `w-full rounded-md border px-3 py-2.5 text-base bg-[var(--color-field)] dark:bg-slate-800/80 min-h-[44px] placeholder:text-slate-400 transition-colors border-[var(--color-field-border-hover)] dark:border-slate-600 hover:border-[var(--color-border)] dark:hover:border-slate-400 focus-visible:border-transparent focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${error ? 'border-red-600' : ''} ${rightElement ? 'pr-20' : ''} ${className ?? ''}`
+  const inputClass = `w-full rounded-md border px-3 py-2.5 text-base bg-[var(--color-field)] dark:bg-slate-800/80 min-h-[44px] placeholder:text-slate-400 transition-colors border-[var(--color-field-border-hover)] dark:border-slate-600 hover:border-[var(--color-border)] dark:hover:border-slate-400 focus-visible:border-transparent focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] ${rightElement ? 'min-w-0 flex-1' : ''} ${error ? 'border-red-600' : ''} ${className ?? ''}`
   return (
     <div className={rowLayout ? 'grid gap-2 sm:max-w-2xl sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-6' : 'flex flex-col gap-1.5'}>
       <label htmlFor={inputId} className={`text-sm font-medium text-slate-700 dark:text-slate-200 ${rowLayout ? 'sm:col-start-1 sm:row-start-1' : ''}`}>
         {label} {required && <span aria-hidden="true" className="text-red-600">*</span>}
       </label>
-      <div className={rowLayout ? 'relative sm:col-start-2 sm:row-start-1 sm:w-32' : 'relative'}>
+      <div className={`${rowLayout ? 'sm:col-start-2 sm:row-start-1 sm:w-32' : ''} ${rightElement ? 'flex min-w-0 flex-wrap items-stretch gap-2' : 'relative'}`}>
         <input
           ref={ref}
           id={inputId}
@@ -28,7 +28,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label,
           className={inputClass}
           {...props}
         />
-        {rightElement && <div className="absolute right-1 top-1/2 -translate-y-1/2">{rightElement}</div>}
+        {rightElement && <div className="flex max-w-full shrink-0 items-center">{rightElement}</div>}
       </div>
       {hint && !error && (
         <p id={hintId} className={`text-xs text-slate-500 ${rowLayout ? 'sm:col-start-1 sm:row-start-2' : ''}`}>
