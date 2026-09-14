@@ -13,7 +13,7 @@ import { PageDescription } from '@/components/ui/PageDescription'
 import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { segmentedControlContainerClasses, segmentedControlIndicatorClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
+import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
 
 type ReaderRole = 'student' | 'teacher'
 
@@ -336,7 +336,6 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
           save.mutate(policies)
         }} className="flex flex-col gap-5">
           <div role="tablist" aria-label="Perfil de leitor" className={`${segmentedControlContainerClasses} mx-auto max-w-4xl`}>
-            <span aria-hidden="true" className={segmentedControlIndicatorClasses('secondary', activeRole === 'teacher' ? 1 : 0)} />
             {(['student', 'teacher'] as ReaderRole[]).map((role) => <button key={role} ref={(element) => { tabRefs.current[role] = element }} type="button" role="tab" id={`${role}-policy-tab`} aria-selected={activeRole === role} aria-controls={`${role}-policy-panel`} tabIndex={activeRole === role ? 0 : -1} onClick={() => selectRole(role)} onKeyDown={handleTabKeyDown} className={segmentedControlItemClasses(activeRole === role)}>{roleLabel[role]}</button>)}
           </div>
           {policies.filter((policy) => policy.reader_role === activeRole).map((policy) => <div key={policy.reader_role} id={`${policy.reader_role}-policy-panel`} role="tabpanel" aria-labelledby={`${activeRole}-policy-tab`} tabIndex={-1}><PolicyForm policy={normalizePolicy(policy)} onChange={updatePolicy} firstInputRef={firstInputRef} readOnly={!canEdit} muted={isSuperAdmin} /></div>)}

@@ -9,6 +9,7 @@ import { Tooltip } from '@/components/ui/Tooltip'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { getErrorMessage } from '@/lib/errors'
 import api from '@/lib/api'
+import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
 
 export function LoginPage() {
   const { login, loginGuest } = useAuth()
@@ -216,13 +217,13 @@ export function LoginPage() {
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Entrar na Biblioteca</h1>
       <p className="text-sm text-slate-500 mb-6">Entre com seu usuário, e-mail ou CPF.</p>
 
-      <div role="tablist" aria-label="Tipo de acesso" className="mb-4 grid grid-cols-2 rounded-lg border border-slate-300 bg-slate-100 p-1 dark:border-slate-600 dark:bg-slate-800">
+      <div role="tablist" aria-label="Tipo de acesso" className={`${segmentedControlContainerClasses} mb-4`}>
         <button
           type="button"
           role="tab"
           aria-selected={mode === 'account'}
           onClick={() => switchMode('account')}
-          className={`min-h-[44px] rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] ${mode === 'account' ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}
+          className={segmentedControlItemClasses(mode === 'account', 'primary')}
         >
           Entrar com conta
         </button>
@@ -231,7 +232,7 @@ export function LoginPage() {
           role="tab"
           aria-selected={mode === 'guest'}
           onClick={() => switchMode('guest')}
-          className={`min-h-[44px] rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] ${mode === 'guest' ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}
+          className={segmentedControlItemClasses(mode === 'guest', 'primary')}
         >
           Acessar como visitante
         </button>

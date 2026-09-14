@@ -8,7 +8,7 @@ import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocompl
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { CirculationPoliciesPage } from '@/features/circulation/CirculationPoliciesPage'
 import { LibraryCalendarPage } from './LibraryCalendarPage'
-import { segmentedControlContainerClasses, segmentedControlIndicatorClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
+import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
 
 type School = { id: number; name: string }
 type Paginated<T> = { items: T[] }
@@ -62,8 +62,7 @@ export function ManageSchoolPage() {
         />
       </div>
     )}
-    <div role="tablist" aria-label="Seções de gerenciamento" className={`${segmentedControlContainerClasses} max-w-xl grid grid-cols-2`}>
-      <span aria-hidden="true" className={segmentedControlIndicatorClasses('primary', section === 'calendar' ? 1 : 0)} />
+    <div role="tablist" aria-label="Seções de gerenciamento" className={`${segmentedControlContainerClasses} max-w-xl`}>
       <button type="button" role="tab" aria-selected={section === 'rules'} onClick={() => selectSection('rules')} className={segmentedControlItemClasses(section === 'rules', 'primary')}>Regras de circulação</button>
       <button type="button" role="tab" aria-selected={section === 'calendar'} onClick={() => selectSection('calendar')} className={segmentedControlItemClasses(section === 'calendar', 'primary')}>Calendário da biblioteca</button>
     </div>
