@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Header } from '@/components/layout/Header'
@@ -97,6 +97,23 @@ describe('Guest navigation', () => {
     expect(navigation).toHaveTextContent('Empréstimos')
     expect(navigation).toHaveTextContent('Reservas')
     expect(navigation).toHaveTextContent('Alunos')
+  })
+
+  it('closes the mobile menu with Escape and restores focus to its trigger', async () => {
+    render(
+      <MemoryRouter initialEntries={['/acervo']}>
+        <Header />
+      </MemoryRouter>,
+    )
+
+    const menuButton = screen.getByRole('button', { name: 'Abrir menu' })
+    fireEvent.click(menuButton)
+    expect(screen.getByRole('navigation', { name: 'Principal móvel' })).toBeInTheDocument()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('navigation', { name: 'Principal móvel' })).not.toBeInTheDocument()
+    await waitFor(() => expect(menuButton).toHaveFocus())
   })
 
   it('offers student management to a school admin', () => {

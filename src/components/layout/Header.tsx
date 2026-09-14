@@ -245,6 +245,12 @@ export function Header() {
 
   useEffect(() => {
     if (!open || desktopNavVisible) return undefined
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setOpen(false)
+      window.requestAnimationFrame(() => mobileMenuButtonRef.current?.focus())
+    }
     const handlePointerDownOutside = (event: PointerEvent) => {
       const target = event.target
       if (!(target instanceof Node)) return
@@ -252,8 +258,12 @@ export function Header() {
       setOpen(false)
       window.requestAnimationFrame(() => mobileMenuButtonRef.current?.focus())
     }
+    document.addEventListener('keydown', handleEscape)
     document.addEventListener('pointerdown', handlePointerDownOutside)
-    return () => document.removeEventListener('pointerdown', handlePointerDownOutside)
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.removeEventListener('pointerdown', handlePointerDownOutside)
+    }
   }, [desktopNavVisible, open])
 
   useLayoutEffect(() => {
