@@ -181,6 +181,29 @@ describe('Carousel paginado e sequenciado', () => {
     expect(labels()).toEqual(['Livro 1', 'Livro 2', 'Livro 3', 'Livro 4'])
   })
 
+  it('distribui a fileira paginada pela largura do viewport', () => {
+    renderCarousel(6)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+
+    expect(region().querySelector('[data-carousel-page]')).toHaveClass('justify-between')
+  })
+
+  it('limita a fileira larga sem centralizar o track', () => {
+    renderCarousel(6)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+
+    const track = region().querySelector('[data-carousel-page]')
+    expect(track).toHaveClass('carousel-page-track', 'carousel-page-track--wide')
+    expect(track).not.toHaveClass('justify-center')
+  })
+
+  it('não empurra um único card para a extremidade', () => {
+    renderCarousel(1)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+
+    expect(region().querySelector('[data-carousel-page]')).not.toHaveClass('justify-between', 'carousel-page-track--wide')
+  })
+
   it('troca a página somente depois da sequência de saída', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     renderCarousel(9)
