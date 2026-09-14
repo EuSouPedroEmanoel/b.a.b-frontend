@@ -18,6 +18,7 @@ vi.mock('framer-motion', () => ({
 }))
 
 const longTitle = 'Introdução à Engenharia de Software — fundamentos, práticas e projetos avançados'
+const longDescription = 'Uma descrição longa para validar que o resumo do preview permanece legível, limitado e sem criar uma região de rolagem interna no card.'
 
 const book = {
   id: 1,
@@ -84,6 +85,24 @@ describe('GridCard title identification', () => {
 
     fireEvent.scroll(window)
     await waitFor(() => expect(document.body.querySelector('[style*="position: fixed"]')).not.toBeInTheDocument())
+  })
+
+  it('limits the preview description without an internal scroll region', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    render(
+      <MemoryRouter>
+        <GridCard book={{ ...book, description: longDescription }} />
+      </MemoryRouter>,
+    )
+
+    const description = screen.getByText(longDescription)
+    expect(description).toHaveClass('line-clamp-3')
+    expect(description).toHaveAttribute('title', longDescription)
+    expect(description.parentElement?.parentElement).not.toHaveClass('overflow-y-auto')
+    expect(description.closest('a')).not.toHaveClass('overflow-y-auto')
   })
 
 })

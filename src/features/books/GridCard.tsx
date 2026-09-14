@@ -229,7 +229,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           onClick={savePosition}
           aria-hidden="true"
           tabIndex={-1}
-          className="grid-card-hover-preview pointer-events-none invisible absolute left-1/2 top-1/2 z-40 flex w-full max-w-[90vw] min-h-[20rem] max-h-[calc(100vh-1rem)] -translate-x-1/2 -translate-y-1/2 scale-100 flex-col justify-between overflow-y-auto overflow-x-hidden rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+          className="grid-card-hover-preview pointer-events-none invisible absolute left-1/2 top-1/2 z-40 flex w-full max-w-[90vw] min-h-[20rem] max-h-[calc(100vh-1rem)] -translate-x-1/2 -translate-y-1/2 scale-100 flex-col justify-between overflow-hidden rounded-2xl border border-white/20 opacity-0 shadow-2xl backdrop-blur-md will-change-transform transition-all duration-400 ease-out group-hover:visible group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
         style={{
           background: hoverBg,
           boxShadow: '0 24px 48px rgba(0,0,0,0.38), 0 10px 20px rgba(0,0,0,0.28)',
@@ -246,7 +246,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
         />
         {/* Conteúdo superior - capa no canto superior esquerdo (reduzida) */}
         <div className="relative flex shrink-0 gap-2 p-3 text-sm">
-          <div className="relative h-[7.5em] w-[5em] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
+          <div className="relative aspect-[2/3] h-auto w-[5em] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
             <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
           </div>
           <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
@@ -279,9 +279,9 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
 
         {/* Descrição ocupando espaço livre entre gêneros e fim do card – gap maior */}
         {book.description ? (
-          <div className="relative flex flex-1 min-h-0 overflow-y-auto px-3.5 pb-3 pt-2">
+          <div className="relative flex shrink-0 px-3.5 pb-3 pt-2">
             <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm">
-              <p className="w-full break-words whitespace-normal text-xs leading-relaxed text-white/90">{book.description}</p>
+              <p className="line-clamp-3 w-full break-words whitespace-normal text-xs leading-relaxed text-white/90" title={book.description}>{book.description}</p>
             </div>
           </div>
         ) : (
@@ -332,7 +332,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 onClick={savePosition}
                 aria-hidden="true"
                 tabIndex={-1}
-                className="flex h-full w-full flex-col justify-between overflow-visible rounded-2xl border border-white/20 shadow-2xl backdrop-blur-md"
+                className="flex h-full w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/20 shadow-2xl backdrop-blur-md"
                 style={{
                   background: hoverBg,
                   boxShadow: '0 24px 48px rgba(0,0,0,0.38), 0 10px 20px rgba(0,0,0,0.28)',
@@ -341,7 +341,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
               >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60" style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.55))' }} aria-hidden="true" />
           <div className="relative flex shrink-0 gap-2 p-3 text-sm">
-            <div className="relative h-[7.5em] w-[5em] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
+            <div className="relative aspect-[2/3] h-auto w-[5em] shrink-0 overflow-hidden rounded-lg border border-white/20 shadow-md flex items-center justify-center bg-white/10">
               <CoverImage src={book.cover_url} title={book.title} alt="" width={64} height={96} priority={isPriority} className="absolute inset-0 h-full w-full" />
             </div>
             <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
@@ -361,9 +361,9 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             </div>
           </div>
           {book.description ? (
-            <div className="relative flex flex-1 min-h-0 overflow-y-auto px-3.5 pb-3 pt-2">
+            <div className="relative flex shrink-0 px-3.5 pb-3 pt-2">
               <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm">
-                <p className="w-full break-words whitespace-normal text-xs leading-relaxed text-white/90">{book.description}</p>
+                <p className="line-clamp-3 w-full break-words whitespace-normal text-xs leading-relaxed text-white/90" title={book.description}>{book.description}</p>
               </div>
             </div>
           ) : <div className="relative flex flex-1 min-h-0" aria-hidden="true" />}
