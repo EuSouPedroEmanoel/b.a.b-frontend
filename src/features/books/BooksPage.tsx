@@ -21,6 +21,7 @@ import { getBookCoverGradient } from '@/lib/coverColor'
 import { clearCatalogSnapshot, createCatalogOrigin, detailRouteState, readCatalogSnapshot, saveCatalogSnapshot } from '@/lib/catalogNavigation'
 import { GridCard } from './GridCard'
 import { hasPersonalReaderCapability } from '@/lib/permissions'
+import { useResponsiveLayout } from '@/components/layout/ResponsiveLayoutContext'
 
 type Book = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; is_active: boolean; added_by: number; cover_url: string | null; published_date: string | null; created_at: string | null; updated_at: string | null; total_copies?: number; available_copies?: number; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
 
@@ -105,10 +106,12 @@ export function BooksPage() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+  const { isCompact } = useResponsiveLayout()
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
   const isPersonalCatalog = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
   const isDesktop = useIsDesktop()
+  const showDesktopTable = isDesktop && !isCompact
   const deniedNoticeRef = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {
@@ -263,7 +266,7 @@ export function BooksPage() {
   const gridTotal = gridData?.pages[0]?.total ?? 0
 
   useLayoutEffect(() => {
-    if (viewMode !== 'table') return
+    if (viewMode !== 'table' || !showDesktopTable) return
     const container = tableContainerRef.current
     const table = tableRef.current
     if (!container || !table) return
@@ -284,7 +287,7 @@ export function BooksPage() {
       observer.disconnect()
       fontObserver.disconnect()
     }
-  }, [compactTable, viewMode, data?.items, pageSize])
+  }, [compactTable, showDesktopTable, viewMode, data?.items, pageSize])
   const [searchPlaceholder, setSearchPlaceholder] = useState('Ex.: título de um livro do acervo')
   const placeholderTitles = useMemo(
     () => (viewMode === 'table' ? data?.items ?? [] : gridData?.pages.flatMap((pageData) => pageData.items) ?? [])
@@ -958,7 +961,7 @@ export function BooksPage() {
 
         {data && viewMode === 'table' && (
           <>
-            {isDesktop ? <div ref={tableContainerRef} className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {showDesktopTable ? <div ref={tableContainerRef} className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <table ref={tableRef} className={`${compactTable ? 'w-full table-fixed' : 'w-max table-auto'} min-w-full text-sm`}>
                 <caption className="sr-only">Tabela de livros com capa, título e descrição, exemplares, autores, gêneros, ano e data de cadastro</caption>
                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-left">

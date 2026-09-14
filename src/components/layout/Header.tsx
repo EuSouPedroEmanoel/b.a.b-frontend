@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { MobileNavigationPanel } from './MobileNavigationPanel'
+import { useResponsiveLayout } from './ResponsiveLayoutContext'
 import { useNavigationFocusIntent } from '../navigation/useNavigationFocusIntent'
 
 function ActiveNavIndicator({ navRef, activeKey, mobile = false }: { navRef: RefObject<HTMLElement | null>; activeKey: string; mobile?: boolean }) {
@@ -129,8 +130,9 @@ export function Header() {
   const navigate = useNavigate()
   const location = useLocation()
   const { registerMouseNavigation } = useNavigationFocusIntent()
+  const { isCompact, setIsCompact } = useResponsiveLayout()
   const [open, setOpen] = useState(false)
-  const [desktopNavVisible, setDesktopNavVisible] = useState(() => window.innerWidth >= 768)
+  const desktopNavVisible = !isCompact
 
   const isActivePath = (to: string) => (to === '/' ? location.pathname === '/' : location.pathname === to || location.pathname.startsWith(to + '/'))
   const navItemCls = (to: string) =>
@@ -267,7 +269,7 @@ export function Header() {
       const requiredWidth = measurement.getBoundingClientRect().width
       const availableWidth = row.clientWidth
       const comfortableWidth = requiredWidth + 16
-      setDesktopNavVisible(hasDesktopViewport && comfortableWidth <= availableWidth)
+      setIsCompact(!(hasDesktopViewport && comfortableWidth <= availableWidth))
     }
     updateLayout()
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updateLayout)
@@ -282,7 +284,7 @@ export function Header() {
       fontSizeObserver?.disconnect()
       window.removeEventListener('resize', handleResize)
     }
-  }, [isAuthenticated, isGuest, isLibrarian, isUsersManager, profileLabel, user?.role, user?.school_code, user?.school_name])
+  }, [isAuthenticated, isGuest, isLibrarian, isUsersManager, profileLabel, setIsCompact, user?.role, user?.school_code, user?.school_name])
 
   return (
     <header data-app-navbar onPointerDown={handleHeaderPointerDown} onMouseDown={handleHeaderMouseDown} onClick={handleHeaderNavigationClick} className="relative sticky top-0 z-40 bg-[#0f4c75] dark:bg-slate-900/95 backdrop-blur border-b border-[#0c3d5e] dark:border-slate-700 shadow-lg pt-[env(safe-area-inset-top)]">

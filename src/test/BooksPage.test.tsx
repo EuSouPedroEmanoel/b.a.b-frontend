@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ResponsiveLayoutContext } from '@/components/layout/ResponsiveLayoutContext'
 import { BooksPage } from '@/features/books/BooksPage'
 
 const fixtures = vi.hoisted(() => ({
@@ -51,14 +52,16 @@ function setViewport(matches: boolean) {
   })
 }
 
-function renderPage() {
+function renderPage({ compact = false }: { compact?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <MemoryRouter>
-      <QueryClientProvider client={client}>
-        <BooksPage />
-      </QueryClientProvider>
-    </MemoryRouter>,
+    <ResponsiveLayoutContext.Provider value={{ isCompact: compact, setIsCompact: vi.fn() }}>
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <BooksPage />
+        </QueryClientProvider>
+      </MemoryRouter>
+    </ResponsiveLayoutContext.Provider>,
   )
 }
 
@@ -115,6 +118,13 @@ describe('BooksPage responsive result structure', () => {
     setViewport(true)
     expect(await screen.findByRole('table')).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Lista de livros' })).not.toBeInTheDocument()
+  })
+
+  it('monta a lista responsiva quando o layout fica compacto em viewport desktop', async () => {
+    renderPage({ compact: true })
+
+    expect(await screen.findByRole('list', { name: 'Lista de livros' })).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
   it('monta apenas GridCard no modo grade', async () => {
