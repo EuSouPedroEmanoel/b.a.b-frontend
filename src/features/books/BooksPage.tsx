@@ -868,8 +868,8 @@ export function BooksPage() {
         </CardBody>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <p className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite" aria-atomic="true">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <p className="min-w-[min(100%,18rem)] flex-[1_1_18rem] text-sm text-slate-600 dark:text-slate-400" aria-live="polite" aria-atomic="true">
           {viewMode === 'table'
             ? isLoading
               ? 'Carregando…'
@@ -880,51 +880,49 @@ export function BooksPage() {
               ? 'Carregando…'
               : `${gridTotal} ${gridTotal === 1 ? 'livro encontrado' : 'livros encontrados'}${gridTime !== null ? ` em ${gridTime < 1000 ? `${Math.round(gridTime)}ms` : `${(gridTime / 1000).toFixed(2)}s`}` : ''}`}
         </p>
-        <div className="flex flex-wrap items-center gap-3">
-          {viewMode === 'table' && (
-            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 text-sm">
-              <label htmlFor="page-size-select" className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                Itens por página
-              </label>
-              <select
-                id="page-size-select"
-                value={String(pageSize)}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value))
-                  setPage(1)
-                }}
-                className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm min-h-[36px] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
-                aria-label="Itens por página"
-              >
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="30">30</option>
-                <option value="50">50</option>
-              </select>
-            </div>
-          )}
-          <div role="group" aria-label="Modo de visualização" className="flex max-w-full min-w-0 flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
-          <Button
-            size="sm"
-            variant={viewMode === 'table' ? 'primary' : 'secondary'}
-            aria-pressed={viewMode === 'table'}
-            onClick={() => chooseViewMode('table')}
-            aria-label="Visualização em tabela"
-            className={`gap-1.5 ${viewMode === 'table' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
-          >
-            <Table className="h-4 w-4" aria-hidden="true" /> Tabela
-          </Button>
-          <Button
-            size="sm"
-            variant={viewMode === 'grid' ? 'primary' : 'secondary'}
-            aria-pressed={viewMode === 'grid'}
-            onClick={() => chooseViewMode('grid')}
-            aria-label="Visualização em grade"
-            className={`gap-1.5 ${viewMode === 'grid' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
-          >
-            <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Grade
-          </Button>
-        </div>
+        {viewMode === 'table' && (
+          <div className="inline-flex max-w-full shrink-0 items-center gap-2 text-sm">
+            <label htmlFor="page-size-select" className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
+              Itens por página
+            </label>
+            <select
+              id="page-size-select"
+              value={String(pageSize)}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value))
+                setPage(1)
+              }}
+              className="min-w-[5.5rem] shrink-0 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm min-h-[36px] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+              aria-label="Itens por página"
+            >
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+        )}
+        <div role="group" aria-label="Modo de visualização" className="flex w-fit max-w-full shrink-0 flex-wrap rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-1 gap-1">
+            <Button
+              size="sm"
+              variant={viewMode === 'table' ? 'primary' : 'secondary'}
+              aria-pressed={viewMode === 'table'}
+              onClick={() => chooseViewMode('table')}
+              aria-label="Visualização em tabela"
+              className={`whitespace-nowrap gap-1.5 ${viewMode === 'table' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
+            >
+              <Table className="h-4 w-4" aria-hidden="true" /> Tabela
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'grid' ? 'primary' : 'secondary'}
+              aria-pressed={viewMode === 'grid'}
+              onClick={() => chooseViewMode('grid')}
+              aria-label="Visualização em grade"
+              className={`whitespace-nowrap gap-1.5 ${viewMode === 'grid' ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Grade
+            </Button>
         </div>
       </div>
 

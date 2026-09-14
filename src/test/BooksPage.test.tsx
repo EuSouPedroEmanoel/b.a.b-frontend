@@ -1,6 +1,7 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResponsiveLayoutContext } from '@/components/layout/ResponsiveLayoutContext'
 import { BooksPage } from '@/features/books/BooksPage'
@@ -106,6 +107,38 @@ describe('BooksPage responsive result structure', () => {
 
     expect(await screen.findByRole('table')).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Lista de livros' })).not.toBeInTheDocument()
+
+    const pageSizeSelect = screen.getByRole('combobox', { name: 'Itens por página' })
+    expect(pageSizeSelect).toHaveAttribute('id', 'page-size-select')
+    expect(pageSizeSelect.parentElement).toContainElement(screen.getByText('Itens por página'))
+    expect(screen.getByText(/livro encontrado/)).toBeInTheDocument()
+
+    const viewModeGroup = screen.getByRole('group', { name: 'Modo de visualização' })
+    expect(within(viewModeGroup).getByRole('button', { name: 'Visualização em tabela' })).toBeInTheDocument()
+    expect(within(viewModeGroup).getByRole('button', { name: 'Visualização em grade' })).toBeInTheDocument()
+  })
+
+  it('preserva a ordem de foco e os comandos de teclado da barra', async () => {
+    renderPage()
+
+    const user = userEvent.setup()
+    const select = await screen.findByRole('combobox', { name: 'Itens por página' })
+    const tableButton = screen.getByRole('button', { name: 'Visualização em tabela' })
+    const gridButton = screen.getByRole('button', { name: 'Visualização em grade' })
+
+    select.focus()
+    await user.tab()
+    expect(document.activeElement).toBe(tableButton)
+
+    await user.tab()
+    expect(document.activeElement).toBe(gridButton)
+
+    await user.keyboard('{Enter}')
+    expect(gridButton).toHaveAttribute('aria-pressed', 'true')
+
+    tableButton.focus()
+    await user.keyboard(' ')
+    expect(tableButton).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('monta apenas os cards no modo tabela em mobile e reage ao resize', async () => {
