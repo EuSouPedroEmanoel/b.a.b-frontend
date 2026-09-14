@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, BookOpen, Calendar, Clock, Funnel, Hash, LayoutGrid, Loader2, Plus, Table } from 'lucide-react'
+import { ArrowDown, ArrowUp, BookOpen, Funnel, LayoutGrid, Loader2, Plus, Table } from 'lucide-react'
 import api from '@/lib/api'
 import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
@@ -1062,89 +1062,10 @@ export function BooksPage() {
                   ))}
                 </tbody>
               </table>
-            </div> : <ul className="grid min-w-0 gap-4" role="list" aria-label="Lista de livros">
-              {data.items.map((b) => (
-                <li
-                  key={b.id}
-                  className="group relative w-full min-w-0 @container overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-all hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 active:scale-[0.99]"
-                >
-                  <Link
-                    to={`/acervo/${b.id}`}
-                    state={detailRouteState(createCatalogOrigin(`${location.pathname}${location.search}`, viewMode))}
-                    onClick={() => {
-                      const origin = createCatalogOrigin(`${location.pathname}${location.search}`, viewMode)
-                      if (origin) saveCatalogSnapshot(origin, window.scrollY)
-                    }}
-                    className="flex min-w-0 flex-col items-center gap-3 p-3 focus-visible:outline-none @min-[18rem]:flex-row @min-[18rem]:items-start"
-                    aria-label={`Ver detalhes de ${b.title}`}
-                  >
-                    <CoverImage
-                      src={b.cover_url}
-                      title={b.title}
-                      alt={`Capa de ${b.title}`}
-                      width={160}
-                      height={240}
-                      className="h-28 w-20 shrink-0 rounded-xl border border-slate-200 dark:border-slate-600"
-                      sizes="80px"
-                    />
-                    <div className="flex w-full min-w-0 flex-col items-center gap-2 @min-[18rem]:flex-1 @min-[18rem]:items-stretch">
-                      <div className="flex min-w-0 flex-col items-center gap-2 @min-[18rem]:items-start @min-[24rem]:flex-row @min-[24rem]:justify-between">
-                        <h3 className="w-full min-w-0 break-words text-center text-sm font-bold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-[#0f4c75] dark:group-hover:text-white transition-colors @min-[18rem]:text-left @min-[24rem]:w-0 @min-[24rem]:flex-1">
-                          {b.title}
-                        </h3>
-                        <Badge tone={isGuest ? publicBookStateTone(b.derived_state) : bookStateTone(b.derived_state)} className="shrink-0 self-center text-xs px-2 py-0.5 @min-[18rem]:self-start @min-[24rem]:self-auto" title={isGuest ? publicBookStateLabel(b.derived_state) : `Estado: ${bookStateLabel(b.derived_state)}`}>
-                          {isGuest ? publicBookStateLabel(b.derived_state) : bookStateLabel(b.derived_state)}
-                        </Badge>
-                      </div>
-                      <p className="flex min-w-0 max-w-full items-start justify-center gap-1.5 text-center font-mono text-xs text-slate-500 dark:text-slate-400 @min-[18rem]:justify-start @min-[18rem]:text-left">
-                        <Hash className="h-3 w-3 opacity-60" aria-hidden="true" />
-                        <span className="min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{b.isbn ?? 'Sem ISBN'}</span>
-                      </p>
-                    </div>
-                  </Link>
-
-                  <div className="mx-4 border-t border-slate-100 dark:border-slate-700" />
-
-                  <div className="px-3 py-2.5 space-y-2.5">
-                    {(b.authors.length > 0 || b.genres.length > 0) && <div className="flex min-w-0 flex-col gap-2">
-                      {b.authors.length > 0 && <OverflowTags items={b.authors} tone="info" maxVisibleFallback={1} hiddenLabel="autores adicionais" itemMaxWidthClass="max-w-[18ch]" className="w-full" />}
-                      {b.genres.length > 0 && <OverflowTags items={b.genres} tone="neutral" maxVisibleFallback={2} maxVisible={2} hiddenLabel="gêneros adicionais" itemMaxWidthClass="max-w-[18ch]" className="w-full" />}
-                    </div>}
-                    {b.description && (
-                      <p className="break-words text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                        {b.description}
-                      </p>
-                    )}
-                    {typeof b.total_copies === 'number' && <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-xl bg-slate-50 px-3 py-1.5 text-xs dark:bg-slate-700/40">
-                      <span className="font-medium text-slate-500 dark:text-slate-400">Disponibilidade</span>
-                      <span className="min-w-0 break-words text-right font-semibold text-slate-700 dark:text-slate-200">{availabilityText(b)}</span>
-                    </div>}
-                    <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2 rounded-xl bg-slate-50 px-2.5 py-2 dark:bg-slate-700/40">
-                      <span className="flex min-w-0 items-center gap-1.5 text-xs">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500">
-                          <Calendar className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
-                        </span>
-                        <span className="flex min-w-0 flex-col leading-tight">
-                          <span className="min-w-0 break-words text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Ano</span>
-                          <span className="min-w-0 break-words text-xs font-semibold text-slate-700 dark:text-slate-200">{b.published_date ? new Date(b.published_date).getFullYear() : '—'}</span>
-                        </span>
-                      </span>
-                      <span className="flex min-w-0 items-center gap-1.5 text-xs">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500">
-                          <Clock className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" aria-hidden="true" />
-                        </span>
-                        <span className="flex min-w-0 flex-col leading-tight">
-                          <span className="min-w-0 break-words text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Cadastro</span>
-                          <span className="min-w-0 break-words text-xs font-semibold text-slate-700 dark:text-slate-200">{b.created_at ? new Date(b.created_at).toLocaleDateString('pt-BR') : '—'}</span>
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/5 dark:bg-white/10">
-                      <ArrowDown className="h-3.5 w-3.5 -rotate-90 text-slate-400" aria-hidden="true" />
-                    </span>
-                  </div>
+            </div> : <ul className={responsiveBookGridClasses} role="list" aria-label="Lista de livros">
+              {data.items.map((b, index) => (
+                <li key={b.id} className="min-w-0">
+                  <GridCard book={b} index={index} isGuest={isGuest} />
                 </li>
               ))}
             </ul>}
@@ -1160,7 +1081,7 @@ export function BooksPage() {
           <>
             <div role="grid" aria-label="Grade de livros" className={responsiveBookGridClasses}>
               {gridItems.map((b, index) => (
-                <GridCard key={b.id} book={b as any} index={index} isGuest={isGuest} />
+                <GridCard key={b.id} book={b as any} index={index} isGuest={isGuest} portalHover />
               ))}
             </div>
             {gridItems.length === 0 && !isGridLoading && <p className="text-sm text-slate-500 py-8 text-center">Nenhum livro encontrado.</p>}
