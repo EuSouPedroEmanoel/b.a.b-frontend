@@ -53,6 +53,13 @@ describe('Guest school autocomplete', () => {
     return screen.findByRole('combobox', { name: 'Escola' })
   }
 
+  it('uses the available page width while keeping a readable maximum', async () => {
+    renderLogin()
+
+    const heading = await screen.findByRole('heading', { name: 'Entrar na Biblioteca' })
+    expect(heading.parentElement).toHaveClass('w-[min(100%,clamp(32rem,calc(20rem+var(--text-sm)*12),42rem))]')
+  })
+
   it('preselects a public link school and supports keyboard selection', async () => {
     renderLogin('/visitar/S1')
 

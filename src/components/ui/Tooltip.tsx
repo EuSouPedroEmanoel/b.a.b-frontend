@@ -20,7 +20,7 @@ export function Tooltip({ children, className = '', id, variant = 'default' }: {
       const viewportPadding = 8
       const viewportLeft = Math.min(
         Math.max(triggerRect.left + (triggerRect.width - tooltipRect.width) / 2, viewportPadding),
-        Math.max(viewportPadding, window.innerWidth - tooltipRect.width - viewportPadding),
+        Math.max(viewportPadding, document.documentElement.clientWidth - tooltipRect.width - viewportPadding),
       )
       const preferredTop = triggerRect.top - tooltipRect.height - gap
       const viewportTop = preferredTop >= viewportPadding

@@ -213,7 +213,7 @@ export function LoginPage() {
   const guestSubmitTooltip = guestLoading ? 'Entrando como visitante, aguarde' : 'Selecione uma escola para continuar'
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto w-[min(100%,clamp(32rem,calc(20rem+var(--text-sm)*12),42rem))]">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Entrar na Biblioteca</h1>
       <p className="text-sm text-slate-500 mb-6">Entre com seu usuário, e-mail ou CPF.</p>
 
