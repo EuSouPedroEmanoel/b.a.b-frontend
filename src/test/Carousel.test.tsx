@@ -4,6 +4,7 @@ import { Carousel } from '@/components/ui/Carousel'
 
 type Geometry = { clientWidth: number; scrollWidth?: number; cardWidth?: number; wrapperWidth?: number }
 let resizeCallbacks: ResizeObserverCallback[] = []
+let mutationCallbacks: MutationCallback[] = []
 
 function renderCarousel(count: number, circular = true, fluidItems = false) {
   return render(
@@ -70,6 +71,7 @@ describe('Carousel paginado e sequenciado', () => {
       disconnect() {}
     })
     vi.stubGlobal('MutationObserver', class {
+      constructor(callback: MutationCallback) { mutationCallbacks.push(callback) }
       observe() {}
       disconnect() {}
     })
@@ -79,6 +81,7 @@ describe('Carousel paginado e sequenciado', () => {
   afterEach(() => {
     cleanup()
     resizeCallbacks = []
+    mutationCallbacks = []
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
@@ -88,6 +91,15 @@ describe('Carousel paginado e sequenciado', () => {
     expect(screen.getByText('Nenhum item disponível.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Próximo' })).not.toBeInTheDocument()
+  })
+
+  it('preserva o crescimento vertical natural no modo circular', () => {
+    renderCarousel(3)
+    const carouselViewport = viewport()
+
+    expect(carouselViewport).toHaveClass('overflow-x-clip', 'overflow-y-visible')
+    expect(carouselViewport).not.toHaveClass('overflow-hidden')
+    expect(carouselViewport.style.height).toBe('')
   })
 
   it('mede somente um item leve e renderiza apenas a página atual', () => {
@@ -123,6 +135,14 @@ describe('Carousel paginado e sequenciado', () => {
 
     expect(labels()).toHaveLength(5)
     expect(carouselViewport.style.getPropertyValue('--carousel-item-width')).toBe('99.2px')
+  })
+
+  it('expande cards fluídos para ocupar toda a largura da página', () => {
+    renderCarousel(9, true, true)
+    const carouselViewport = configureGeometry({ clientWidth: 650, cardWidth: 100 })
+
+    expect(labels()).toHaveLength(5)
+    expect(carouselViewport.style.getPropertyValue('--carousel-item-width')).toBe('120.4px')
   })
 
   it('calcula apenas cards completos por página, sem cards adjacentes no DOM', () => {
@@ -181,6 +201,34 @@ describe('Carousel paginado e sequenciado', () => {
     expect(labels()).toHaveLength(4)
   })
 
+  it('recalcula a quantidade e o anúncio quando a tipografia muda', () => {
+    renderCarousel(9)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+    expect(labels()).toHaveLength(4)
+    expect(screen.getByText('Página 1 de 3')).toBeInTheDocument()
+
+    const measuredItem = viewport().querySelector('[data-carousel-measure-item]') as HTMLElement
+    Object.defineProperty(measuredItem, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ width: 200, height: 180, top: 0, left: 0, right: 200, bottom: 180, x: 0, y: 0, toJSON: () => ({}) }),
+    })
+    act(() => mutationCallbacks.forEach((callback) => callback([], {} as MutationObserver)))
+
+    expect(labels()).toHaveLength(2)
+    expect(screen.getByText('Página 1 de 5')).toBeInTheDocument()
+  })
+
+  it('torna duplicatas visuais da última página inertes', () => {
+    renderCarousel(6)
+    configureGeometry({ clientWidth: 480, cardWidth: 100 })
+
+    fireEvent.click(nextButton())
+
+    const duplicateItems = Array.from(region().querySelectorAll('[data-carousel-page-item][aria-hidden="true"]'))
+    expect(duplicateItems).toHaveLength(2)
+    expect(duplicateItems.every((item) => item.hasAttribute('inert'))).toBe(true)
+  })
+
   it('restaura o foco programático para a região quando remove um card focado', () => {
     renderCarousel(9)
     configureGeometry({ clientWidth: 480, cardWidth: 100 })
@@ -207,7 +255,7 @@ describe('Carousel paginado e sequenciado', () => {
 
   it('preserva o modo não circular com rolagem e setas', () => {
     renderCarousel(3, false)
-    const scroller = screen.getByRole('region', { name: '' }) as HTMLDivElement
+    const scroller = screen.getByRole('region', { name: 'Livros' }) as HTMLDivElement
     let scrollLeft = 0
     Object.defineProperties(scroller, {
       clientWidth: { configurable: true, get: () => 200 },
@@ -220,5 +268,24 @@ describe('Carousel paginado e sequenciado', () => {
     expect(nextButton()).not.toBeDisabled()
     fireEvent.click(nextButton())
     expect(previousButton()).not.toBeDisabled()
+  })
+
+  it('rola com ArrowRight e ArrowLeft quando a região não circular está focada', () => {
+    renderCarousel(3, false)
+    const scroller = screen.getByRole('region', { name: 'Livros' }) as HTMLDivElement
+    let scrollLeft = 0
+    Object.defineProperties(scroller, {
+      clientWidth: { configurable: true, get: () => 200 },
+      scrollWidth: { configurable: true, get: () => 600 },
+      scrollLeft: { configurable: true, get: () => scrollLeft, set: (value: number) => { scrollLeft = value } },
+      scrollTo: { configurable: true, value: ({ left }: ScrollToOptions) => { scrollLeft = left ?? scrollLeft; fireEvent.scroll(scroller) } },
+    })
+    act(() => resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver)))
+    scroller.focus()
+
+    fireEvent.keyDown(scroller, { key: 'ArrowRight' })
+    expect(scrollLeft).toBe(170)
+    fireEvent.keyDown(scroller, { key: 'ArrowLeft' })
+    expect(scrollLeft).toBe(0)
   })
 })

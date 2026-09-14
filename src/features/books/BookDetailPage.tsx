@@ -49,8 +49,9 @@ type Reservation = { id: number; book_id: number; status: string; created_at?: s
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 
 const responsiveStatusBadgeClasses = 'min-h-6 max-w-full min-w-0 whitespace-normal !px-2 !py-0.5 text-xs font-medium leading-normal [overflow-wrap:anywhere]'
-const recommendationPreferredWidthClasses = 'w-[min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85))] max-w-full basis-[min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85))] shrink-0 grow-0'
-const recommendationItemClasses = 'w-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85)))] max-w-full basis-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(7.5rem_+_var(--text-sm)_*_2.85)),calc(7.5rem_+_var(--text-sm)_*_2.85)))] shrink-0 grow-0'
+// Espelha a largura mínima da grade do Acervo: menor em mobile e 9rem + 3.5×texto a partir de md.
+const recommendationPreferredWidthClasses = 'w-[min(var(--carousel-viewport-width,calc(4rem_+_var(--text-sm)_*_3)),calc(4rem_+_var(--text-sm)_*_3))] max-w-full basis-[min(var(--carousel-viewport-width,calc(4rem_+_var(--text-sm)_*_3)),calc(4rem_+_var(--text-sm)_*_3))] shrink-0 grow-0 md:w-[min(var(--carousel-viewport-width,calc(9rem_+_var(--text-sm)_*_3.5)),calc(9rem_+_var(--text-sm)_*_3.5))] md:basis-[min(var(--carousel-viewport-width,calc(9rem_+_var(--text-sm)_*_3.5)),calc(9rem_+_var(--text-sm)_*_3.5))]'
+const recommendationItemClasses = 'w-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(4rem_+_var(--text-sm)_*_3)),calc(4rem_+_var(--text-sm)_*_3)))] max-w-full basis-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(4rem_+_var(--text-sm)_*_3)),calc(4rem_+_var(--text-sm)_*_3)))] shrink-0 grow-0 md:w-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(9rem_+_var(--text-sm)_*_3.5)),calc(9rem_+_var(--text-sm)_*_3.5)))] md:basis-[var(--carousel-item-width,min(var(--carousel-viewport-width,calc(9rem_+_var(--text-sm)_*_3.5)),calc(9rem_+_var(--text-sm)_*_3.5))]'
 
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()

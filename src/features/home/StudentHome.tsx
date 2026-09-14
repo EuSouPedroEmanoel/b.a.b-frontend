@@ -21,16 +21,19 @@ type DiscoveryBook = {
 }
 
 
+// Mantém o mesmo tamanho mínimo da grade do Acervo em cada breakpoint.
+const homeCarouselItemClasses = 'relative w-[min(var(--carousel-viewport-width,100vw),calc(4rem_+_var(--text-sm)_*_3))] shrink-0 md:w-[min(var(--carousel-viewport-width,100vw),calc(9rem_+_var(--text-sm)_*_3.5))]'
+
 function renderDiscoveryBook(book: DiscoveryBook, index: number, ranking = false) {
   return (
-    <div className="relative w-[140px] shrink-0 sm:w-[160px] lg:w-[180px]">
+    <div className={homeCarouselItemClasses}>
       <GridCard book={book} index={index} portalHover rankingPosition={ranking ? index + 1 : undefined} />
     </div>
   )
 }
 
 function measureDiscoveryBook() {
-  return <div data-carousel-measure-item aria-hidden="true" className="relative h-0 w-[140px] shrink-0 sm:w-[160px] lg:w-[180px]" />
+  return <div data-carousel-measure-item aria-hidden="true" className={`h-0 ${homeCarouselItemClasses}`} />
 }
 
 export function StudentHome() {

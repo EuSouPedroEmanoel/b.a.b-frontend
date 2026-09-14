@@ -593,7 +593,7 @@ export function BooksPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 overflow-x-clip">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl sm:text-3xl font-bold">Acervo</h1>
@@ -1025,7 +1025,7 @@ export function BooksPage() {
                       </td>
                       <td className={`${compactTable ? 'w-[calc(68%-clamp(3.75rem,calc(var(--text-base)*3),6rem))]' : 'w-[28%]'} px-2 py-2`}>
                         <div className="flex flex-col gap-1 min-w-0">
-                          <span className="line-clamp-2 break-words font-medium text-slate-900 dark:text-slate-100" title={b.title}>
+                          <span className="line-clamp-3 break-words font-medium text-slate-900 dark:text-slate-100" title={b.title}>
                             {b.title}
                           </span>
                           {b.description ? (

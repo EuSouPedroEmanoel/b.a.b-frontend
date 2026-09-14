@@ -78,9 +78,11 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
     const style = pageRow ? window.getComputedStyle(pageRow) : null
     const measuredGap = Number.parseFloat(style?.columnGap || style?.gap || '')
 
+    const nextViewportWidth = viewport.clientWidth
+    const nextGap = Number.isFinite(measuredGap) ? measuredGap : DEFAULT_GAP
     setItemWidth((current) => Math.abs(current - width) < 0.5 ? current : width)
-    setViewportWidth(viewport.clientWidth)
-    setGap(Number.isFinite(measuredGap) ? measuredGap : DEFAULT_GAP)
+    setViewportWidth((current) => current === nextViewportWidth ? current : nextViewportWidth)
+    setGap((current) => Math.abs(current - nextGap) < 0.5 ? current : nextGap)
   }, [])
 
   useEffect(() => {
@@ -94,12 +96,17 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
     observer?.observe(viewport)
     const measuredItem = measurement.querySelector<HTMLElement>('[data-carousel-measure-item]')
     if (measuredItem) observer?.observe(measuredItem)
+    const contentObserver = typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(measure)
+    contentObserver?.observe(measurement, { attributes: true, characterData: true, childList: true, subtree: true })
     const fontObserver = typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(measure)
     fontObserver?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-font-size'] })
+    if (!observer) window.addEventListener('resize', measure)
     const frame = window.requestAnimationFrame(measure)
     return () => {
       observer?.disconnect()
+      contentObserver?.disconnect()
       fontObserver?.disconnect()
+      if (!observer) window.removeEventListener('resize', measure)
       window.cancelAnimationFrame(frame)
     }
   }, [circular, items.length, measure])
@@ -110,10 +117,11 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
   )
   const renderedItemsPerPage = itemsPerPage || (items.length ? 1 : 0)
   const renderedItemWidth = fluidItems && itemsPerPage
-    ? Math.min(itemWidth, (viewportWidth - gap * (itemsPerPage - 1)) / itemsPerPage)
+    ? (viewportWidth - gap * (itemsPerPage - 1)) / itemsPerPage
     : 0
   const pageCount = renderedItemsPerPage ? Math.ceil(items.length / renderedItemsPerPage) : 0
   const hasMultiplePages = pageCount > 1
+  const currentPage = pageCount ? Math.min(page, pageCount - 1) : 0
 
   useEffect(() => {
     if (!pageCount) {
@@ -125,12 +133,12 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
 
   const pageItems = useMemo(() => {
     if (!renderedItemsPerPage || !items.length) return []
-    const start = page * renderedItemsPerPage
+    const start = currentPage * renderedItemsPerPage
     return Array.from({ length: Math.min(renderedItemsPerPage, items.length) }, (_, offset) => {
       const index = normalize(start + offset, items.length)
-      return { item: items[index], index, offset }
+      return { item: items[index], index, offset, duplicate: start + offset >= items.length }
     })
-  }, [items, page, renderedItemsPerPage])
+  }, [currentPage, items, renderedItemsPerPage])
 
   const updateScroll = useCallback(() => {
     const scroller = scrollerRef.current
@@ -163,7 +171,7 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
   const changePage = async (direction: 'prev' | 'next') => {
     if (!hasMultiplePages || isAnimating) return
 
-    const nextPage = normalize(page + (direction === 'next' ? 1 : -1), pageCount)
+    const nextPage = normalize(currentPage + (direction === 'next' ? 1 : -1), pageCount)
     if (reducedMotion) {
       restoreRegionFocusIfNeeded()
       setPage(nextPage)
@@ -228,7 +236,8 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
   const previousDisabled = circular ? !hasMultiplePages || isAnimating : !canPrev
   const nextDisabled = circular ? !hasMultiplePages || isAnimating : !canNext
   const renderMeasurementItem = measureItem ?? renderItem
+  const viewportOverflowClasses = circular ? 'overflow-x-clip overflow-y-visible' : 'overflow-hidden'
 
   const enteringX = enteringDirection === 'next' ? EXIT_DISTANCE : -EXIT_DISTANCE
-  return <section aria-labelledby={titleId} aria-label={ariaLabel ?? title} className="w-full"><div className="mb-3 flex items-center justify-between gap-3"><h2 id={titleId} className="min-w-0 text-lg font-semibold text-slate-900 dark:text-white">{title}</h2><div className="flex shrink-0 items-center gap-2"><button type="button" aria-label="Anterior" onClick={() => scroll('prev')} disabled={previousDisabled} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button><button type="button" aria-label="Próximo" onClick={() => scroll('next')} disabled={nextDisabled} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronRight className="h-4 w-4" aria-hidden="true" /></button></div></div><div ref={scope} className="relative"><div ref={viewportRef} className="relative overflow-hidden" style={viewportWidth > 0 ? ({ '--carousel-viewport-width': `${viewportWidth}px`, ...(renderedItemWidth > 0 ? { '--carousel-item-width': `${renderedItemWidth}px` } : {}) } as CSSProperties) : undefined}>{circular && <div ref={measurementRef} aria-hidden="true" inert={true} className="pointer-events-none absolute left-0 top-0 opacity-0" style={{ visibility: 'hidden' }}>{measureItem ? renderMeasurementItem(items[0], 0) : <div data-carousel-measure-item className="inline-block">{renderMeasurementItem(items[0], 0)}</div>}</div>}{circular ? <div ref={regionRef} role="region" aria-roledescription="carrossel" aria-label={`${ariaLabel ?? title}. Página ${page + 1} de ${Math.max(pageCount, 1)}`} tabIndex={-1} onKeyDown={handleKeyboard} className="focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"><div ref={pageRowRef} data-carousel-page className="flex items-start gap-3 py-3">{pageItems.map(({ item, index, offset }) => <div key={`${page}-${(item as { id?: string | number })?.id ?? index}-${offset}`} data-carousel-page-item className="shrink-0" style={enteringDirection ? { opacity: 0, transform: `translateX(${enteringX}px)` } : undefined}>{renderItem(item, index)}</div>)}</div><p className="sr-only" aria-live="polite">Página ${page + 1} de ${Math.max(pageCount, 1)}</p></div> : <div ref={scrollerRef} role="region" aria-roledescription="carrossel" tabIndex={0} onKeyDown={handleKeyboard} className="flex gap-3 overflow-x-auto overflow-y-visible scroll-smooth snap-x snap-mandatory px-1 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]" style={{ WebkitOverflowScrolling: 'touch' }}>{items.map((item, index) => <div key={(item as { id?: string | number })?.id ?? index} className="shrink-0 snap-start">{renderItem(item, index)}</div>)}</div>}</div></div></section>
+  return <section role="group" aria-labelledby={titleId} className="w-full"><div className="mb-3 flex items-center justify-between gap-3"><h2 id={titleId} className="min-w-0 text-lg font-semibold text-slate-900 dark:text-white">{title}</h2><div className="flex shrink-0 items-center gap-2"><button type="button" aria-label="Anterior" onClick={() => scroll('prev')} disabled={previousDisabled} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button><button type="button" aria-label="Próximo" onClick={() => scroll('next')} disabled={nextDisabled} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"><ChevronRight className="h-4 w-4" aria-hidden="true" /></button></div></div><div ref={scope} className="relative"><div ref={viewportRef} className={`relative ${viewportOverflowClasses}`} style={viewportWidth > 0 ? ({ '--carousel-viewport-width': `${viewportWidth}px`, ...(renderedItemWidth > 0 ? { '--carousel-item-width': `${renderedItemWidth}px` } : {}) } as CSSProperties) : undefined}>{circular && <div ref={measurementRef} aria-hidden="true" inert={true} className="pointer-events-none absolute left-0 top-0 opacity-0" style={{ visibility: 'hidden' }}>{measureItem ? renderMeasurementItem(items[0], 0) : <div data-carousel-measure-item className="inline-block">{renderMeasurementItem(items[0], 0)}</div>}</div>}{circular ? <div ref={regionRef} role="region" aria-roledescription="carrossel" aria-label={`${ariaLabel ?? title}. Página ${currentPage + 1} de ${Math.max(pageCount, 1)}`} tabIndex={-1} onKeyDown={handleKeyboard} className="focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"><div ref={pageRowRef} data-carousel-page className="flex items-start gap-3 py-3">{pageItems.map(({ item, index, offset, duplicate }) => <div key={`${currentPage}-${(item as { id?: string | number })?.id ?? index}-${offset}`} data-carousel-page-item aria-hidden={duplicate || undefined} inert={duplicate || undefined} className="shrink-0" style={enteringDirection ? { opacity: 0, transform: `translateX(${enteringX}px)` } : undefined}>{renderItem(item, index)}</div>)}</div><p className="sr-only" aria-live="polite">Página {currentPage + 1} de {Math.max(pageCount, 1)}</p></div> : <div ref={scrollerRef} role="region" aria-roledescription="carrossel" aria-label={ariaLabel ?? title} tabIndex={0} onKeyDown={handleKeyboard} className="flex gap-3 overflow-x-auto overflow-y-visible scroll-smooth snap-x snap-mandatory px-1 py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]" style={{ WebkitOverflowScrolling: 'touch' }}>{items.map((item, index) => <div key={(item as { id?: string | number })?.id ?? index} className="shrink-0 snap-start">{renderItem(item, index)}</div>)}</div>}</div></div></section>
 }

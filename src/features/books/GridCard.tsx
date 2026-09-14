@@ -186,7 +186,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           {rankingPosition !== undefined && <span aria-hidden="true" className="absolute left-2 top-2 z-10 text-2xl font-black text-white/85 drop-shadow">{rankingPosition}º</span>}
           {/* Rodapé da capa – igual para com imagem e fallback: Título + Autor sobre gradiente escuro */}
           <div className="absolute inset-x-0 bottom-0 overflow-hidden bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8">
-            <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
+            <h3 className="line-clamp-3 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
             {book.authors[0] && <p className="truncate text-xs text-white/80">{book.authors[0].name}</p>}
           </div>
         </div>
@@ -238,7 +238,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           </div>
           <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
             <div className="flex flex-col gap-1">
-              <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
+              <h3 className="line-clamp-3 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
               <span className="truncate text-xs font-medium leading-snug text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
             </div>
             <div className="flex min-w-0 flex-wrap gap-1">
@@ -333,7 +333,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
             </div>
             <div className="preview-status-info flex min-w-0 flex-1 flex-col justify-between gap-3 py-0.5">
               <div className="flex flex-col gap-1">
-                <h3 className="line-clamp-2 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
+                <h3 className="line-clamp-3 overflow-hidden text-sm font-bold leading-snug text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{book.title}</h3>
                 <span className="truncate text-xs font-medium leading-snug text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
               </div>
               <div className="flex min-w-0 flex-wrap gap-1">
