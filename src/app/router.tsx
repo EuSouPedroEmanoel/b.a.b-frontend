@@ -1,32 +1,25 @@
-import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
 import { HomePage, DiscoveryHome } from '@/features/home/HomePage'
 import { AccountOnly, Protected, PublicOnly, RedirectBookCopies, StudentManagementOnly } from './RouteGuards'
-
-const AccountPage = lazy(() => import('@/features/account/AccountPage').then((module) => ({ default: module.AccountPage })))
-const AccountManagementPage = lazy(() => import('@/features/account/AccountManagementPage').then((module) => ({ default: module.AccountManagementPage })))
-const BooksPage = lazy(() => import('@/features/books/BooksPage').then((module) => ({ default: module.BooksPage })))
-const BookCreatePage = lazy(() => import('@/features/books/BookCreatePage').then((module) => ({ default: module.BookCreatePage })))
-const BookDetailPage = lazy(() => import('@/features/books/BookDetailPage').then((module) => ({ default: module.BookDetailPage })))
-const BookCopyCreatePage = lazy(() => import('@/features/books/BookCopyCreatePage').then((module) => ({ default: module.BookCopyCreatePage })))
-const CopiesPage = lazy(() => import('@/features/copies/CopiesPage').then((module) => ({ default: module.CopiesPage })))
-const LoansPage = lazy(() => import('@/features/loans/LoansPage').then((module) => ({ default: module.LoansPage })))
-const ReservationsPage = lazy(() => import('@/features/reservations/ReservationsPage').then((module) => ({ default: module.ReservationsPage })))
-const SchoolsPage = lazy(() => import('@/features/schools/SchoolsPage').then((module) => ({ default: module.SchoolsPage })))
-const StudentsPage = lazy(() => import('@/features/students/StudentsPage').then((module) => ({ default: module.StudentsPage })))
-const UsersPage = lazy(() => import('@/features/users/UsersPage').then((module) => ({ default: module.UsersPage })))
-const ManageSchoolPage = lazy(() => import('@/features/schools/ManageSchoolPage').then((module) => ({ default: module.ManageSchoolPage })))
-
-function RouteLoading() {
-  return <div role="status" aria-live="polite" aria-busy="true" className="flex min-h-[12rem] items-center justify-center p-8 text-sm text-[var(--color-text-muted)]">Carregando página…</div>
-}
-
-function LazyRoute({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<RouteLoading />}>{children}</Suspense>
-}
+import {
+  AccountManagementPage,
+  AccountPage,
+  BookCopyCreatePage,
+  BookCreatePage,
+  BookDetailPage,
+  BooksPage,
+  CopiesPage,
+  LazyRoute,
+  LoansPage,
+  ManageSchoolPage,
+  ReservationsPage,
+  SchoolsPage,
+  StudentsPage,
+  UsersPage,
+} from './routeComponents'
 
 export const router = createBrowserRouter([
   {

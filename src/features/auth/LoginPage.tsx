@@ -65,6 +65,8 @@ export function LoginPage() {
 
   useEffect(() => {
     let active = true
+    // O estado de carregamento precisa ser reiniciado antes de cada consulta por escola.
+    // oxlint-disable-next-line react/set-state-in-effect -- sincroniza a UI com a requisição assíncrona.
     setGuestSchoolsLoading(true)
     void api.get<{ code: string; name: string }[]>('/auth/guest/schools')
       .then(({ data }) => {
@@ -85,7 +87,11 @@ export function LoginPage() {
   }, [schoolCode])
 
   useEffect(() => {
-    if (schoolCode) setMode('guest')
+    if (schoolCode) {
+      // A rota pública é a fonte de verdade quando o parâmetro muda sem remontar a página.
+      // oxlint-disable-next-line react/set-state-in-effect -- sincroniza estado local com a URL.
+      setMode('guest')
+    }
   }, [schoolCode])
 
   useEffect(() => {

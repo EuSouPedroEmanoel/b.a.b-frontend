@@ -3,7 +3,7 @@ import { Header } from './Header'
 import { SkipLink } from './SkipLink'
 import { AccessibilityMenu } from '../accessibility/AccessibilityMenu'
 import { NavigationFocusIntentProvider } from '../navigation/NavigationFocusIntent'
-import { ResponsiveLayoutProvider } from './ResponsiveLayoutContext'
+import { ResponsiveLayoutProvider } from './ResponsiveLayoutProvider'
 
 export function Layout() {
   return (

@@ -21,7 +21,7 @@ import { getBookCoverGradient } from '@/lib/coverColor'
 import { clearCatalogSnapshot, createCatalogOrigin, detailRouteState, readCatalogSnapshot, saveCatalogSnapshot } from '@/lib/catalogNavigation'
 import { GridCard } from './GridCard'
 import { hasPersonalReaderCapability } from '@/lib/permissions'
-import { useResponsiveLayout } from '@/components/layout/ResponsiveLayoutContext'
+import { useResponsiveLayout } from '@/components/layout/useResponsiveLayout'
 
 type Book = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; is_active: boolean; added_by: number; cover_url: string | null; published_date: string | null; created_at: string | null; updated_at: string | null; total_copies?: number; available_copies?: number; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
 

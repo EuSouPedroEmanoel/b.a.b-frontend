@@ -5,13 +5,15 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { MobileNavigationPanel } from './MobileNavigationPanel'
-import { useResponsiveLayout } from './ResponsiveLayoutContext'
+import { useResponsiveLayout } from './useResponsiveLayout'
 import { useNavigationFocusIntent } from '../navigation/useNavigationFocusIntent'
 
+type IndicatorPosition = { left: number; top: number; width: number; height: number }
+
 function ActiveNavIndicator({ navRef, activeKey, mobile = false }: { navRef: RefObject<HTMLElement | null>; activeKey: string; mobile?: boolean }) {
-  const [position, setPosition] = useState({ left: 0, top: 0, width: 0, height: 0 })
-  const [animatedPosition, setAnimatedPosition] = useState(position)
-  const hasAnimatedPosition = useRef(false)
+  const initialPosition: IndicatorPosition = { left: 0, top: 0, width: 0, height: 0 }
+  const [position, setPosition] = useState<IndicatorPosition>(initialPosition)
+  const [animatedPosition, setAnimatedPosition] = useState<IndicatorPosition>(initialPosition)
   const [reducedMotion, setReducedMotion] = useState(false)
 
   useLayoutEffect(() => {
@@ -43,24 +45,16 @@ function ActiveNavIndicator({ navRef, activeKey, mobile = false }: { navRef: Ref
   }, [activeKey, navRef])
 
   useLayoutEffect(() => {
-    if (!mobile || !position.width) {
-      setAnimatedPosition(position)
-      return undefined
-    }
-    if (!hasAnimatedPosition.current) {
-      hasAnimatedPosition.current = true
-      setAnimatedPosition(position)
-      return undefined
+    if (!mobile || !position.width) return undefined
+    if (!animatedPosition.width) {
+      const initialTimer = window.setTimeout(() => setAnimatedPosition(position), 0)
+      return () => window.clearTimeout(initialTimer)
     }
     if (position.left === animatedPosition.left && position.top === animatedPosition.top && position.width === animatedPosition.width) return undefined
 
-    setAnimatedPosition((current) => ({ ...current, width: 0 }))
-    const moveTimer = window.setTimeout(() => {
-      setAnimatedPosition((current) => ({ ...current, left: position.left, top: position.top, height: position.height }))
-      window.requestAnimationFrame(() => setAnimatedPosition(position))
-    }, 160)
+    const moveTimer = window.setTimeout(() => setAnimatedPosition(position), 0)
     return () => window.clearTimeout(moveTimer)
-  }, [mobile, position])
+  }, [animatedPosition, mobile, position])
 
   useLayoutEffect(() => {
     if (typeof window.matchMedia !== 'function') return undefined
@@ -71,16 +65,18 @@ function ActiveNavIndicator({ navRef, activeKey, mobile = false }: { navRef: Ref
     return () => media.removeEventListener?.('change', update)
   }, [])
 
+  const indicatorPosition = !mobile || !position.width || !animatedPosition.width ? position : animatedPosition
+
   return (
     <span
       aria-hidden="true"
       className={`pointer-events-none absolute ${mobile ? '' : 'rounded-sm bg-white/80 dark:bg-slate-200'}`}
       style={{
         left: 0,
-        top: mobile ? `${animatedPosition.top + 1}px` : `${animatedPosition.top + animatedPosition.height - 2}px`,
-        width: mobile ? '0.125rem' : `${animatedPosition.width}px`,
-        height: mobile ? `${Math.max(0, animatedPosition.height - 1)}px` : '2px',
-        transform: `translateX(${animatedPosition.left}px)`,
+        top: mobile ? `${indicatorPosition.top + 1}px` : `${indicatorPosition.top + indicatorPosition.height - 2}px`,
+        width: mobile ? '0.125rem' : `${indicatorPosition.width}px`,
+        height: mobile ? `${Math.max(0, indicatorPosition.height - 1)}px` : '2px',
+        transform: `translateX(${indicatorPosition.left}px)`,
         transition: reducedMotion ? 'none' : 'top 250ms ease-out, transform 250ms ease-out, width 150ms ease-out',
       }}
     >

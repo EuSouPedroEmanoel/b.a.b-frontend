@@ -111,7 +111,6 @@ export function AccessibilityMenu() {
   }, [persist, textScale])
 
   useEffect(() => {
-    setTop((current) => clampTop(current))
     const handleResize = () => {
       setTop((current) => {
         const next = clampTop(current)
@@ -212,10 +211,6 @@ export function AccessibilityMenu() {
     const direction = pending.side === 'right' ? 1 : -1
 
     pendingSnapRef.current = null
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setSnapping(false)
-      return
-    }
 
     const animation = button.animate(
       [
@@ -331,6 +326,16 @@ export function AccessibilityMenu() {
     const button = buttonRef.current
     const id = ++animationRef.current
     const originLeft = button?.getBoundingClientRect().left ?? left
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reducedMotion) {
+      pendingSnapRef.current = null
+      setSide(nextSide)
+      setLeft(initialLeft(nextSide))
+      setTop(nextTop)
+      setSnapping(false)
+      persist({ side: nextSide, top: nextTop })
+      return
+    }
     pendingSnapRef.current = { id, originLeft, side: nextSide, speed }
     setSide(nextSide)
     setLeft(initialLeft(nextSide))

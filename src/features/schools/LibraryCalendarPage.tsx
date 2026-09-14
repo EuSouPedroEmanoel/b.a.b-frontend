@@ -13,7 +13,7 @@ import { PageDescription } from '@/components/ui/PageDescription'
 import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { calendarMarkedOutlineClasses, dangerSubtleClasses } from '@/components/ui/Badge'
+import { calendarMarkedOutlineClasses, dangerSubtleClasses } from '@/components/ui/Badge.styles'
 
 type NonWorkingDay = { date: string }
 type NationalHoliday = { date: string; name: string; already_added: boolean }
@@ -112,7 +112,7 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
     queryFn: async () => (await api.get<NationalHolidayPreview>(`/library-calendar/${effectiveSchoolId}/national-holidays?year=${year}`)).data,
     enabled: false,
   })
-  const days = daysQuery.data?.days ?? daysQuery.data?.items ?? []
+  const days = useMemo(() => daysQuery.data?.days ?? daysQuery.data?.items ?? [], [daysQuery.data])
   const dayMap = useMemo(() => new Map(days.map((day) => [day.date, day])), [days])
   const groupedDays = useMemo(() => {
     const groups = new Map<string, NonWorkingDay[]>()
@@ -142,10 +142,6 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
     observer.observe(grid)
     return () => observer.disconnect()
   }, [effectiveSchoolId])
-
-  useEffect(() => {
-    if (!singleMonthMode) setVisibleMonth(0)
-  }, [singleMonthMode])
 
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['library-calendar', effectiveSchoolId, year] })
   const setDaysCache = (nextDays: NonWorkingDay[]) => {

@@ -184,6 +184,8 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
   useEffect(() => {
     if (policyQuery.data) {
       const normalized = normalizePolicies(policyQuery.data.policies)
+      // O resultado remoto inicializa estados editáveis que podem divergir da query.
+      // oxlint-disable-next-line react/set-state-in-effect -- sincronização intencional de dados remotos.
       setPolicies(normalized)
       setOriginalPolicies(normalized)
       setDefaultPolicies(normalizePolicies(policyQuery.data.defaults ?? policyQuery.data.policies))

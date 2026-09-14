@@ -23,16 +23,12 @@ export function ProgressiveCarouselSection<T>({
   priority = false,
 }: ProgressiveCarouselSectionProps<T>) {
   const sectionRef = useRef<HTMLElement>(null)
-  const [activated, setActivated] = useState(priority)
+  const [activated, setActivated] = useState(() => priority || typeof IntersectionObserver === 'undefined')
 
   useEffect(() => {
     if (activated) return undefined
     const section = sectionRef.current
     if (!section) return undefined
-    if (typeof IntersectionObserver === 'undefined') {
-      setActivated(true)
-      return undefined
-    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {

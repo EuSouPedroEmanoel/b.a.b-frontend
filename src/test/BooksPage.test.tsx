@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ResponsiveLayoutContext } from '@/components/layout/ResponsiveLayoutContext'
+import { ResponsiveLayoutContext } from '@/components/layout/ResponsiveLayoutContextValue'
 import { BooksPage } from '@/features/books/BooksPage'
 
 const fixtures = vi.hoisted(() => ({

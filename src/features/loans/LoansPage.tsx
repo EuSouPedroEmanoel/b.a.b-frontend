@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Funnel } from 'lucide-react'
@@ -331,6 +331,8 @@ function OperationalLoansPage() {
     if (operation !== 'borrow') return
     const code = internalCode.trim()
     if (code.length <= 2) {
+      // O valor é separado para preservar o debounce da consulta do exemplar.
+      // oxlint-disable-next-line react/set-state-in-effect -- estado de consulta debounced.
       setCopyLookupCode('')
       return
     }
@@ -362,6 +364,8 @@ function OperationalLoansPage() {
     if (operation !== 'borrow' || pickupReservation) return
     const value = onlyDigits(cpf)
     if (value.length !== 11) {
+      // O valor é separado para preservar o debounce da consulta do leitor.
+      // oxlint-disable-next-line react/set-state-in-effect -- estado de consulta debounced.
       setUserLookupCpf('')
       return
     }
@@ -374,9 +378,9 @@ function OperationalLoansPage() {
 
   const user = userMatchesInput ? userQuery.data : undefined
   const sameSchool = !!copy && !!user && copy.school_id === user.school_id
-  const reader = pickupReservation
+  const reader = useMemo(() => pickupReservation
     ? { id: pickupReservation.user_id, username: pickupReservation.reserver_username, role: pickupReservation.reserver_role, school_id: pickupReservation.school_id, school_name: null, turma_numero: pickupReservation.reserver_turma_numero, turma_letra: pickupReservation.reserver_turma_letra, is_active: pickupReservation.reserver_is_active }
-    : sameSchool ? user : undefined
+    : sameSchool ? user : undefined, [pickupReservation, sameSchool, user])
   const copyAvailable = copy?.state === 'available'
   const userEligible = !!reader?.is_active
   const copyBelongsToSelectedBook = !preselectedBookId || !copy || copy.book_id === preselectedBookId

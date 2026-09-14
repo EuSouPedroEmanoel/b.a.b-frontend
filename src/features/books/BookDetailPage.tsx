@@ -15,7 +15,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { buttonVariantClasses } from '@/components/ui/Button'
+import { buttonVariantClasses } from '@/components/ui/Button.styles'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { Badge } from '@/components/ui/Badge'
 import { Carousel } from '@/components/ui/Carousel'
@@ -384,14 +384,15 @@ export function BookDetailPage() {
   // otimizado: proxy 40px + cache FastAverageColor + hash memoizado; sem placeholder neutro (transição suave)
   const proxiedForAvg = useMemo(() => getCoverProxyUrl(book?.cover_url ?? null, 40), [book?.cover_url])
   const { color: avgHex } = useAverageColor(proxiedForAvg ?? null, !!book?.cover_url)
-  const [coverThemeReady, setCoverThemeReady] = useState(false)
+  const [coverThemeReadyKey, setCoverThemeReadyKey] = useState<string | null>(null)
+  const coverThemeKey = `${book?.id ?? 'none'}:${avgHex ?? 'none'}`
+  const coverThemeReady = !!avgHex && coverThemeReadyKey === coverThemeKey
 
   useEffect(() => {
-    setCoverThemeReady(false)
     if (!avgHex) return undefined
-    const timer = window.setTimeout(() => setCoverThemeReady(true), 300)
+    const timer = window.setTimeout(() => setCoverThemeReadyKey(coverThemeKey), 300)
     return () => window.clearTimeout(timer)
-  }, [avgHex, book?.id])
+  }, [avgHex, coverThemeKey])
 
   const baseHue = useMemo(() => {
     if (avgHex) {

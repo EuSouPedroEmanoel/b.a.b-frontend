@@ -123,14 +123,6 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
   const hasMultiplePages = pageCount > 1
   const currentPage = pageCount ? Math.min(page, pageCount - 1) : 0
 
-  useEffect(() => {
-    if (!pageCount) {
-      setPage(0)
-      return
-    }
-    setPage((current) => Math.min(current, pageCount - 1))
-  }, [pageCount])
-
   const pageItems = useMemo(() => {
     if (!renderedItemsPerPage || !items.length) return []
     const start = currentPage * renderedItemsPerPage
