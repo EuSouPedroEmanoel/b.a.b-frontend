@@ -141,6 +141,36 @@ describe('BooksPage responsive result structure', () => {
     expect(tableButton).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('preserva a ordem de foco e os comandos de teclado da pesquisa', async () => {
+    renderPage()
+
+    const user = userEvent.setup()
+    const searchInput = await screen.findByRole('combobox', { name: 'Buscar' })
+    const searchButton = screen.getByRole('button', { name: 'Buscar' })
+    const filterButton = screen.getByRole('button', { name: 'Filtros' })
+    const sortButton = screen.getByRole('button', { name: 'Ordem crescente' })
+
+    searchInput.focus()
+    await user.tab()
+    expect(document.activeElement).toBe(searchButton)
+
+    await user.tab()
+    expect(document.activeElement).toBe(filterButton)
+
+    await user.keyboard('{Enter}')
+    expect(filterButton).toHaveAttribute('aria-expanded', 'true')
+
+    await user.keyboard('{Escape}')
+    expect(filterButton).toHaveAttribute('aria-expanded', 'false')
+
+    await user.tab()
+    expect(document.activeElement).toBe(sortButton)
+
+    sortButton.focus()
+    await user.keyboard(' ')
+    expect(screen.getByRole('button', { name: 'Ordem decrescente' })).toBeInTheDocument()
+  })
+
   it('monta apenas os cards no modo tabela em mobile e reage ao resize', async () => {
     configureViewport(false)
     renderPage()

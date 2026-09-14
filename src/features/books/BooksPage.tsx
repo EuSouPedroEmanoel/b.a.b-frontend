@@ -695,7 +695,7 @@ export function BooksPage() {
               </div>
                 <Button
                   type="submit"
-                  className="mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] h-[calc(var(--text-base)*var(--text-base--line-height)+1.25rem)] shrink-0"
+                  className="mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] border border-transparent shrink-0"
                 >
                   Buscar
                 </Button>
@@ -714,7 +714,7 @@ export function BooksPage() {
                   aria-expanded={filterMenuOpen}
                   aria-controls="filter-menu"
                   aria-label="Filtros"
-                  className={`relative z-30 h-full gap-2 transition-colors ${hasActiveFilters ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
+                  className={`relative z-30 gap-2 transition-colors ${hasActiveFilters ? '' : 'hover:!bg-slate-100 dark:hover:!bg-slate-700'}`}
                 >
                   <Funnel className="h-4 w-4" aria-hidden="true" />
                   Filtros
