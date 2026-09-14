@@ -665,7 +665,7 @@ export function BooksPage() {
                       >
                         {s.kind === 'book' ? (
                           <>
-                            <span className="truncate min-w-0 flex-1 font-medium text-left">{s.title}</span>
+                            <span className="min-w-0 flex-1 break-words font-medium text-left">{s.title}</span>
                             {s.isbn && (
                               <span className={`font-mono text-xs shrink-0 ${i === activeIndex ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}`}>
                                 {s.isbn}
@@ -674,17 +674,17 @@ export function BooksPage() {
                           </>
                         ) : s.kind === 'availability' ? (
                           <>
-                            <span className="truncate min-w-0 flex-1 font-medium text-left">{(s as any).label}</span>
+                            <span className="min-w-0 flex-1 break-words font-medium text-left">{(s as any).label}</span>
                             <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}>Disponibilidade</span>
                           </>
                         ) : s.kind === 'author' ? (
                           <>
-                            <span className="truncate min-w-0 flex-1 font-semibold text-left">{s.name}</span>
+                            <span className="min-w-0 flex-1 break-words font-semibold text-left">{s.name}</span>
                             <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'}`}>Autor</span>
                           </>
                         ) : (
                           <>
-                            <span className="truncate min-w-0 flex-1 font-medium text-left">{s.name}</span>
+                            <span className="min-w-0 flex-1 break-words font-medium text-left">{s.name}</span>
                             <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>Gênero</span>
                           </>
                         )}
