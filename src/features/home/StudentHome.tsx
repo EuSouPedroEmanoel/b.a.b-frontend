@@ -73,7 +73,7 @@ export function StudentHome() {
 
       <div className="flex flex-col gap-6">
         {homeCarousels.map((section: { type: string; title: string; books: DiscoveryBook[]; emptyText?: string; ranking?: boolean }, index: number) => (
-          <ProgressiveCarouselSection key={section.type} title={section.title} items={section.books} circular={!section.ranking} renderItem={(book, cardIndex) => renderDiscoveryBook(book, cardIndex, section.ranking)} measureItem={measureDiscoveryBook} emptyText={section.emptyText ?? 'Nenhum livro disponível nesta seção.'} priority={index === 0} />
+          <ProgressiveCarouselSection key={section.type} title={section.title} items={section.books} circular renderItem={(book, cardIndex) => renderDiscoveryBook(book, cardIndex, section.ranking)} measureItem={measureDiscoveryBook} emptyText={section.emptyText ?? 'Nenhum livro disponível nesta seção.'} priority={index === 0} />
         ))}
 
         <aside className="flex w-full flex-col items-center justify-center gap-[1.1rem] rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center dark:border-slate-700 dark:bg-slate-800/60 sm:flex-row">

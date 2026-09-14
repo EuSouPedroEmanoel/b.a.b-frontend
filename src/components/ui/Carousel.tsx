@@ -112,7 +112,7 @@ export function Carousel<T>({ title, items, renderItem, measureItem, ariaLabel, 
   }, [circular, items.length, measure])
 
   const itemsPerPage = useMemo(
-    () => circular ? itemsThatFit(itemWidth, items.length, viewportWidth, gap, fluidItems ? FLUID_FIT_TOLERANCE : 0) : 0,
+    () => circular ? itemsThatFit(itemWidth, items.length, viewportWidth, gap, fluidItems ? FLUID_FIT_TOLERANCE : TOLERANCE) : 0,
     [circular, fluidItems, gap, itemWidth, items.length, viewportWidth],
   )
   const renderedItemsPerPage = itemsPerPage || (items.length ? 1 : 0)

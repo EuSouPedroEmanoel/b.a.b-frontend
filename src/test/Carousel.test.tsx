@@ -153,6 +153,13 @@ describe('Carousel paginado e sequenciado', () => {
     expect(region().querySelectorAll('[aria-label^="Livro"]')).toHaveLength(4)
   })
 
+  it('aceita a margem mínima de arredondamento ao completar uma página', () => {
+    renderCarousel(6)
+    configureGeometry({ clientWidth: 658, cardWidth: 100 })
+
+    expect(labels()).toHaveLength(6)
+  })
+
   it('desabilita as setas quando todos os itens cabem', () => {
     renderCarousel(3)
     configureGeometry({ clientWidth: 700, cardWidth: 100 })
