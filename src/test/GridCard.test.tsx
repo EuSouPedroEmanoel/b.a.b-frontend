@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { GridCard } from '@/features/books/GridCard'
@@ -33,7 +33,11 @@ const book = {
   available_copies: 1,
 }
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 describe('GridCard title identification', () => {
   it('keeps the full title accessible while showing three lines in the resting card', () => {
@@ -49,6 +53,37 @@ describe('GridCard title identification', () => {
     const title = screen.getByRole('heading', { name: longTitle })
     expect(title).toHaveClass('line-clamp-3')
     expect(title).not.toHaveClass('line-clamp-2')
+  })
+
+  it('closes the portal preview when the page scrolls', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 300,
+      left: 400,
+      right: 600,
+      top: 300,
+      width: 200,
+      x: 400,
+      y: 300,
+      toJSON: () => ({}),
+    } as DOMRect)
+    render(
+      <MemoryRouter>
+        <GridCard book={book} portalHover />
+      </MemoryRouter>,
+    )
+
+    const link = screen.getByRole('link', { name: `Abrir detalhes de ${longTitle}, autor desconhecido` })
+    fireEvent.mouseEnter(link.parentElement!)
+    const preview = document.body.querySelector<HTMLElement>('[style*="position: fixed"]')
+    expect(preview).toHaveStyle({ left: '375px', top: '262.5px' })
+
+    fireEvent.scroll(window)
+    await waitFor(() => expect(document.body.querySelector('[style*="position: fixed"]')).not.toBeInTheDocument())
   })
 
 })

@@ -125,22 +125,35 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
     ? Math.min(portalRect.height * 1.25, window.innerHeight - 16)
     : 0
   const portalLeft = portalRect && typeof window !== 'undefined'
-    ? Math.max(8, Math.min(portalRect.left - portalWidth * 0.1, window.innerWidth - portalWidth - 8))
+    ? Math.max(8, Math.min(
+      portalRect.left + portalRect.width / 2 - portalWidth / 2,
+      window.innerWidth - portalWidth - 8,
+    ))
     : 0
   const portalTop = portalRect && typeof window !== 'undefined'
-    ? Math.max(8, Math.min(portalRect.top - portalHeight * 0.1, window.innerHeight - portalHeight - 8))
+    ? Math.max(8, Math.min(
+      portalRect.top + portalRect.height / 2 - portalHeight / 2,
+      window.innerHeight - portalHeight - 8,
+    ))
     : 0
 
   useEffect(() => {
     if (!portalHover || !portalHovered) return
     const onScroll = () => {
+      if (hideTimeoutRef.current) {
+        window.clearTimeout(hideTimeoutRef.current)
+        hideTimeoutRef.current = null
+      }
+      setPortalHovered(false)
+    }
+    const onResize = () => {
       if (cardRef.current) setPortalRect(cardRef.current.getBoundingClientRect())
     }
     window.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onScroll)
+    window.addEventListener('resize', onResize)
     return () => {
       window.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onScroll)
+      window.removeEventListener('resize', onResize)
     }
   }, [portalHover, portalHovered])
 
