@@ -426,9 +426,14 @@ export function AccessibilityMenu() {
                   A−
                 </button>
                 <div className="min-w-[8rem] flex-[1_1_8rem]">
-                  <div className="relative flex min-h-12 items-center px-1">
-                    <div aria-hidden="true" className="pointer-events-none absolute left-3 right-3 top-1/2 flex -translate-y-1/2 justify-between">
-                      {FONT_SIZE_LEVELS.map((level) => <span key={level} className={`h-3 w-3 rounded-full border-2 ${previewScale === level ? 'border-blue-700 bg-blue-700 dark:border-blue-300 dark:bg-blue-300' : 'border-slate-400 bg-white dark:border-slate-400 dark:bg-slate-800'}`} />)}
+                  <div className="accessibility-font-scale relative flex min-h-12 items-center px-3">
+                    <div aria-hidden="true" className="pointer-events-none absolute left-3 right-3 top-1/2 z-20 flex -translate-y-1/2 justify-between">
+                      {FONT_SIZE_LEVELS.map((level) => (
+                        <span
+                          key={level}
+                          className={`accessibility-font-step ${previewScale === level ? 'accessibility-font-step--active' : ''}`}
+                        />
+                      ))}
                     </div>
                     <input
                       ref={scaleSliderRef}

@@ -45,4 +45,18 @@ describe('AccessibilityMenu high contrast', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir menu de acessibilidade' }))
     expect(screen.getByRole('switch', { name: 'Alto contraste' })).toBeChecked()
   })
+
+  it('highlights the selected text-size state', () => {
+    render(<AccessibilityMenu />)
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menu de acessibilidade' }))
+
+    const slider = screen.getByRole('slider', { name: 'Tamanho do texto' })
+    const steps = document.querySelectorAll('.accessibility-font-step')
+    expect(steps).toHaveLength(3)
+    expect(steps[0]).toHaveClass('accessibility-font-step--active')
+
+    fireEvent.change(slider, { target: { value: '1' } })
+    expect(steps[0]).not.toHaveClass('accessibility-font-step--active')
+    expect(steps[1]).toHaveClass('accessibility-font-step--active')
+  })
 })

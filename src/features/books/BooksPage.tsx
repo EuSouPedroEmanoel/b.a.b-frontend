@@ -700,7 +700,7 @@ export function BooksPage() {
                   Buscar
                 </Button>
               </div>
-            <div className="order-[2] mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] ml-auto flex shrink-0 flex-wrap items-stretch gap-2 pl-5">
+            <div className="order-[2] mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] ml-auto flex shrink-0 flex-wrap items-stretch gap-2 px-5">
               <div ref={filterWrapperRef} className="relative shrink-0 self-stretch">
                 <Button
                   ref={filterTriggerRef}
