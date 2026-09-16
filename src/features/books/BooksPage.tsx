@@ -814,7 +814,7 @@ export function BooksPage() {
                 onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
                 aria-label={sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
                 aria-describedby="sort-order-tooltip"
-                className="group relative min-w-0 shrink-0 self-stretch !px-0 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
+                className="group relative min-w-0 shrink-0 self-stretch !px-2 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
               >
                 {sortOrder === 'asc' ? <ArrowUp className="size-[calc(var(--text-sm)*1.15)]" /> : <ArrowDown className="size-[calc(var(--text-sm)*1.15)]" />}
                 <Tooltip id="sort-order-tooltip" className="left-auto right-0 translate-x-0">
