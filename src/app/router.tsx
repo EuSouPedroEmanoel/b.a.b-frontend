@@ -10,6 +10,7 @@ import {
   BookCopyCreatePage,
   BookCreatePage,
   BookDetailPage,
+  BookEditPage,
   BooksPage,
   CopiesPage,
   LazyRoute,
@@ -63,6 +64,14 @@ export const router = createBrowserRouter([
           <Protected>
             <LazyRoute><BookDetailPage /></LazyRoute>
           </Protected>
+        ),
+      },
+      {
+        path: '/acervo/:bookId/editar',
+        element: (
+          <AccountOnly>
+            <LazyRoute><BookEditPage /></LazyRoute>
+          </AccountOnly>
         ),
       },
       {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, BookOpen, Plus, Hand, Undo2, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, Plus, Hand, Pencil, Undo2, X } from 'lucide-react'
 import api from '@/lib/api'
 import { bookConditionLabel, bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { CoverImage } from '@/components/ui/CoverImage'
@@ -62,6 +62,7 @@ export function BookDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const canManage = canViewBookCirculation(user?.role)
+  const canEditBook = user?.role === 'librarian' || user?.role === 'school_admin' || user?.role === 'super_admin'
   const canReserve = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
   const canViewMyLoans = !!user && !isGuest
@@ -548,7 +549,7 @@ export function BookDetailPage() {
             <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" /> Voltar ao acervo
           </button>
 
-      {canManage && (
+      {(canManage || canEditBook) && (
         <div
           className="flex flex-wrap items-center justify-end gap-3 ml-auto"
           role="toolbar"
@@ -574,6 +575,15 @@ export function BookDetailPage() {
           >
             <Plus className="h-4 w-4" aria-hidden="true" /> Cadastrar exemplar
           </Link>
+          {canEditBook && (
+            <Link
+              to={`/acervo/${id}/editar`}
+              className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md px-4 py-2 font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 ${buttonVariantClasses.secondary}`}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              {user?.role === 'super_admin' ? 'Editar catálogo global' : 'Personalizar para esta escola'}
+            </Link>
+          )}
           <Button
             variant="primary"
             type="button"

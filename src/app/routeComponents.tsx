@@ -5,6 +5,7 @@ export const AccountManagementPage = lazy(() => import('@/features/account/Accou
 export const BooksPage = lazy(() => import('@/features/books/BooksPage').then((module) => ({ default: module.BooksPage })))
 export const BookCreatePage = lazy(() => import('@/features/books/BookCreatePage').then((module) => ({ default: module.BookCreatePage })))
 export const BookDetailPage = lazy(() => import('@/features/books/BookDetailPage').then((module) => ({ default: module.BookDetailPage })))
+export const BookEditPage = lazy(() => import('@/features/books/BookEditPage').then((module) => ({ default: module.BookEditPage })))
 export const BookCopyCreatePage = lazy(() => import('@/features/books/BookCopyCreatePage').then((module) => ({ default: module.BookCopyCreatePage })))
 export const CopiesPage = lazy(() => import('@/features/copies/CopiesPage').then((module) => ({ default: module.CopiesPage })))
 export const LoansPage = lazy(() => import('@/features/loans/LoansPage').then((module) => ({ default: module.LoansPage })))

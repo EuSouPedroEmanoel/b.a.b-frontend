@@ -131,25 +131,7 @@ export function BookCreatePage() {
     },
   })
 
-  const patchMut = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => {
-      if (!preview?.existing_book_id) throw new Error('ID do livro não encontrado')
-      const { data } = await api.patch<Book>(`/books/${preview.existing_book_id}`, payload)
-      return data
-    },
-    onSuccess: (book) => {
-      announce('Livro atualizado com sucesso', 'polite')
-      qc.invalidateQueries({ queryKey: ['books'] })
-      navigate(`/acervo/${book.id}`)
-    },
-    onError: (e: unknown) => {
-      const msg = getErrorMessage(e, 'Erro ao atualizar livro')
-      setFormError(msg)
-      announce(msg, 'assertive')
-    },
-  })
-
-  const isSaving = createMut.isPending || patchMut.isPending
+  const isSaving = createMut.isPending
 
   const initialIsbn = searchParams.get('isbn') || ''
   useEffect(() => {
@@ -233,10 +215,10 @@ export function BookCreatePage() {
     else if (selectedAuthors.length === 0 && authorInput.trim() === '') payload.author_names = []
     if (!preview) return
     if (preview.already_exists && preview.existing_book_id) {
-      patchMut.mutate(payload)
-    } else {
-      createMut.mutate({ isbn: preview.isbn, ...payload })
+      navigate(`/acervo/${preview.existing_book_id}/editar`)
+      return
     }
+    createMut.mutate({ isbn: preview.isbn, ...payload })
   }
 
   if (!canCreate) {
@@ -410,16 +392,15 @@ export function BookCreatePage() {
                   >
                     Ir para o livro
                   </Link>
-                  <Button
-                    type="button"
-                    variant="secondary"
+                  <Link
+                    to={`/acervo/${preview.existing_book_id}/editar`}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-slate-300 px-5 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
                     onClick={() => {
                       setManual({ title: preview.title || '', description: preview.description || '', cover_url: preview.cover_url || '', published_date: preview.published_date ? String(preview.published_date).slice(0, 10) : manual.published_date || '' })
-                      setStep('edit')
                     }}
                   >
                     <Edit3 className="h-4 w-4 mr-2" aria-hidden="true" /> Editar dados do livro
-                  </Button>
+                  </Link>
                 </>
               ) : (
                 <Button onClick={handleConfirm} disabled={createMut.isPending} aria-busy={createMut.isPending}>
