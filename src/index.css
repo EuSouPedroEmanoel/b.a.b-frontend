@@ -213,6 +213,115 @@ html:not(.dark) :is(button, input, textarea, select):disabled:hover {
 html { color-scheme: light; }
 html.dark { color-scheme: dark; }
 
+/* Modo opcional de alto contraste. Mantém a interface reconhecível e força
+ * uma separação visual consistente mesmo em componentes legados. */
+html[data-high-contrast='true'] {
+  color-scheme: dark;
+  --color-bg: #000000;
+  --color-surface: #000000;
+  --color-surface-elevated: #000000;
+  --color-surface-muted: #171717;
+  --color-field: #000000;
+  --color-text: #ffffff;
+  --color-text-muted: #ffffff;
+  --color-border: #ffffff;
+  --color-field-border-hover: #ffff00;
+  --color-primary: #ffff00;
+  --color-primary-hover: #ffffff;
+  --color-primary-active: #ffff00;
+  --color-primary-contrast: #000000;
+  --color-accent: #00ffff;
+  --color-disabled-bg: #262626;
+  --color-disabled-text: #d4d4d4;
+  --color-focus: #ffff00;
+}
+html[data-high-contrast='true'] body,
+html[data-high-contrast='true'] main,
+html[data-high-contrast='true'] header,
+html[data-high-contrast='true'] nav,
+html[data-high-contrast='true'] footer {
+  background-color: var(--color-bg) !important;
+  color: var(--color-text) !important;
+}
+/* Componentes antigos ainda possuem cores literais. No alto contraste, todo
+ * conteúdo textual parte do branco e somente links/ações recebem destaque. */
+html[data-high-contrast='true'] body * {
+  color: var(--color-text) !important;
+}
+html[data-high-contrast='true'] .book-detail-page {
+  background: var(--color-bg) !important;
+}
+html[data-high-contrast='true'] :is(.bg-white, [class*='bg-slate-'], [class*='dark:bg-slate-']) {
+  background-color: var(--color-surface) !important;
+}
+html[data-high-contrast='true'] :is([class*='bg-red-'], [class*='bg-amber-'],
+  [class*='bg-emerald-'], [class*='bg-green-'], [class*='bg-sky-'],
+  [class*='bg-violet-']) {
+  background-color: var(--color-surface) !important;
+}
+html[data-high-contrast='true'] :is(.text-slate-300, .text-slate-400, .text-slate-500,
+  .text-slate-600, .text-slate-700, .text-slate-800, .text-slate-900, .text-slate-950) {
+  color: var(--color-text) !important;
+}
+html[data-high-contrast='true'] :is([class*='text-blue-'], [class*='dark:text-blue-']) {
+  color: var(--color-primary) !important;
+}
+html[data-high-contrast='true'] :is(.card, .accessibility-panel, dialog, table,
+  fieldset, article, aside, section, form, input, textarea, select, button) {
+  border-color: var(--color-border) !important;
+}
+html[data-high-contrast='true'] :is(.card, .accessibility-panel, dialog, table,
+  article, aside, form) {
+  outline: 1px solid var(--color-border);
+  outline-offset: -1px;
+}
+html[data-high-contrast='true'] :is(input, textarea, select) {
+  background-color: var(--color-field) !important;
+  color: var(--color-text) !important;
+  border-width: 2px;
+}
+html[data-high-contrast='true'] :is(input, textarea, select):-webkit-autofill,
+html[data-high-contrast='true'] :is(input, textarea, select):-webkit-autofill:hover,
+html[data-high-contrast='true'] :is(input, textarea, select):-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text) !important;
+  caret-color: var(--color-text);
+  box-shadow: 0 0 0 1000px var(--color-field) inset !important;
+}
+html[data-high-contrast='true'] :is(a[href]:not(.skip-link)) {
+  color: var(--color-accent) !important;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+}
+html[data-high-contrast='true'] :is(button, [role='button'], [role='switch']):not(:disabled):not([aria-disabled='true']) {
+  border-color: var(--color-border) !important;
+  border-style: solid;
+  border-width: 1px;
+}
+html[data-high-contrast='true'] :is(button, [role='button']):hover:not(:disabled) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+html[data-high-contrast='true'] ::placeholder {
+  color: var(--color-text) !important;
+  opacity: 1;
+}
+html[data-high-contrast='true'] :focus-visible {
+  outline-color: var(--color-focus) !important;
+  box-shadow: 0 0 0 5px var(--color-bg), 0 0 0 8px var(--color-border) !important;
+}
+/* Ações primárias continuam sendo o único preenchimento chamativo. Esta regra
+ * vem por último para manter texto e ícones pretos sobre o amarelo. */
+html[data-high-contrast='true'] :is(.bg-\[var\(--color-primary\)\],
+  [class*='bg-blue-'], [class*='dark:bg-blue-']) {
+  background-color: var(--color-primary) !important;
+  color: var(--color-primary-contrast) !important;
+}
+html[data-high-contrast='true'] :is(.bg-\[var\(--color-primary\)\],
+  [class*='bg-blue-'], [class*='dark:bg-blue-']) * {
+  color: var(--color-primary-contrast) !important;
+}
+
 /* Transição suave claro ↔ escuro — respeita prefers-reduced-motion */
 @media (prefers-reduced-motion: no-preference) {
   html { transition: background-color 300ms ease, color 300ms ease; }

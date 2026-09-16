@@ -542,7 +542,7 @@ export function BookDetailPage() {
   }
 
   return (
-    <div style={{ background: pageBg, transition: 'background-color 0.3s ease, background 0.3s ease' }} className="w-full">
+    <div style={{ background: pageBg, transition: 'background-color 0.3s ease, background 0.3s ease' }} className="book-detail-page min-h-full w-full">
       <div className="mx-auto max-w-full !max-w-4xl w-full overflow-visible flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button type="button" onClick={handleBack} aria-label="Voltar ao acervo" className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 ${buttonVariantClasses.secondary}`}>

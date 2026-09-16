@@ -1,6 +1,7 @@
 import { PersonStanding, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { Switch } from '@/components/ui/Switch'
 
 type Side = 'left' | 'right'
 
@@ -8,6 +9,7 @@ type StoredPreference = {
   side?: Side
   top?: number
   textScale?: number
+  highContrast?: boolean
 }
 
 const STORAGE_KEY = 'bab-accessibility-preferences'
@@ -32,9 +34,10 @@ function readPreferences(storageKey = STORAGE_KEY): Required<StoredPreference> {
       textScale: FONT_SIZE_LEVELS.includes(stored.textScale as FontSizeLevel)
         ? stored.textScale as FontSizeLevel
         : DEFAULT_SCALE,
+      highContrast: stored.highContrast === true,
     }
   } catch {
-    return { side: 'right', top: 0.5, textScale: DEFAULT_SCALE }
+    return { side: 'right', top: 0.5, textScale: DEFAULT_SCALE, highContrast: false }
   }
 }
 
@@ -64,6 +67,7 @@ export function AccessibilityMenu() {
   const [top, setTop] = useState(() => clampTop(initial.top <= 1 ? (window.innerHeight - BUTTON_SIZE) * initial.top : initial.top))
   const [textScale, setTextScale] = useState<FontSizeLevel>(initial.textScale as FontSizeLevel)
   const [previewScale, setPreviewScale] = useState<FontSizeLevel>(initial.textScale as FontSizeLevel)
+  const [highContrast, setHighContrast] = useState(initial.highContrast)
   const [open, setOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [snapping, setSnapping] = useState(false)
@@ -94,12 +98,13 @@ export function AccessibilityMenu() {
     setTop(clampTop(next.top <= 1 ? (window.innerHeight - BUTTON_SIZE) * next.top : next.top))
     setTextScale(next.textScale as FontSizeLevel)
     setPreviewScale(next.textScale as FontSizeLevel)
+    setHighContrast(next.highContrast)
   }, [preferenceKey])
 
   const persist = useCallback((next: Partial<StoredPreference>) => {
     const current = readPreferences(preferenceKey)
-    localStorage.setItem(preferenceKey, JSON.stringify({ ...current, side, top, textScale, ...next }))
-  }, [preferenceKey, side, textScale, top])
+    localStorage.setItem(preferenceKey, JSON.stringify({ ...current, side, top, textScale, highContrast, ...next }))
+  }, [highContrast, preferenceKey, side, textScale, top])
 
   useEffect(() => {
     if (skipPersistenceRef.current) {
@@ -109,6 +114,11 @@ export function AccessibilityMenu() {
     document.documentElement.dataset.fontSize = String(textScale)
     persist({ textScale })
   }, [persist, textScale])
+
+  useEffect(() => {
+    document.documentElement.dataset.highContrast = highContrast ? 'true' : 'false'
+    persist({ highContrast })
+  }, [highContrast, persist])
 
   useEffect(() => {
     const handleResize = () => {
@@ -456,6 +466,16 @@ export function AccessibilityMenu() {
                 Confirmar tamanho
               </button>
             </fieldset>
+          </div>
+          <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-600">
+            <Switch
+              label="Alto contraste"
+              description="Usa fundo preto, texto branco e contornos reforçados."
+              checked={highContrast}
+              onChange={setHighContrast}
+              controlOnRight
+              accessibleLabel="Alto contraste"
+            />
           </div>
           <button type="button" onClick={moveSide} className="mt-3 w-full rounded-md border px-3 py-1 text-left text-sm font-medium leading-tight">
             Mover botão para a {side === 'left' ? 'direita' : 'esquerda'}
