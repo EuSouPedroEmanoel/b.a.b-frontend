@@ -75,10 +75,10 @@ export function LiveRegionProvider({ children }: { children: ReactNode }) {
   return (
     <AnnouncerContext.Provider value={announce}>
       {children}
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only overflow-hidden">
         <span key={polite.id}>{polite.text}</span>
       </div>
-      <div role="alert" aria-live="assertive" aria-atomic="true" className="sr-only">
+      <div role="alert" aria-live="assertive" aria-atomic="true" className="sr-only overflow-hidden">
         <span key={assertive.id}>{assertive.text}</span>
       </div>
     </AnnouncerContext.Provider>

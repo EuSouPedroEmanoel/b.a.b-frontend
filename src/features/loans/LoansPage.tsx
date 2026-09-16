@@ -774,7 +774,7 @@ function OperationalLoansPage() {
   }
 
   return <div className="flex flex-col gap-6">
-    <header><h1 className="text-2xl sm:text-3xl font-bold">Empréstimos</h1><PageDescription>Empreste e devolva livros com atendimento rápido no balcão.</PageDescription></header>
+    <header><h1 className="break-words text-2xl font-bold sm:text-3xl">Empréstimos</h1><PageDescription>Empreste e devolva livros com atendimento rápido no balcão.</PageDescription></header>
     {loanSuccessMessage && <div aria-hidden="true" className="fixed right-4 top-4 z-50 max-w-md rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-950 shadow-lg dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">{loanSuccessMessage}</div>}
     {returnUndo && <UndoSnackbar message={`Devolução de ${returnUndo.book_title} concluída.`} onUndo={() => undoReturnMut.mutate(returnUndo.id)} onClose={() => { if (returnUndoTimer.current) clearTimeout(returnUndoTimer.current); returnUndoTimer.current = null; setReturnUndo(null) }} />}
     {isSuperAdmin && <p role="status" className="rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">Você está consultando os empréstimos em modo somente leitura. Apenas bibliotecários e administradores escolares podem emprestar ou devolver livros.</p>}

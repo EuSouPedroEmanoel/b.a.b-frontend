@@ -288,7 +288,7 @@ export function LibraryCalendarPage({ schoolIdOverride, showSchoolSelector = tru
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div><h1 ref={calendarHeadingRef} id="library-calendar-heading" tabIndex={-1} className="text-2xl sm:text-3xl font-bold flex items-center gap-2 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]"><CalendarDays aria-hidden="true" /> Calendário da biblioteca</h1><PageDescription>Consulte os dias não úteis da escola e o calendário anual de funcionamento.</PageDescription></div>
+        <div className="min-w-0"><h1 ref={calendarHeadingRef} id="library-calendar-heading" tabIndex={-1} className="flex min-w-0 items-center gap-2 text-2xl font-bold focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] sm:text-3xl"><CalendarDays aria-hidden="true" /><span className="min-w-0 break-words">Calendário da biblioteca</span></h1><PageDescription>Consulte os dias não úteis da escola e o calendário anual de funcionamento.</PageDescription></div>
         <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Ações do calendário">
           {isManager && <><Button ref={dateDialogTrigger} variant="secondary" size="sm" onClick={() => setDialog('date')}>Adicionar por data</Button><Button ref={rangeDialogTrigger} variant="secondary" size="sm" onClick={() => setDialog('range')}>Marcar intervalo</Button><Button ref={holidayDialogTrigger} variant="secondary" size="sm" onClick={openHolidayDialog}>Importar feriados nacionais</Button></>}
         </div>
