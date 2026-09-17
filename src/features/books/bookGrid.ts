@@ -1,0 +1,1 @@
+export const responsiveBookGridClasses = 'grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(4rem_+_var(--text-sm)_*_3)),1fr))] md:[grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(9rem_+_var(--text-sm)_*_3.5)),1fr))]'

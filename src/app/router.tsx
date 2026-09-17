@@ -135,7 +135,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/minha-conta',
+        path: '/perfil',
         element: (
           <AccountOnly>
             <LazyRoute><AccountPage /></LazyRoute>
@@ -143,7 +143,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/minha-conta/gerenciar',
+        path: '/perfil/:id',
         element: (
           <AccountOnly>
             <LazyRoute><AccountManagementPage /></LazyRoute>

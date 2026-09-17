@@ -23,6 +23,7 @@ export type AuthContextType = {
   login: (username: string, password: string) => Promise<void>
   loginGuest: (schoolCode: string, schoolName?: string) => Promise<void>
   logout: () => Promise<void>
+  refreshUser: () => Promise<void>
   isAuthenticated: boolean
 }
 

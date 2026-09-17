@@ -360,9 +360,9 @@ export function Header() {
             ) : isAuthenticated ? (
               <>
                 <Link
-                  to="/minha-conta"
+                  to="/perfil"
                   aria-label={`Ver perfil de ${profileLabel}`}
-                  aria-current={isActivePath('/minha-conta') ? 'page' : undefined}
+                  aria-current={isActivePath('/perfil') ? 'page' : undefined}
                   className="hidden lg:inline-flex min-h-[44px] items-center rounded-md px-3 py-2 text-sm text-left text-white/90 hover:bg-white/15 hover:text-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
                 >
                   <span aria-live="polite">
@@ -430,7 +430,7 @@ export function Header() {
               {isUsersManager && (<li><Link to="/usuarios" aria-current={isActivePath('/usuarios') ? 'page' : undefined} className={`${navItemCls('/usuarios')} w-full justify-start`}>Usuários</Link></li>)}
               {(user?.role === 'school_admin' || isLibrarian) && (<li><Link to="/gerenciar-escola" aria-current={isActivePath('/gerenciar-escola') ? 'page' : undefined} className={`${navItemCls('/gerenciar-escola')} w-full justify-start`}>Gerenciar escola</Link></li>)}
               {user?.role === 'super_admin' && (<li><Link to="/escolas" aria-current={isActivePath('/escolas') ? 'page' : undefined} className={`${navItemCls('/escolas')} w-full justify-start`}>Escolas</Link></li>)}
-              {!isGuest && <li><Link to="/minha-conta" aria-current={isActivePath('/minha-conta') ? 'page' : undefined} className={`${navItemCls('/minha-conta')} w-full justify-start`}>Ver perfil</Link></li>}
+              {!isGuest && <li><Link to="/perfil" aria-current={isActivePath('/perfil') ? 'page' : undefined} className={`${navItemCls('/perfil')} w-full justify-start`}>Meu perfil</Link></li>}
             </ul>
             <div role="group" aria-label="Ações da conta" className="flex flex-col gap-1 pt-2">
               {isGuest ? (
