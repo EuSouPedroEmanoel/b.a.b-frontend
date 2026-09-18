@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { bookStateLabel, bookStateTone, publicBookStateLabel, publicBookStateTone } from '@/lib/bookStates'
 import { useAverageColor } from '@/hooks/useAverageColor'
 import { OverflowTags } from '@/components/ui/OverflowTags'
@@ -281,7 +282,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
         {book.description ? (
           <div className="relative flex shrink-0 px-3.5 pb-3 pt-2">
             <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm">
-              <p className="line-clamp-3 w-full break-words whitespace-normal text-xs leading-relaxed text-white/90" title={book.description}>{book.description}</p>
+            <p className="relative line-clamp-3 w-full break-words whitespace-normal text-xs leading-relaxed text-white/90">{book.description}<Tooltip>{book.description}</Tooltip></p>
             </div>
           </div>
         ) : (
@@ -363,7 +364,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
           {book.description ? (
             <div className="relative flex shrink-0 px-3.5 pb-3 pt-2">
               <div className="flex w-full flex-1 items-start rounded-lg bg-black/10 border border-white/10 px-3 py-1.5 backdrop-blur-sm">
-                <p className="line-clamp-3 w-full break-words whitespace-normal text-xs leading-relaxed text-white/90" title={book.description}>{book.description}</p>
+                <p className="relative line-clamp-3 w-full break-words whitespace-normal text-xs leading-relaxed text-white/90">{book.description}<Tooltip>{book.description}</Tooltip></p>
               </div>
             </div>
           ) : <div className="relative flex flex-1 min-h-0" aria-hidden="true" />}

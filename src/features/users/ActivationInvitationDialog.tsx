@@ -5,6 +5,7 @@ import { Clipboard, Printer, RefreshCw } from 'lucide-react'
 import { UndoSnackbar } from '@/components/feedback/UndoSnackbar'
 import { Button } from '@/components/ui/Button'
 import { ModalDialog } from '@/components/ui/ModalDialog'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import api from '@/lib/api'
 
@@ -180,15 +181,15 @@ export function ActivationActions({ user, onUpdated }: { user: { id: number; nam
       type="button"
       size="sm"
       variant="secondary"
-      className="relative group gap-1"
+      className="relative gap-1"
       disabled={pending}
       onClick={() => void regenerate()}
       aria-label="Gerar novo convite"
-      title="Gerar novo convite"
+      aria-describedby="regenerate-invitation-tooltip"
     >
       <RefreshCw aria-hidden="true" className="h-5 w-5" />
       <span className="sr-only">Novo convite</span>
-      <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs font-normal text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">Novo convite</span>
+      <Tooltip id="regenerate-invitation-tooltip">Novo convite</Tooltip>
     </Button>
     {created && <ActivationInvitationDialog created={created} onClose={() => setCreated(null)} />}
   </>

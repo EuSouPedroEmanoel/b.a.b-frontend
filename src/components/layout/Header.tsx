@@ -7,6 +7,7 @@ import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { MobileNavigationPanel } from './MobileNavigationPanel'
 import { useResponsiveLayout } from './useResponsiveLayout'
 import { useNavigationFocusIntent } from '../navigation/useNavigationFocusIntent'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 type IndicatorPosition = { left: number; top: number; width: number; height: number }
 
@@ -341,10 +342,11 @@ export function Header() {
               onClick={handleToggle}
               aria-label={resolved === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
               aria-pressed={resolved === 'dark'}
-              title={resolved === 'dark' ? 'Modo escuro (clique para claro)' : 'Modo claro (clique para escuro)'}
-              className={themeBtnCls}
+              aria-describedby="theme-toggle-tooltip"
+              className={`${themeBtnCls} relative`}
             >
               {resolved === 'dark' ? <Sun className="h-5 w-5 transition-transform duration-300 rotate-0" aria-hidden="true" /> : <Moon className="h-5 w-5 transition-transform duration-300" aria-hidden="true" />}
+              <Tooltip id="theme-toggle-tooltip">{resolved === 'dark' ? 'Modo escuro (clique para claro)' : 'Modo claro (clique para escuro)'}</Tooltip>
             </button>
             {isGuest ? (
               <>

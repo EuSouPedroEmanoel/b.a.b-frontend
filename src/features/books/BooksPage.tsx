@@ -58,6 +58,7 @@ type SuggestItem =
   | { kind: 'genre'; id: number; name: string }
   | { kind: 'book'; id: number; title: string; isbn: string | null }
   | { kind: 'availability'; state: string; label: string }
+  | { kind: 'condition'; condition: string; label: string }
 
 const DESKTOP_MEDIA_QUERY = '(min-width: 768px)'
 
@@ -96,6 +97,7 @@ export function BooksPage() {
   const [genreFilter, setGenreFilter] = useState('')
   const [authorFilter, setAuthorFilter] = useState('')
   const [stateFilter, setStateFilter] = useState('')
+  const [conditionFilter, setConditionFilter] = useState('')
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'published_date' | 'author'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [tableTime, setTableTime] = useState<number | null>(null)
@@ -110,6 +112,14 @@ export function BooksPage() {
   const canCreate = !!user && ['librarian', 'school_admin'].includes(user.role)
   const isPersonalCatalog = hasPersonalReaderCapability(user?.role)
   const isGuest = user?.role === 'guest'
+  const canFilterCondition = !!user && (
+    ['super_admin', 'school_admin', 'librarian'].includes(user.role)
+    || (user.role === 'student' && user.school_allows_student_condition_filter === true)
+  )
+  const canFilterRestrictedAvailability = !!user && (
+    ['super_admin', 'school_admin', 'librarian'].includes(user.role)
+    || (user.role === 'student' && user.school_allows_student_restricted_availability === true)
+  )
   const isDesktop = useIsDesktop()
   const showDesktopTable = isDesktop && !isCompact
   const deniedNoticeRef = useRef<HTMLParagraphElement>(null)
@@ -158,12 +168,21 @@ export function BooksPage() {
       { value: 'archived', label: 'Arquivado' },
     ].filter((option) => {
       if (isGuest) return ['','available'].includes(option.value)
-      return !isPersonalCatalog || !['lost', 'archived'].includes(option.value)
+      return !isPersonalCatalog || canFilterRestrictedAvailability || !['lost', 'archived'].includes(option.value)
     }),
-    [isGuest, isPersonalCatalog],
+    [isGuest, isPersonalCatalog, canFilterRestrictedAvailability],
   )
 
-  const hasActiveFilters = !!genreFilter || !!authorFilter || !!stateFilter || sortBy !== 'created_at'
+  const conditionOptions = useMemo(() => [
+    { value: '', label: 'Todas' },
+    { value: 'new', label: 'Novo' },
+    { value: 'good', label: 'Bom' },
+    { value: 'fair', label: 'Regular' },
+    { value: 'poor', label: 'Ruim' },
+    { value: 'bad', label: 'Péssimo' },
+  ], [])
+
+  const hasActiveFilters = !!genreFilter || !!authorFilter || !!stateFilter || !!conditionFilter || sortBy !== 'created_at'
 
   // Inicializa a partir da URL para link de query page compartilhável
   useEffect(() => {
@@ -171,6 +190,7 @@ export function BooksPage() {
     const genre = searchParams.get('genre_id') ?? ''
     const author = searchParams.get('author_id') ?? ''
     const state = searchParams.get('state') ?? ''
+    const condition = searchParams.get('condition') ?? ''
     const p = parseInt(searchParams.get('page') ?? '1', 10)
     const size = parseInt(searchParams.get('size') ?? '', 10)
     const sort = searchParams.get('sort_by') as any
@@ -181,13 +201,14 @@ export function BooksPage() {
     }
     if (genre) setGenreFilter(genre)
     if (author) setAuthorFilter(author)
-    if (state && (!isPersonalCatalog || !['lost', 'archived'].includes(state))) setStateFilter(state)
+    if (state && (!isPersonalCatalog || canFilterRestrictedAvailability || !['lost', 'archived'].includes(state))) setStateFilter(state)
+    if (condition && canFilterCondition) setConditionFilter(condition)
     if (!Number.isNaN(p) && p !== 1) setPage(p)
     if (!Number.isNaN(size) && [10, 20, 30, 50].includes(size)) setPageSize(size)
     if (sort && sort !== sortBy) setSortBy(sort)
     if (order && (order === 'asc' || order === 'desc') && order !== sortOrder) setSortOrder(order)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPersonalCatalog])
+  }, [isPersonalCatalog, canFilterCondition, canFilterRestrictedAvailability])
 
   // Sincroniza estado com URL para link compartilhável
   useEffect(() => {
@@ -196,6 +217,7 @@ export function BooksPage() {
     if (genreFilter) params.set('genre_id', genreFilter)
     if (authorFilter) params.set('author_id', authorFilter)
     if (stateFilter) params.set('state', stateFilter)
+    if (conditionFilter && canFilterCondition) params.set('condition', conditionFilter)
     if (page !== 1) params.set('page', String(page))
     if (pageSize !== 10) params.set('size', String(pageSize))
     if (sortBy !== 'created_at') params.set('sort_by', sortBy)
@@ -203,7 +225,7 @@ export function BooksPage() {
     const cur = searchParams.toString()
     const next = params.toString()
     if (cur !== next) setSearchParams(params, { replace: true })
-  }, [queryQ, genreFilter, authorFilter, stateFilter, page, pageSize, sortBy, sortOrder, searchParams, setSearchParams])
+  }, [queryQ, genreFilter, authorFilter, stateFilter, conditionFilter, canFilterCondition, page, pageSize, sortBy, sortOrder, searchParams, setSearchParams])
 
   const { data: genreOptions } = useQuery({
     queryKey: ['genres-list'],
@@ -215,7 +237,7 @@ export function BooksPage() {
 
   // Tabela: paginação clássica (até 50)
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['books', 'table', page, pageSize, queryQ, genreFilter, authorFilter, stateFilter, sortBy, sortOrder],
+    queryKey: ['books', 'table', page, pageSize, queryQ, genreFilter, authorFilter, stateFilter, conditionFilter, sortBy, sortOrder],
     queryFn: async () => {
       const t0 = performance.now()
       const params = new URLSearchParams({ page: String(page), size: String(pageSize) })
@@ -223,6 +245,7 @@ export function BooksPage() {
       if (genreFilter) params.set('genre_id', genreFilter)
       if (authorFilter) params.set('author_id', authorFilter)
       if (stateFilter) params.set('state', stateFilter)
+      if (conditionFilter && canFilterCondition) params.set('condition', conditionFilter)
       if (sortBy) params.set('sort_by', sortBy)
       if (sortOrder) params.set('sort_order', sortOrder)
       const { data } = await api.get<Paginated<Book>>(`/books/?${params}`)
@@ -243,7 +266,7 @@ export function BooksPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['books', 'grid', queryQ, genreFilter, authorFilter, stateFilter, sortBy, sortOrder],
+    queryKey: ['books', 'grid', queryQ, genreFilter, authorFilter, stateFilter, conditionFilter, sortBy, sortOrder],
     queryFn: async ({ pageParam = 1 }) => {
       const t0 = performance.now()
       const params = new URLSearchParams({ page: String(pageParam), size: String(GRID_SIZE) })
@@ -251,6 +274,7 @@ export function BooksPage() {
       if (genreFilter) params.set('genre_id', genreFilter)
       if (authorFilter) params.set('author_id', authorFilter)
       if (stateFilter) params.set('state', stateFilter)
+      if (conditionFilter && canFilterCondition) params.set('condition', conditionFilter)
       if (sortBy) params.set('sort_by', sortBy)
       if (sortOrder) params.set('sort_order', sortOrder)
       const { data } = await api.get<Paginated<Book>>(`/books/?${params}`)
@@ -496,8 +520,13 @@ export function BooksPage() {
             .filter((o) => o.value !== '' && rawNorm.length >= 2 && normalize(o.label).includes(rawNorm))
             .slice(0, 2)
             .map((o) => ({ kind: 'availability' as const, state: o.value, label: o.label }))
-          // mostra disponibilidade primeiro, depois autor/gênero, depois livros
-          const combined: SuggestItem[] = [...availOptions, ...authors, ...genres, ...books].slice(0, 8)
+          const conditionSuggestions: SuggestItem[] = canFilterCondition
+            ? conditionOptions
+              .filter((o) => o.value !== '' && rawNorm.length >= 2 && normalize(o.label).includes(rawNorm))
+              .map((o) => ({ kind: 'condition' as const, condition: o.value, label: o.label }))
+            : []
+          // mostra disponibilidade/conservação primeiro, depois autor/gênero e livros
+          const combined: SuggestItem[] = [...availOptions, ...conditionSuggestions, ...authors, ...genres, ...books].slice(0, 8)
           setSuggestItems(combined)
           setActiveIndex(combined.length ? 0 : -1)
           setSuggestOpen(combined.length > 0)
@@ -510,7 +539,7 @@ export function BooksPage() {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query, availabilityOptions])
+  }, [query, availabilityOptions, conditionOptions, canFilterCondition])
 
   const closeSuggestions = () => {
     setSuggestOpen(false)
@@ -530,6 +559,13 @@ export function BooksPage() {
       setStateFilter(s.state)
       setPage(1)
       announce(`Filtrando por ${s.label}`, 'polite')
+      return
+    } else if (s.kind === 'condition') {
+      setQuery('')
+      setQueryQ('')
+      setConditionFilter(s.condition)
+      setPage(1)
+      announce(`Filtrando por conservação ${s.label}`, 'polite')
       return
     } else {
       // autor ou gênero: filtra a lista por esse nome via busca unificada (q)
@@ -677,6 +713,11 @@ export function BooksPage() {
                             <span className="min-w-0 flex-1 break-words font-medium text-left">{(s as any).label}</span>
                             <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}>Disponibilidade</span>
                           </>
+                        ) : s.kind === 'condition' ? (
+                          <>
+                            <span className="min-w-0 flex-1 break-words font-medium text-left">{s.label}</span>
+                            <span className={`text-xs font-medium shrink-0 px-2 py-0.5 rounded-full ${i === activeIndex ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>Conservação</span>
+                          </>
                         ) : s.kind === 'author' ? (
                           <>
                             <span className="min-w-0 flex-1 break-words font-semibold text-left">{s.name}</span>
@@ -720,7 +761,7 @@ export function BooksPage() {
                   Filtros
                   {hasActiveFilters && (
                     <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600 dark:bg-white dark:text-slate-900" aria-hidden="true">
-                      {[genreFilter, authorFilter, stateFilter, sortBy !== 'created_at' ? sortBy : null].filter(Boolean).length}
+                      {[genreFilter, authorFilter, stateFilter, conditionFilter, sortBy !== 'created_at' ? sortBy : null].filter(Boolean).length}
                     </span>
                   )}
                 </Button>
@@ -767,6 +808,18 @@ export function BooksPage() {
                       }}
                       options={availabilityOptions}
                     />
+                    {canFilterCondition && (
+                      <Select
+                        label="Estado de conservação"
+                        id="condition-filter"
+                        value={conditionFilter}
+                        onChange={(v) => {
+                          setConditionFilter(v)
+                          setPage(1)
+                        }}
+                        options={conditionOptions}
+                      />
+                    )}
                     <Select
                       label="Ordenar por"
                       id="sort-by"
@@ -791,6 +844,7 @@ export function BooksPage() {
                           setGenreFilter('')
                           setAuthorFilter('')
                           setStateFilter('')
+                          setConditionFilter('')
                           setSortBy('created_at')
                           setSortOrder('asc')
                           setPage(1)
@@ -814,10 +868,10 @@ export function BooksPage() {
                 onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
                 aria-label={sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
                 aria-describedby="sort-order-tooltip"
-                className="group relative min-w-0 shrink-0 self-stretch !px-2 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
+                className="relative min-w-0 shrink-0 self-stretch !px-2 hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
               >
                 {sortOrder === 'asc' ? <ArrowUp className="size-[calc(var(--text-sm)*1.15)]" /> : <ArrowDown className="size-[calc(var(--text-sm)*1.15)]" />}
-                <Tooltip id="sort-order-tooltip" className="left-auto right-0 translate-x-0">
+                <Tooltip id="sort-order-tooltip">
                   {sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
                 </Tooltip>
               </Button>
@@ -828,6 +882,7 @@ export function BooksPage() {
                 {genreFilter && <Badge tone="neutral">Gênero aplicado</Badge>}
                 {authorFilter && <Badge tone="info">Autor aplicado</Badge>}
                 {stateFilter && <Badge tone="neutral">Disponibilidade: {availabilityOptions.find((o) => o.value === stateFilter)?.label}</Badge>}
+                {conditionFilter && canFilterCondition && <Badge tone="neutral">Conservação: {conditionOptions.find((o) => o.value === conditionFilter)?.label}</Badge>}
                 {hasActiveFilters && (
                   <Button
                     type="button"
@@ -856,6 +911,7 @@ export function BooksPage() {
                     setGenreFilter('')
                     setAuthorFilter('')
                     setStateFilter('')
+                    setConditionFilter('')
                     setPage(1)
                   }}
                   className="sm:hidden hover:!bg-slate-100 dark:hover:!bg-slate-700 transition-colors"
@@ -1025,12 +1081,14 @@ export function BooksPage() {
                       </td>
                       <td className={`${compactTable ? 'w-[calc(68%-clamp(3.75rem,calc(var(--text-base)*3),6rem))]' : 'w-[28%]'} px-2 py-2`}>
                         <div className="flex flex-col gap-1 min-w-0">
-                          <span className="line-clamp-3 break-words font-medium text-slate-900 dark:text-slate-100" title={b.title}>
+                          <span className="relative line-clamp-3 break-words font-medium text-slate-900 dark:text-slate-100">
                             {b.title}
+                            <Tooltip>{b.title}</Tooltip>
                           </span>
                           {b.description ? (
-                            <span className="line-clamp-2 break-words text-xs leading-snug text-slate-500 dark:text-slate-400" title={b.description}>
+                            <span className="relative line-clamp-2 break-words text-xs leading-snug text-slate-500 dark:text-slate-400">
                               {b.description}
+                              <Tooltip>{b.description}</Tooltip>
                             </span>
                           ) : (
                             <span className="text-xs text-slate-400">—</span>

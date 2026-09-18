@@ -10,7 +10,9 @@ describe('OverflowTags mobile overflow', () => {
 
     expect(trigger).toBeInTheDocument()
     expect(tooltip).toHaveTextContent('Ficção científica')
-    expect(tooltip).toHaveClass('group-hover/category:opacity-100', 'group-focus-visible/category:opacity-100')
+    expect(tooltip).toHaveClass('opacity-0', 'translate-y-1')
+    fireEvent.mouseEnter(trigger)
+    expect(tooltip).toHaveClass('opacity-100', 'translate-y-0')
   })
 
   it('expands the hidden items from a keyboard/touch-sized button and closes on Escape', () => {

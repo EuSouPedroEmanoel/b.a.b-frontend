@@ -98,9 +98,9 @@ describe('GridCard title identification', () => {
       </MemoryRouter>,
     )
 
-    const description = screen.getByText(longDescription)
+    const description = screen.getByText(longDescription, { selector: 'p' })
     expect(description).toHaveClass('line-clamp-3')
-    expect(description).toHaveAttribute('title', longDescription)
+    expect(description.parentElement?.querySelector('[role="tooltip"]')).toHaveTextContent(longDescription)
     expect(description.parentElement?.parentElement).not.toHaveClass('overflow-y-auto')
     expect(description.closest('a')).not.toHaveClass('overflow-y-auto')
   })

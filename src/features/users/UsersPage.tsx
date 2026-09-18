@@ -562,11 +562,12 @@ export function UsersPage() {
                                     onClick={() => openEdit(u)}
                                     disabled={readOnly}
                                     aria-label={`Editar usuário ${u.name || u.username}`}
-                                    className={`relative group ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}`}
+                                    aria-describedby={`edit-user-tooltip-${u.id}`}
+                                    className={`relative ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}`}
                                   >
                                     <Pencil className="h-5 w-5" aria-hidden="true" />
                                     <span className="sr-only">Editar</span>
-                                    <Tooltip className="left-1/2 right-auto -translate-x-1/2">Editar</Tooltip>
+                                    <Tooltip id={`edit-user-tooltip-${u.id}`}>Editar</Tooltip>
                                   </Button>
                                   <Button
                                     type="button"
@@ -574,12 +575,12 @@ export function UsersPage() {
                                     variant="secondary"
                                     disabled
                                     aria-label={`Configurar usuário ${u.name || u.username}`}
-                                    title="Configurar usuário"
-                                    className="relative group"
+                                    aria-describedby={`configure-user-tooltip-${u.id}`}
+                                    className="relative"
                                   >
                                     <MonitorCog className="h-5 w-5" aria-hidden="true" />
                                     <span className="sr-only">Configurar usuário</span>
-                                    <Tooltip className="left-1/2 right-auto -translate-x-1/2">Configurar usuário</Tooltip>
+                                    <Tooltip id={`configure-user-tooltip-${u.id}`}>Configurar usuário</Tooltip>
                                   </Button>
                                   <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
                                 </div>

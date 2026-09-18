@@ -12,6 +12,8 @@ export type User = {
   school_id: number | null
   school_code?: string | null
   school_name?: string | null
+  school_allows_student_condition_filter?: boolean
+  school_allows_student_restricted_availability?: boolean
   is_active: boolean
   administrative_capabilities?: string[]
 }

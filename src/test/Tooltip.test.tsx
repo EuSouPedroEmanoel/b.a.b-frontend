@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Tooltip } from '@/components/ui/Tooltip'
@@ -36,5 +36,22 @@ describe('Tooltip', () => {
     expect(trigger).toHaveFocus()
     expect(trigger).toHaveAttribute('aria-describedby', 'keyboard-tooltip')
     expect(screen.getByRole('tooltip')).toHaveAttribute('role', 'tooltip')
+  })
+
+  it('shows on pointer hover and hides when the pointer leaves', () => {
+    render(
+      <button type="button" aria-describedby="hover-tooltip">
+        Ajuda
+        <Tooltip id="hover-tooltip">Descrição</Tooltip>
+      </button>,
+    )
+
+    const trigger = screen.getByRole('button', { name: /Ajuda/ })
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip).toHaveClass('opacity-0')
+    fireEvent.mouseEnter(trigger)
+    expect(tooltip).toHaveClass('opacity-100', 'translate-y-0')
+    fireEvent.mouseLeave(trigger)
+    expect(tooltip).toHaveClass('opacity-0', 'translate-y-1')
   })
 })

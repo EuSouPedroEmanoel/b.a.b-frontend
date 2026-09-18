@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowDown } from 'lucide-react'
 
@@ -13,21 +14,64 @@ type Props = {
   disabled?: boolean
 }
 
+type DropdownPosition = {
+  left: number
+  top: number
+  width: number
+}
+
 export function Select({ label, id, value, onChange, options, placeholder, disabled }: Props) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const buttonId = id ?? `select-${label.toLowerCase().replace(/\s+/g, '-')}`
   const listId = `${buttonId}-listbox`
   const selected = options.find((o) => o.value === value)
   const selectedIndex = options.length > 0 ? Math.max(0, options.findIndex((o) => o.value === value)) : -1
   const [activeIndex, setActiveIndex] = useState(selectedIndex)
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const updatePosition = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+
+      const rect = trigger.getBoundingClientRect()
+      const viewportPadding = 8
+      const gap = 4
+      const estimatedHeight = Math.min(options.length * 44, Math.max(120, window.innerHeight - 32))
+      const opensAbove = rect.bottom + gap + estimatedHeight > window.innerHeight - viewportPadding
+        && rect.top - gap - estimatedHeight >= viewportPadding
+      const left = Math.min(
+        Math.max(viewportPadding, rect.left),
+        Math.max(viewportPadding, window.innerWidth - rect.width - viewportPadding),
+      )
+
+      setDropdownPosition({
+        left,
+        top: opensAbove ? rect.top - gap - estimatedHeight : rect.bottom + gap,
+        width: rect.width,
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open, options.length])
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node
-      if (wrapperRef.current && !wrapperRef.current.contains(t)) setOpen(false)
+      const clickedTriggerOrList = wrapperRef.current?.contains(t) || listRef.current?.contains(t)
+      if (!clickedTriggerOrList) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -55,6 +99,38 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
     onChange(option.value)
     close()
   }
+
+  const listbox = open && dropdownPosition ? (
+    <ul
+      ref={listRef}
+      id={listId}
+      role="listbox"
+      aria-labelledby={`${buttonId}-label`}
+      style={{
+        left: dropdownPosition.left,
+        top: dropdownPosition.top,
+        width: dropdownPosition.width,
+      }}
+      className="fixed z-50 max-h-[min(12.5rem,calc(100dvh-8rem))] overflow-auto overscroll-contain rounded-md border border-[var(--color-border)] bg-[var(--color-field)] shadow-lg dark:border-slate-600 dark:bg-slate-800"
+    >
+      {options.map((opt, index) => (
+        <li
+          key={opt.value}
+          id={`${listId}-option-${index}`}
+          role="option"
+          aria-selected={opt.value === value}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            choose(index)
+          }}
+          onMouseEnter={() => setActiveIndex(index)}
+          className={`flex min-h-[44px] cursor-pointer items-start px-3 py-2.5 text-sm ${index === activeIndex ? 'bg-slate-100 dark:bg-slate-700' : ''} ${opt.value === value ? 'font-semibold text-[#0f4c75] dark:text-sky-300' : 'text-slate-800 dark:text-slate-100'}`}
+        >
+          <span className="min-w-0 flex-1 whitespace-normal break-words">{opt.label}</span>
+        </li>
+      ))}
+    </ul>
+  ) : null
 
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1.5">
@@ -117,31 +193,7 @@ export function Select({ label, id, value, onChange, options, placeholder, disab
         <span className="min-w-0 flex-1 whitespace-normal break-words">{selected ? selected.label : (placeholder ?? options[0]?.label ?? '')}</span>
         <ArrowDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
-      {open && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-labelledby={`${buttonId}-label`}
-          className="absolute z-20 top-full mt-1 max-h-[min(12.5rem,calc(100dvh-8rem))] w-full overflow-auto overscroll-contain rounded-md border border-[var(--color-border)] bg-[var(--color-field)] shadow-lg dark:border-slate-600 dark:bg-slate-800"
-        >
-          {options.map((opt, index) => (
-            <li
-              key={opt.value}
-              id={`${listId}-option-${index}`}
-              role="option"
-              aria-selected={opt.value === value}
-              onPointerDown={(e) => {
-                e.preventDefault()
-                choose(index)
-              }}
-              onMouseEnter={() => setActiveIndex(index)}
-              className={`flex min-h-[44px] cursor-pointer items-start px-3 py-2.5 text-sm ${index === activeIndex ? 'bg-slate-100 dark:bg-slate-700' : ''} ${opt.value === value ? 'font-semibold text-[#0f4c75] dark:text-sky-300' : 'text-slate-800 dark:text-slate-100'}`}
-            >
-              <span className="min-w-0 flex-1 whitespace-normal break-words">{opt.label}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {listbox && createPortal(listbox, document.body)}
     </div>
   )
 }

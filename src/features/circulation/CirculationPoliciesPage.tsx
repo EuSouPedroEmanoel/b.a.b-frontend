@@ -14,6 +14,7 @@ import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocompl
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 type ReaderRole = 'student' | 'teacher'
 
@@ -342,9 +343,9 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
           </div>
           {policies.filter((policy) => policy.reader_role === activeRole).map((policy) => <div key={policy.reader_role} id={`${policy.reader_role}-policy-panel`} role="tabpanel" aria-labelledby={`${activeRole}-policy-tab`} tabIndex={-1}><PolicyForm policy={normalizePolicy(policy)} onChange={updatePolicy} firstInputRef={firstInputRef} readOnly={!canEdit} muted={isSuperAdmin} /></div>)}
           {canEdit && <div className="flex w-fit self-end justify-end gap-2 rounded-md border border-slate-300 bg-transparent p-2 dark:border-slate-600">
-            <span className="group relative" tabIndex={saveDisabled ? 0 : undefined} aria-describedby={saveDisabled ? 'save-rules-tooltip' : undefined}>
+            <span className="relative" tabIndex={saveDisabled ? 0 : undefined} aria-describedby={saveDisabled ? 'save-rules-tooltip' : undefined}>
               <Button type="submit" className="disabled:opacity-40" disabled={saveDisabled} aria-busy={save.isPending}>{save.isPending ? 'Salvando…' : 'Salvar regras'}</Button>
-              {saveDisabled && <span id="save-rules-tooltip" role="tooltip" className="pointer-events-none absolute bottom-[calc(100%+0.5rem)] right-0 z-30 translate-y-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 opacity-0 shadow-lg transition-opacity duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 dark:border-slate-600 dark:bg-slate-800 dark:text-white">Nenhuma alteração para salvar.</span>}
+              {saveDisabled && <Tooltip id="save-rules-tooltip">Nenhuma alteração para salvar.</Tooltip>}
             </span>
             {canRestoreDefaults && <Button ref={restoreTriggerRef} type="button" variant="danger-secondary" onClick={() => setRestoreOpen(true)}>Restaurar padrões</Button>}
           </div>}

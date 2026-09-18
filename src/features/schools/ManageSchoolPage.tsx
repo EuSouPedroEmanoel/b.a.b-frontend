@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { PageDescription } from '@/components/ui/PageDescription'
@@ -9,18 +9,20 @@ import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { CirculationPoliciesPage } from '@/features/circulation/CirculationPoliciesPage'
 import { LibraryCalendarPage } from './LibraryCalendarPage'
 import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
+import { Switch } from '@/components/ui/Switch'
 
-type School = { id: number; name: string }
+type School = { id: number; name: string; allow_student_condition_filter?: boolean; allow_student_restricted_availability?: boolean }
 type Paginated<T> = { items: T[] }
-type Section = 'rules' | 'calendar'
+type Section = 'rules' | 'calendar' | 'settings'
 
 export function ManageSchoolPage() {
   const { user } = useAuth()
   const [params, setParams] = useSearchParams()
-  const initialSection: Section = params.get('tab') === 'calendar' ? 'calendar' : 'rules'
+  const initialSection: Section = params.get('tab') === 'calendar' ? 'calendar' : params.get('tab') === 'settings' ? 'settings' : 'rules'
   const [section, setSection] = useState<Section>(initialSection)
   const isSuperAdmin = user?.role === 'super_admin'
   const schoolId = isSuperAdmin ? params.get('school') ?? '' : String(user?.school_id ?? '')
+  const queryClient = useQueryClient()
   const schools = useQuery({
     queryKey: ['schools', 'manage-school'],
     queryFn: async () => (await api.get<Paginated<School>>('/schools/?size=100')).data.items,
@@ -31,6 +33,18 @@ export function ManageSchoolPage() {
     label: school.name,
     data: school,
   }))
+  const schoolSettings = useQuery({
+    queryKey: ['school-settings', schoolId],
+    queryFn: async () => (await api.get<School>(`/schools/${schoolId}/settings`)).data,
+    enabled: !!schoolId && !!user && ['super_admin', 'school_admin', 'librarian'].includes(user.role),
+  })
+  const updateSchoolSettings = useMutation({
+    mutationFn: async (settings: { allow_student_condition_filter: boolean; allow_student_restricted_availability: boolean }) => (await api.patch<School>(`/schools/${schoolId}/settings`, settings)).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['school-settings', schoolId], data)
+      queryClient.invalidateQueries({ queryKey: ['schools', 'manage-school'] })
+    },
+  })
   const selectSection = (next: Section) => {
     setSection(next)
     setParams((current) => {
@@ -65,7 +79,35 @@ export function ManageSchoolPage() {
     <div role="tablist" aria-label="Seções de gerenciamento" className={`${segmentedControlContainerClasses} max-w-xl`}>
       <button type="button" role="tab" aria-selected={section === 'rules'} onClick={() => selectSection('rules')} className={segmentedControlItemClasses(section === 'rules', 'primary')}>Regras de circulação</button>
       <button type="button" role="tab" aria-selected={section === 'calendar'} onClick={() => selectSection('calendar')} className={segmentedControlItemClasses(section === 'calendar', 'primary')}>Calendário da biblioteca</button>
+      <button type="button" role="tab" aria-selected={section === 'settings'} onClick={() => selectSection('settings')} className={segmentedControlItemClasses(section === 'settings', 'primary')}>Preferências</button>
     </div>
-    {section === 'rules' ? <CirculationPoliciesPage schoolIdOverride={schoolId} showSchoolSelector={false} /> : <LibraryCalendarPage schoolIdOverride={schoolId} showSchoolSelector={false} />}
+    {section === 'rules' ? <CirculationPoliciesPage schoolIdOverride={schoolId} showSchoolSelector={false} /> : section === 'calendar' ? <LibraryCalendarPage schoolIdOverride={schoolId} showSchoolSelector={false} /> : (
+      <section aria-labelledby="school-preferences-title" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <h2 id="school-preferences-title" className="text-lg font-semibold">Preferências da escola</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Defina quais filtros ficam disponíveis para os alunos no acervo.</p>
+        <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
+          <Switch
+            controlOnRight
+            label="Permitir filtro por estado de conservação para alunos"
+            description="Quando ativado, alunos poderão filtrar livros por Novo, Bom, Regular, Ruim ou Péssimo."
+            checked={schoolSettings.data?.allow_student_condition_filter ?? false}
+            disabled={schoolSettings.isLoading || updateSchoolSettings.isPending}
+            accessibleLabel="Permitir filtro por estado de conservação para alunos"
+            onChange={(checked) => updateSchoolSettings.mutate({ allow_student_condition_filter: checked, allow_student_restricted_availability: schoolSettings.data?.allow_student_restricted_availability ?? false })}
+          />
+          <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <Switch
+              controlOnRight
+              label="Permitir filtros de disponibilidade restrita para alunos"
+              description="Quando ativado, alunos poderão consultar livros Perdidos e Arquivados no acervo."
+              checked={schoolSettings.data?.allow_student_restricted_availability ?? false}
+              disabled={schoolSettings.isLoading || updateSchoolSettings.isPending}
+              accessibleLabel="Permitir filtros de disponibilidade restrita para alunos"
+              onChange={(checked) => updateSchoolSettings.mutate({ allow_student_condition_filter: schoolSettings.data?.allow_student_condition_filter ?? false, allow_student_restricted_availability: checked })}
+            />
+          </div>
+        </div>
+      </section>
+    )}
   </div>
 }
