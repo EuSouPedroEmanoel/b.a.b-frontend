@@ -36,7 +36,6 @@ describe('AuthProvider', () => {
         id: 7,
         username: 'ana',
         name: 'Ana',
-        email: 'ana@example.com',
         role: 'student',
         school_id: 3,
         is_active: true,

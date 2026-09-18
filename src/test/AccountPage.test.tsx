@@ -9,7 +9,7 @@ import { AuthContext, type User } from '@/context/auth-context'
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }))
 vi.mock('@/lib/api', () => ({ default: api }))
 
-const student: User = { id: 7, username: 'ana', name: 'Ana Silva', email: 'ana@example.com', role: 'student', school_id: 3, is_active: true }
+const student: User = { id: 7, username: 'ana', name: 'Ana Silva', role: 'student', school_id: 3, is_active: true }
 
 function renderPage(user: User = student) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })

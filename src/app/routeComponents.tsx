@@ -11,7 +11,6 @@ export const CopiesPage = lazy(() => import('@/features/copies/CopiesPage').then
 export const LoansPage = lazy(() => import('@/features/loans/LoansPage').then((module) => ({ default: module.LoansPage })))
 export const ReservationsPage = lazy(() => import('@/features/reservations/ReservationsPage').then((module) => ({ default: module.ReservationsPage })))
 export const SchoolsPage = lazy(() => import('@/features/schools/SchoolsPage').then((module) => ({ default: module.SchoolsPage })))
-export const StudentsPage = lazy(() => import('@/features/students/StudentsPage').then((module) => ({ default: module.StudentsPage })))
 export const UsersPage = lazy(() => import('@/features/users/UsersPage').then((module) => ({ default: module.UsersPage })))
 export const ManageSchoolPage = lazy(() => import('@/features/schools/ManageSchoolPage').then((module) => ({ default: module.ManageSchoolPage })))
 

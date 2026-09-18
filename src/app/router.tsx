@@ -3,7 +3,7 @@ import { Layout } from '@/components/layout/Layout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
 import { HomePage, DiscoveryHome } from '@/features/home/HomePage'
-import { AccountOnly, Protected, PublicOnly, RedirectBookCopies, StudentManagementOnly } from './RouteGuards'
+import { AccountOnly, Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
 import {
   AccountManagementPage,
   AccountPage,
@@ -18,7 +18,6 @@ import {
   ManageSchoolPage,
   ReservationsPage,
   SchoolsPage,
-  StudentsPage,
   UsersPage,
 } from './routeComponents'
 
@@ -124,14 +123,6 @@ export const router = createBrowserRouter([
           <AccountOnly>
             <LazyRoute><SchoolsPage /></LazyRoute>
           </AccountOnly>
-        ),
-      },
-      {
-        path: '/alunos',
-        element: (
-          <StudentManagementOnly>
-            <LazyRoute><StudentsPage /></LazyRoute>
-          </StudentManagementOnly>
         ),
       },
       {

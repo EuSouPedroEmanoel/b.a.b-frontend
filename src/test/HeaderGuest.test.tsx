@@ -8,7 +8,6 @@ const authState = vi.hoisted(() => ({
     id: 0,
     username: 'Visitante',
     name: 'Visitante',
-    email: null,
     cpf_masked: null,
     birthdate: null,
     turma_numero: null,
@@ -96,7 +95,7 @@ describe('Guest navigation', () => {
     const navigation = screen.getByRole('navigation', { name: 'Principal' })
     expect(navigation).toHaveTextContent('Empréstimos')
     expect(navigation).toHaveTextContent('Reservas')
-    expect(navigation).toHaveTextContent('Alunos')
+    expect(navigation).toHaveTextContent('Usuários')
   })
 
   it('closes the mobile menu with Escape and restores focus to its trigger', async () => {
@@ -116,7 +115,7 @@ describe('Guest navigation', () => {
     await waitFor(() => expect(menuButton).toHaveFocus())
   })
 
-  it('offers student management to a school admin', () => {
+  it('offers user management to a school admin', () => {
     authState.user = {
       id: 4,
       username: 'admin-escola',
@@ -129,7 +128,7 @@ describe('Guest navigation', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('navigation', { name: 'Principal' })).toHaveTextContent('Alunos')
+    expect(screen.getByRole('navigation', { name: 'Principal' })).toHaveTextContent('Usuários')
   })
 
   it('keeps the reader navigation and marks the current page discreetly', () => {

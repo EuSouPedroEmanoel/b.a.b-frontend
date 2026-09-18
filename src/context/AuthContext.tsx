@@ -19,7 +19,6 @@ function guestUser(token: string): User | null {
     id: 0,
     username: 'Visitante',
     name: 'Visitante',
-    email: null,
     cpf_masked: null,
     birthdate: null,
     turma_numero: null,

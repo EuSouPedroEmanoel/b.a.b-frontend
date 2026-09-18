@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import * as QRCode from 'qrcode'
-import { Clipboard, Printer, RefreshCw, XCircle } from 'lucide-react'
+import { Clipboard, Printer, RefreshCw } from 'lucide-react'
 import { UndoSnackbar } from '@/components/feedback/UndoSnackbar'
 import { Button } from '@/components/ui/Button'
 import { ModalDialog } from '@/components/ui/ModalDialog'
@@ -175,23 +175,21 @@ export function ActivationActions({ user, onUpdated }: { user: { id: number; nam
     }
   }
 
-  const revoke = async () => {
-    if (!window.confirm('Revogar o convite ativo deste usuário?')) return
-    setPending(true)
-    try {
-      await api.post(`/users/${user.id}/activation/revoke`)
-      announce('Convite revogado.', 'polite')
-      onUpdated()
-    } finally {
-      setPending(false)
-    }
-  }
-
   return <>
-    <div className="mt-2 flex flex-wrap justify-end gap-2">
-      <Button type="button" size="sm" variant="secondary" className="gap-1" disabled={pending} onClick={() => void regenerate()}><RefreshCw aria-hidden="true" className="h-4 w-4" /> Novo convite</Button>
-      <Button type="button" size="sm" variant="danger-secondary" className="gap-1" disabled={pending} onClick={() => void revoke()}><XCircle aria-hidden="true" className="h-4 w-4" /> Revogar</Button>
-    </div>
+    <Button
+      type="button"
+      size="sm"
+      variant="secondary"
+      className="relative group gap-1"
+      disabled={pending}
+      onClick={() => void regenerate()}
+      aria-label="Gerar novo convite"
+      title="Gerar novo convite"
+    >
+      <RefreshCw aria-hidden="true" className="h-5 w-5" />
+      <span className="sr-only">Novo convite</span>
+      <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs font-normal text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">Novo convite</span>
+    </Button>
     {created && <ActivationInvitationDialog created={created} onClose={() => setCreated(null)} />}
   </>
 }

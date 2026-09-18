@@ -9,7 +9,7 @@ import { AccountManagementPage } from '@/features/account/AccountManagementPage'
 const api = vi.hoisted(() => ({ put: vi.fn() }))
 vi.mock('@/lib/api', () => ({ default: api }))
 
-const user: User = { id: 7, username: 'ana', name: 'Ana Silva', email: 'ana@example.com', role: 'student', school_id: 3, is_active: true }
+const user: User = { id: 7, username: 'ana', name: 'Ana Silva', role: 'student', school_id: 3, is_active: true }
 const refreshUser = vi.fn()
 
 function renderPage(path = '/perfil/7') {
@@ -29,7 +29,7 @@ describe('AccountManagementPage', () => {
     await userEvent.clear(nameInput)
     await userEvent.type(nameInput, 'Ana Souza')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
-    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/users/7', { name: 'Ana Souza', username: 'ana', email: 'ana@example.com' }))
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith('/users/7', { name: 'Ana Souza', username: 'ana' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Perfil atualizado com sucesso.')
     expect(refreshUser).toHaveBeenCalled()
   })

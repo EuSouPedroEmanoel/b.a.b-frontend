@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Pencil, Plus, AlertTriangle } from 'lucide-react'
+import { Users, Pencil, Plus, AlertTriangle, MonitorCog } from 'lucide-react'
 import api from '@/lib/api'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { getErrorMessage } from '@/lib/errors'
@@ -16,13 +16,13 @@ import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ModalDialog } from '@/components/ui/ModalDialog'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { Pagination } from '@/components/ui/Pagination'
 import { ActivationActions, ActivationInvitationDialog, ResetPasswordAction, type CreatedUserInvitation } from './ActivationInvitationDialog'
 
 type AppUser = {
   id: number
   username: string
   name: string
-  email: string | null
   cpf_masked: string | null
   birthdate: string | null
   turma_numero: number | null
@@ -110,7 +110,6 @@ type CreateForm = {
   type: string
   name: string
   username: string
-  email: string
   cpf: string
   birthdate: string
   turmaNumero: string
@@ -121,7 +120,6 @@ const emptyCreate: CreateForm = {
   type: 'student',
   name: '',
   username: '',
-  email: '',
   cpf: '',
   birthdate: '',
   turmaNumero: '',
@@ -133,12 +131,13 @@ export function UsersPage() {
   const qc = useQueryClient()
   const [role, setRole] = useState('')
   const [schoolFilter, setSchoolFilter] = useState('')
+  const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate)
   const [createError, setCreateError] = useState('')
   const [createdInvitation, setCreatedInvitation] = useState<CreatedUserInvitation | null>(null)
   const [editing, setEditing] = useState<AppUser | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
+  const [editForm, setEditForm] = useState({ name: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
 
   const { user: currentUser } = useAuth()
 
@@ -167,11 +166,11 @@ export function UsersPage() {
     return selected ? schoolLabel(selected.name, selected.code) : ''
   }, [isSuperAdmin, schoolFilter, schoolsData])
 
-  const queryKey = ['users', role, schoolFilter]
+  const queryKey = ['users', role, schoolFilter, page]
   const { data, isLoading, isError, error } = useQuery({
     queryKey,
     queryFn: async () => {
-      const params = new URLSearchParams({ size: '100' })
+      const params = new URLSearchParams({ page: String(page), size: '10' })
       if (role) params.set('role', role)
       if (schoolFilter) params.set('school_id', schoolFilter)
       const { data } = await api.get<Paginated<AppUser>>(`/users/?${params.toString()}`)
@@ -183,12 +182,13 @@ export function UsersPage() {
     mutationFn: async () => {
       const f = createForm
       if (f.type === 'student') {
-        const { data } = await api.post<AppUser & CreatedUserInvitation>('/users/students', {
+        const { data } = await api.post<AppUser & CreatedUserInvitation>('/users/', {
           name: f.name.trim(),
           cpf: f.cpf,
           birthdate: f.birthdate,
           turma_numero: Number(f.turmaNumero),
           turma_letra: f.turmaLetra,
+          role: 'student',
         })
         return data
       }
@@ -197,7 +197,6 @@ export function UsersPage() {
         const { data } = await api.post<AppUser & CreatedUserInvitation>(`/schools/${schoolId}/admins`, {
           username: f.username.trim(),
           name: f.name.trim(),
-          email: f.email.trim(),
           cpf: f.cpf,
         })
         return data
@@ -205,7 +204,6 @@ export function UsersPage() {
       const { data } = await api.post<AppUser & CreatedUserInvitation>('/users/', {
         username: f.username.trim(),
         name: f.name.trim(),
-        email: f.email.trim() || null,
         cpf: f.cpf,
         role: f.type,
         ...(isSuperAdmin && schoolFilter ? { school_id: Number(schoolFilter) } : {}),
@@ -219,7 +217,6 @@ export function UsersPage() {
       setCreateError('')
       setCreatedInvitation(createdUser)
       qc.invalidateQueries({ queryKey: ['users'] })
-      qc.invalidateQueries({ queryKey: ['students'] })
     },
     onError: (err: unknown) => {
       setCreateError(getErrorMessage(err, 'Erro ao criar usuário'))
@@ -229,7 +226,7 @@ export function UsersPage() {
 
   const update = useMutation({
     mutationFn: async () => {
-      const payload: Record<string, unknown> = { name: editForm.name.trim(), email: editForm.email || null }
+      const payload: Record<string, unknown> = { name: editForm.name.trim() }
       if (editing?.role === 'student') {
         payload.birthdate = editForm.birthdate
         payload.turma_numero = Number(editForm.turmaNumero)
@@ -250,7 +247,6 @@ export function UsersPage() {
       announce('Usuário atualizado com sucesso', 'polite')
       closeEdit()
       qc.invalidateQueries({ queryKey: ['users'] })
-      qc.invalidateQueries({ queryKey: ['students'] })
     },
     onError: (err: unknown) => {
       announce(getErrorMessage(err, 'Erro ao atualizar usuário'), 'assertive')
@@ -295,7 +291,6 @@ export function UsersPage() {
     setEditing(u)
     setEditForm({
       name: u.name || u.username,
-      email: u.email ?? '',
       birthdate: u.birthdate ?? '',
       turmaNumero: u.turma_numero === null ? '' : String(u.turma_numero),
       turmaLetra: u.turma_letra ?? '',
@@ -307,7 +302,7 @@ export function UsersPage() {
 
   const closeEdit = () => {
     setEditing(null)
-    setEditForm({ name: '', email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
+    setEditForm({ name: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
   }
 
   const availableCreateTypes = useMemo(() => {
@@ -337,7 +332,7 @@ export function UsersPage() {
           title: roleLabel(role),
           roles: [role],
           showCpf: role !== 'super_admin',
-          showSchool: role !== 'super_admin',
+          showSchool: isSuperAdmin,
           showTurma: isStudent,
           showNascimento: isStudent,
         },
@@ -350,7 +345,7 @@ export function UsersPage() {
           title: 'Admins da escola',
           roles: ['school_admin'],
           showCpf: true,
-          showSchool: true,
+          showSchool: isSuperAdmin,
           showTurma: false,
           showNascimento: false,
         },
@@ -359,7 +354,7 @@ export function UsersPage() {
           title: 'Bibliotecários',
           roles: ['librarian'],
           showCpf: true,
-          showSchool: true,
+          showSchool: isSuperAdmin,
           showTurma: false,
           showNascimento: false,
         },
@@ -368,7 +363,7 @@ export function UsersPage() {
           title: 'Professores',
           roles: ['teacher'],
           showCpf: true,
-          showSchool: true,
+          showSchool: isSuperAdmin,
           showTurma: false,
           showNascimento: false,
         },
@@ -377,7 +372,7 @@ export function UsersPage() {
           title: 'Alunos',
           roles: ['student'],
           showCpf: true,
-          showSchool: true,
+          showSchool: isSuperAdmin,
           showTurma: true,
           showNascimento: true,
         },
@@ -389,7 +384,7 @@ export function UsersPage() {
         title: 'Alunos',
         roles: ['student'],
         showCpf: true,
-        showSchool: true,
+        showSchool: isSuperAdmin,
         showTurma: true,
         showNascimento: true,
       },
@@ -398,7 +393,7 @@ export function UsersPage() {
         title: 'Admin da escola',
         roles: ['school_admin'],
         showCpf: true,
-        showSchool: true,
+        showSchool: isSuperAdmin,
         showTurma: false,
         showNascimento: false,
       },
@@ -407,7 +402,7 @@ export function UsersPage() {
         title: 'Bibliotecários e professores',
         roles: ['librarian', 'teacher'],
         showCpf: true,
-        showSchool: true,
+        showSchool: isSuperAdmin,
         showTurma: false,
         showNascimento: false,
       },
@@ -441,11 +436,11 @@ export function UsersPage() {
 
       <Card>
         <CardBody className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Tipo de usuário"
-            id="user-role"
-            value={role}
-            onChange={setRole}
+            <Select
+              label="Tipo de usuário"
+              id="user-role"
+              value={role}
+              onChange={(value) => { setRole(value); setPage(1) }}
             options={filterRoleOptions.map((o) => ({ value: o.value, label: o.label }))}
           />
           {isSuperAdmin && (
@@ -453,7 +448,7 @@ export function UsersPage() {
               label="Escola"
               id="user-school"
               value={schoolFilter}
-              onChange={setSchoolFilter}
+              onChange={(value) => { setSchoolFilter(value); setPage(1) }}
               options={schoolOptions}
               placeholder="Todas as escolas"
               hint="Deixe vazio para exibir usuários de todas as escolas."
@@ -513,7 +508,7 @@ export function UsersPage() {
                   <Badge tone="info">{`${sec.items.length} registro(s)`}</Badge>
                 </CardHeader>
                 <CardBody className="p-0">
-                  <div className="@container max-w-full overflow-x-auto overscroll-x-contain">
+                  <div className="@container max-w-full">
                     <table className="w-full table-fixed border-spacing-0 min-w-0 text-sm">
                       <caption className="sr-only">{sec.title}</caption>
                       <thead className="bg-slate-50 dark:bg-slate-700/50">
@@ -521,9 +516,9 @@ export function UsersPage() {
                           <th scope="col" className="px-4 py-3 text-left font-semibold">Identificação</th>
                           {sec.showCpf && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">CPF</th>}
                           {sec.showSchool && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Escola</th>}
+                          {sec.showTurma && <th scope="col" className="px-4 py-3 text-left font-semibold">Turma</th>}
                           {sec.showNascimento && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Nascimento</th>}
-                          {sec.showTurma && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Turma</th>}
-                          <th scope="col" className="w-32 break-words [overflow-wrap:anywhere] px-4 py-3 text-right font-semibold @max-[72rem]:w-20">Ações</th>
+                          <th scope="col" className="w-44 whitespace-nowrap px-4 py-3 text-right font-semibold">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -538,42 +533,56 @@ export function UsersPage() {
                                 {currentUser?.id === u.id && <span className="ml-2 text-sm font-normal text-slate-600 dark:text-slate-300">(EU)</span>}
                                 <div className="mt-1 space-y-0.5 text-xs font-normal text-slate-600 dark:text-slate-300">
                                   <p className="break-words font-mono">{u.username}</p>
-                                  <p className="break-words">{u.email ?? 'Sem e-mail'}</p>
                                   {sec.showCpf && <p className="hidden font-mono @max-lg:block">CPF: {u.cpf_masked ?? '—'}</p>}
                                   {sec.showSchool && <p className="hidden break-words @max-lg:block">Escola: {schoolLabel(u.school_name, u.school_code)}</p>}
-                                  {sec.showNascimento && <p className="hidden @max-lg:block">Nascimento: {formatDate(u.birthdate)}</p>}
                                   {sec.showTurma && <p className="hidden @max-lg:block">Turma: {turmaLabel(u.turma_numero, u.turma_letra)}{deprecated ? ' · Atualizar' : ''}</p>}
+                                  {sec.showNascimento && <p className="hidden @max-lg:block">Nascimento: {formatDate(u.birthdate)}</p>}
                                 </div>
                               </td>
                               {sec.showCpf && <td className="break-words px-4 py-3 align-top font-mono text-xs @max-lg:hidden">{u.cpf_masked ?? '—'}</td>}
                               {sec.showSchool && (
                                 <td className="break-words px-4 py-3 align-top @max-lg:hidden">{schoolLabel(u.school_name, u.school_code)}</td>
                               )}
-                              {sec.showNascimento && (
-                                <td className="px-4 py-3 align-top @max-lg:hidden">{formatDate(u.birthdate)}</td>
-                              )}
                               {sec.showTurma && (
-                                <td className="px-4 py-3 align-top @max-lg:hidden">
+                                <td className="px-4 py-3 align-top">
                                   <span className="flex items-center gap-2">
                                     {turmaLabel(u.turma_numero, u.turma_letra)}
                                     {deprecated && <Badge tone="warning">Atualizar</Badge>}
                                   </span>
                                 </td>
                               )}
-                              <td className="px-4 py-3 text-right align-top">
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => openEdit(u)}
-                                  disabled={readOnly}
-                                  aria-label={`Editar usuário ${u.name || u.username}`}
-                                  className={`relative group ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}`}
-                                >
-                                  <Pencil className="h-5 w-5 @max-lg:mr-0 @max-[80rem]:mr-0 mr-1" aria-hidden="true" />
-                                  <span className="@max-lg:sr-only @max-[80rem]:sr-only">Editar</span>
-                                  <Tooltip className="left-1/2 right-auto -translate-x-1/2">Editar</Tooltip>
-                                </Button>
-                                <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
+                              {sec.showNascimento && (
+                                <td className="px-4 py-3 align-top @max-lg:hidden">{formatDate(u.birthdate)}</td>
+                              )}
+                              <td className="whitespace-nowrap px-4 py-3 text-right align-top">
+                                <div className="flex flex-nowrap items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => openEdit(u)}
+                                    disabled={readOnly}
+                                    aria-label={`Editar usuário ${u.name || u.username}`}
+                                    className={`relative group ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}`}
+                                  >
+                                    <Pencil className="h-5 w-5" aria-hidden="true" />
+                                    <span className="sr-only">Editar</span>
+                                    <Tooltip className="left-1/2 right-auto -translate-x-1/2">Editar</Tooltip>
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled
+                                    aria-label={`Configurar usuário ${u.name || u.username}`}
+                                    title="Configurar usuário"
+                                    className="relative group"
+                                  >
+                                    <MonitorCog className="h-5 w-5" aria-hidden="true" />
+                                    <span className="sr-only">Configurar usuário</span>
+                                    <Tooltip className="left-1/2 right-auto -translate-x-1/2">Configurar usuário</Tooltip>
+                                  </Button>
+                                  <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
+                                </div>
                               </td>
                             </tr>
                           )
@@ -591,6 +600,7 @@ export function UsersPage() {
               </CardBody>
             </Card>
           )}
+          <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
         </div>
       )}
 
@@ -624,7 +634,6 @@ export function UsersPage() {
               <>
                 <Input label="Nome de usuário" value={createForm.username} onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))} required autoComplete="off" />
                 <Input label="Nome completo" value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" />
-                <Input label="E-mail" type="email" value={createForm.email} onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))} autoComplete="off" />
                 <Input label="CPF" value={formatCpfInput(createForm.cpf)} onChange={(e) => setCreateForm((f) => ({ ...f, cpf: onlyDigits(e.target.value) }))} placeholder="000.000.000-00" required inputMode="numeric" autoComplete="off" />
                 {isSuperAdmin && createForm.type === 'school_admin' && (
                   <Input label="Escola" value={createSchoolLabel} disabled autoComplete="off" />
@@ -672,7 +681,6 @@ export function UsersPage() {
           >
             <Input label="Nome completo" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" />
             <Input label="Usuário" value={editing.username} disabled autoComplete="off" />
-            <Input label="E-mail" type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} autoComplete="off" />
             {editing.role === 'student' && (
               <>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">

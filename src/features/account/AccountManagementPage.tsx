@@ -10,13 +10,13 @@ import { useAuth } from '@/hooks/useAuth'
 import api from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
 
-type ProfileForm = { name: string; username: string; email: string }
+type ProfileForm = { name: string; username: string }
 
 export function AccountManagementPage() {
   const { id } = useParams()
   const { hash } = useLocation()
   const { user, refreshUser } = useAuth()
-  const [profile, setProfile] = useState<ProfileForm>(() => ({ name: user?.name ?? '', username: user?.username ?? '', email: user?.email ?? '' }))
+  const [profile, setProfile] = useState<ProfileForm>(() => ({ name: user?.name ?? '', username: user?.username ?? '' }))
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [profileError, setProfileError] = useState('')
@@ -34,7 +34,7 @@ export function AccountManagementPage() {
   }, [hash])
 
   const profileMutation = useMutation({
-    mutationFn: async (payload: ProfileForm) => api.put(`/users/${user?.id}`, { ...payload, email: payload.email || null }),
+    mutationFn: async (payload: ProfileForm) => api.put(`/users/${user?.id}`, payload),
     onSuccess: async () => { await refreshUser(); setProfileSuccess('Perfil atualizado com sucesso.'); setProfileError(''); requestAnimationFrame(() => profileSuccessRef.current?.focus()) },
     onError: (error: unknown) => { setProfileError(getErrorMessage(error, 'Não foi possível atualizar o perfil.')); setProfileSuccess(''); requestAnimationFrame(() => profileErrorRef.current?.focus()) },
   })
@@ -49,9 +49,9 @@ export function AccountManagementPage() {
 
   const submitProfile = (event: FormEvent) => {
     event.preventDefault()
-    const name = profile.name.trim(); const username = profile.username.trim(); const email = profile.email.trim()
+    const name = profile.name.trim(); const username = profile.username.trim()
     if (!name || !username) { setProfileError('Preencha o nome e o nome de usuário.'); requestAnimationFrame(() => profileErrorRef.current?.focus()); return }
-    profileMutation.mutate({ name, username, email })
+    profileMutation.mutate({ name, username })
   }
   const submitPassword = (event: FormEvent) => {
     event.preventDefault()
@@ -67,7 +67,6 @@ export function AccountManagementPage() {
         {profileError && <div ref={profileErrorRef} tabIndex={-1} role="alert" className="profile-error-message">{profileError}</div>}{profileSuccess && <div ref={profileSuccessRef} tabIndex={-1} role="status" className="profile-success-message">{profileSuccess}</div>}
         <Input id="profile-name" label="Nome" value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} required autoComplete="name" />
         <Input id="profile-username" label="Nome de usuário" value={profile.username} onChange={(event) => setProfile((current) => ({ ...current, username: event.target.value }))} required autoComplete="username" />
-        <Input id="profile-email" label="E-mail" type="email" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} autoComplete="email" hint="Deixe em branco caso não queira informar um e-mail." />
         <div><Button type="submit" disabled={profileMutation.isPending} aria-busy={profileMutation.isPending}>{profileMutation.isPending ? 'Salvando…' : 'Salvar alterações'}</Button></div>
       </form>
     </CardBody></Card></section>
