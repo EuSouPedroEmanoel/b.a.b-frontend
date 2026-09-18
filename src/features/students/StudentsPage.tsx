@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { ModalDialog } from '@/components/ui/ModalDialog'
-import { ActivationActions, ActivationInvitationDialog, type CreatedUserInvitation } from '@/features/users/ActivationInvitationDialog'
+import { ActivationActions, ActivationInvitationDialog, ResetPasswordAction, type CreatedUserInvitation } from '@/features/users/ActivationInvitationDialog'
 
 type Student = {
   id: number
@@ -134,7 +134,6 @@ export function StudentsPage() {
         turma_letra: editForm.turmaLetra,
         birthdate: editForm.birthdate,
       }
-      if (editForm.password.trim()) payload.password = editForm.password
       const { data } = await api.put<Student>(`/users/${editing?.id}`, payload)
       return data
     },
@@ -418,13 +417,11 @@ export function StudentsPage() {
               onChange={(e) => setEditForm((f) => ({ ...f, birthdate: e.target.value }))}
               autoComplete="off"
             />
-            <Input
-              label="Nova senha (opcional)"
-              type="password"
-              value={editForm.password}
-              onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
-              autoComplete="new-password"
-            />
+            <div className="rounded-md border border-slate-200 p-4 dark:border-slate-700">
+              <p className="text-sm font-medium">Senha</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Resete a senha para gerar um novo código de primeiro acesso. A senha atual será invalidada.</p>
+              <div className="mt-3"><ResetPasswordAction user={editing} onUpdated={() => void qc.invalidateQueries({ queryKey: ['students'] })} /></div>
+            </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="secondary" onClick={closeEdit}>
                 Cancelar

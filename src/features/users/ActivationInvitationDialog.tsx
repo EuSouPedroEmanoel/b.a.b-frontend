@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import * as QRCode from 'qrcode'
 import { Clipboard, Printer, RefreshCw, XCircle } from 'lucide-react'
+import { UndoSnackbar } from '@/components/feedback/UndoSnackbar'
 import { Button } from '@/components/ui/Button'
 import { ModalDialog } from '@/components/ui/ModalDialog'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
@@ -192,5 +193,62 @@ export function ActivationActions({ user, onUpdated }: { user: { id: number; nam
       <Button type="button" size="sm" variant="danger-secondary" className="gap-1" disabled={pending} onClick={() => void revoke()}><XCircle aria-hidden="true" className="h-4 w-4" /> Revogar</Button>
     </div>
     {created && <ActivationInvitationDialog created={created} onClose={() => setCreated(null)} />}
+  </>
+}
+
+export function ResetPasswordAction({ user, onUpdated }: { user: { id: number; name: string; username: string }; onUpdated?: () => void }) {
+  const announce = useAnnouncer()
+  const [pending, setPending] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [created, setCreated] = useState<CreatedUserInvitation | null>(null)
+  const [undoId, setUndoId] = useState<number | null>(null)
+  const [undoAvailable, setUndoAvailable] = useState(false)
+
+  const resetPassword = async () => {
+    setConfirmOpen(false)
+    setPending(true)
+    try {
+      const { data } = await api.post<ActivationInvitation & { undo_id: number }>(`/users/${user.id}/password/reset`)
+      setCreated({ ...user, activation_invitation: data })
+      setUndoId(data.undo_id)
+      setUndoAvailable(true)
+      announce('Senha resetada. Entregue o novo convite de primeiro acesso ao usuário.', 'polite')
+    } catch {
+      announce('Não foi possível resetar a senha.', 'assertive')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const undoReset = async () => {
+    if (undoId === null) return
+    setPending(true)
+    try {
+      await api.post(`/users/${user.id}/password/reset/undo`, { undo_id: undoId })
+      setCreated(null)
+      setUndoAvailable(false)
+      setUndoId(null)
+      onUpdated?.()
+      announce('Reset de senha desfeito.', 'polite')
+    } catch {
+      announce('Não foi possível desfazer o reset de senha.', 'assertive')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return <>
+    <Button type="button" variant="danger-secondary" disabled={pending} onClick={() => setConfirmOpen(true)}>
+      {pending ? 'Gerando…' : 'Resetar senha'}
+    </Button>
+    {created && <ActivationInvitationDialog created={created} onClose={() => setCreated(null)} />}
+    {confirmOpen && <ModalDialog variant="compact" title="Resetar senha?" onClose={() => { if (!pending) setConfirmOpen(false) }} describedBy="reset-password-description">
+      <p id="reset-password-description" className="text-sm text-slate-600 dark:text-slate-300">A senha atual será invalidada e um novo primeiro acesso será gerado para este usuário. Você poderá desfazer a ação pela snackbar após confirmar.</p>
+      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="danger-secondary" onClick={() => void resetPassword()} disabled={pending} aria-busy={pending}>{pending ? 'Resetando…' : 'Confirmar reset'}</Button>
+        <Button type="button" variant="blue-secondary" onClick={() => setConfirmOpen(false)} disabled={pending}>Cancelar</Button>
+      </div>
+    </ModalDialog>}
+    {undoAvailable && <UndoSnackbar message="Senha resetada e novo primeiro acesso gerado." onUndo={() => void undoReset()} onClose={() => setUndoAvailable(false)} />}
   </>
 }

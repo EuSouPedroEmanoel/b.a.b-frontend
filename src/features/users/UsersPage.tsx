@@ -16,7 +16,7 @@ import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ModalDialog } from '@/components/ui/ModalDialog'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { ActivationActions, ActivationInvitationDialog, type CreatedUserInvitation } from './ActivationInvitationDialog'
+import { ActivationActions, ActivationInvitationDialog, ResetPasswordAction, type CreatedUserInvitation } from './ActivationInvitationDialog'
 
 type AppUser = {
   id: number
@@ -235,7 +235,6 @@ export function UsersPage() {
         payload.turma_numero = Number(editForm.turmaNumero)
         payload.turma_letra = editForm.turmaLetra
       }
-      if (editForm.password.trim()) payload.password = editForm.password
       const { data } = await api.put<AppUser>(`/users/${editing?.id}`, payload)
       if (editing?.role === 'librarian' && canManageStaffCapabilities) {
         await api.put(`/users/${editing.id}/administrative-capabilities`, {
@@ -702,7 +701,11 @@ export function UsersPage() {
                 )}
               </fieldset>
             )}
-            <Input label="Nova senha (opcional)" type="password" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} autoComplete="new-password" />
+            <div className="rounded-md border border-slate-200 p-4 dark:border-slate-700">
+              <p className="text-sm font-medium">Senha</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Resete a senha para gerar um novo código de primeiro acesso. A senha atual será invalidada.</p>
+              <div className="mt-3"><ResetPasswordAction user={editing} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} /></div>
+            </div>
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="secondary" onClick={closeEdit}>
                 Cancelar
