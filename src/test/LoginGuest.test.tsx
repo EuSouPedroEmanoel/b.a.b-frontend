@@ -48,7 +48,7 @@ describe('Guest school autocomplete', () => {
   }
 
   const openGuestMode = async () => {
-    const toggle = await screen.findByRole('tab', { name: 'Acessar como visitante' })
+    const toggle = await screen.findByRole('button', { name: 'Acessar como visitante' })
     fireEvent.click(toggle)
     return screen.findByRole('combobox', { name: 'Escola' })
   }
@@ -101,17 +101,27 @@ describe('Guest school autocomplete', () => {
     expect(screen.getByRole('listbox')).toBeInTheDocument()
   })
 
-  it('switches modes without reloading and moves focus to the relevant first field', async () => {
+  it('opens guest access from the secondary action and returns focus to account login', async () => {
     renderLogin()
 
-    const guestToggle = await screen.findByRole('tab', { name: 'Acessar como visitante' })
+    const guestToggle = await screen.findByRole('button', { name: 'Acessar como visitante' })
     fireEvent.click(guestToggle)
     const guestInput = await screen.findByRole('combobox', { name: 'Escola' })
     await waitFor(() => expect(document.activeElement).toBe(guestInput))
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Entrar com conta' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar para entrar' }))
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: /Usuário, e-mail ou CPF/ })))
     expect(screen.queryByRole('combobox', { name: 'Escola' })).not.toBeInTheDocument()
+  })
+
+  it('shows account login directly without a redundant access selector', () => {
+    renderLogin()
+
+    expect(screen.getByRole('textbox', { name: /Usuário, e-mail ou CPF/ })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Senha/)).toBeRequired()
+    expect(screen.queryByRole('tab', { name: 'Entrar com conta' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Acesso restrito' })).not.toBeInTheDocument()
+    expect(screen.getByText('ou')).toBeInTheDocument()
   })
 
   it('supports ArrowDown/ArrowUp, Enter selection, and closes on outside click', async () => {
@@ -192,7 +202,7 @@ describe('Guest school autocomplete', () => {
     fixtures.login.mockRejectedValueOnce(new Error('Network Error'))
     renderLogin()
 
-    await screen.findByRole('tab', { name: 'Entrar com conta' })
+    await screen.findByRole('textbox', { name: /Usuário, e-mail ou CPF/ })
     fireEvent.change(screen.getByRole('textbox', { name: /Usuário, e-mail ou CPF/ }), { target: { value: 'bibliotecario' } })
     fireEvent.change(document.getElementById('password')!, { target: { value: 'senha-segura' } })
     fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))

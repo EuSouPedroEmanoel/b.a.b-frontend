@@ -11,10 +11,12 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { ModalDialog } from '@/components/ui/ModalDialog'
+import { ActivationActions, ActivationInvitationDialog, type CreatedUserInvitation } from '@/features/users/ActivationInvitationDialog'
 
 type Student = {
   id: number
   username: string
+  name: string
   email: string | null
   cpf_masked: string | null
   birthdate: string | null
@@ -25,6 +27,7 @@ type Student = {
   school_name: string | null
   school_code: string | null
   is_active: boolean
+  account_status: 'pending_activation' | 'active' | 'disabled'
   created_at: string | null
   updated_at: string | null
 }
@@ -86,6 +89,7 @@ export function StudentsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState(emptyCreate)
   const [createError, setCreateError] = useState('')
+  const [createdInvitation, setCreatedInvitation] = useState<CreatedUserInvitation | null>(null)
   const [editing, setEditing] = useState<Student | null>(null)
   const [editForm, setEditForm] = useState({ turmaNumero: '', turmaLetra: '', birthdate: '', password: '' })
 
@@ -99,7 +103,7 @@ export function StudentsPage() {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<Student>('/users/students', {
+      const { data } = await api.post<Student & CreatedUserInvitation>('/users/students', {
         name: createForm.name.trim(),
         cpf: createForm.cpf,
         birthdate: createForm.birthdate,
@@ -108,11 +112,12 @@ export function StudentsPage() {
       })
       return data
     },
-    onSuccess: () => {
+    onSuccess: (createdStudent) => {
       announce('Aluno cadastrado com sucesso', 'polite')
       setShowCreate(false)
       setCreateForm(emptyCreate)
       setCreateError('')
+      setCreatedInvitation(createdStudent)
       qc.invalidateQueries({ queryKey: ['students'] })
     },
     onError: (err: unknown) => {
@@ -258,7 +263,8 @@ export function StudentsPage() {
                       return (
                         <tr key={s.id}>
                           <td className="break-words px-4 py-3 align-top font-medium capitalize @max-md:px-2">
-                            <span>{s.username.replace(/\./g, ' ')}</span>
+                            <span>{s.name || s.username.replace(/\./g, ' ')}</span>
+                            <span className="ml-2"><Badge tone={s.account_status === 'active' ? 'success' : s.account_status === 'pending_activation' ? 'warning' : 'danger'}>{s.account_status === 'active' ? 'Ativa' : s.account_status === 'pending_activation' ? 'Pendente' : 'Desativada'}</Badge></span>
                             <span className="mt-1 hidden text-xs font-normal text-slate-600 dark:text-slate-300 @max-lg:block">
                               Nascimento: {s.birthdate ? new Date(`${s.birthdate}T00:00:00`).toLocaleDateString('pt-BR') : '—'}
                             </span>
@@ -295,6 +301,7 @@ export function StudentsPage() {
                               <Pencil className="h-4 w-4 @max-lg:mr-0 mr-1" aria-hidden="true" />
                               <span className="@max-lg:sr-only">Editar</span>
                             </Button>
+                            <ActivationActions user={s} onUpdated={() => void qc.invalidateQueries({ queryKey: ['students'] })} />
                           </td>
                         </tr>
                       )
@@ -337,7 +344,7 @@ export function StudentsPage() {
               value={createForm.birthdate}
               onChange={(e) => setCreateForm((f) => ({ ...f, birthdate: e.target.value }))}
               autoComplete="off"
-              hint="A primeira senha do aluno será a data de nascimento como números (ddmmaaaa)."
+              hint="A senha será criada pelo aluno no primeiro acesso."
             />
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
               <div className="min-w-0"><Input
@@ -370,6 +377,8 @@ export function StudentsPage() {
           </form>
         </ModalDialog>
       )}
+
+      {createdInvitation && <ActivationInvitationDialog created={createdInvitation} onClose={() => setCreatedInvitation(null)} />}
 
       {editing && (
         <ModalDialog variant="form" title={`Editar aluno — ${editing.username.replace(/\./g, ' ')}`} onClose={closeEdit}>

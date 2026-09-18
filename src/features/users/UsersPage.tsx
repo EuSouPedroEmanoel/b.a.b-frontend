@@ -16,6 +16,7 @@ import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ModalDialog } from '@/components/ui/ModalDialog'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { ActivationActions, ActivationInvitationDialog, type CreatedUserInvitation } from './ActivationInvitationDialog'
 
 type AppUser = {
   id: number
@@ -31,6 +32,7 @@ type AppUser = {
   school_name: string | null
   school_code: string | null
   is_active: boolean
+  account_status: 'pending_activation' | 'active' | 'disabled'
   created_at: string | null
   updated_at: string | null
   administrative_capabilities?: string[]
@@ -113,7 +115,6 @@ type CreateForm = {
   birthdate: string
   turmaNumero: string
   turmaLetra: string
-  password: string
 }
 
 const emptyCreate: CreateForm = {
@@ -125,7 +126,6 @@ const emptyCreate: CreateForm = {
   birthdate: '',
   turmaNumero: '',
   turmaLetra: '',
-  password: '',
 }
 
 export function UsersPage() {
@@ -136,6 +136,7 @@ export function UsersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate)
   const [createError, setCreateError] = useState('')
+  const [createdInvitation, setCreatedInvitation] = useState<CreatedUserInvitation | null>(null)
   const [editing, setEditing] = useState<AppUser | null>(null)
   const [editForm, setEditForm] = useState({ name: '', email: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
 
@@ -182,7 +183,7 @@ export function UsersPage() {
     mutationFn: async () => {
       const f = createForm
       if (f.type === 'student') {
-        const { data } = await api.post<AppUser>('/users/students', {
+        const { data } = await api.post<AppUser & CreatedUserInvitation>('/users/students', {
           name: f.name.trim(),
           cpf: f.cpf,
           birthdate: f.birthdate,
@@ -193,31 +194,30 @@ export function UsersPage() {
       }
       if (f.type === 'school_admin' && isSuperAdmin) {
         const schoolId = schoolFilter || (schoolsData?.items[0]?.id ?? 0)
-        const { data } = await api.post<AppUser>(`/schools/${schoolId}/admins`, {
+        const { data } = await api.post<AppUser & CreatedUserInvitation>(`/schools/${schoolId}/admins`, {
           username: f.username.trim(),
           name: f.name.trim(),
           email: f.email.trim(),
           cpf: f.cpf,
-          password: f.password,
         })
         return data
       }
-      const { data } = await api.post<AppUser>('/users/', {
+      const { data } = await api.post<AppUser & CreatedUserInvitation>('/users/', {
         username: f.username.trim(),
         name: f.name.trim(),
         email: f.email.trim() || null,
         cpf: f.cpf,
-        password: f.password,
         role: f.type,
         ...(isSuperAdmin && schoolFilter ? { school_id: Number(schoolFilter) } : {}),
       })
       return data
     },
-    onSuccess: () => {
+    onSuccess: (createdUser) => {
       announce('Usuário criado com sucesso', 'polite')
       setShowCreate(false)
       setCreateForm(emptyCreate)
       setCreateError('')
+      setCreatedInvitation(createdUser)
       qc.invalidateQueries({ queryKey: ['users'] })
       qc.invalidateQueries({ queryKey: ['students'] })
     },
@@ -279,9 +279,9 @@ export function UsersPage() {
         announce(bd.message ?? 'Data de nascimento inválida', 'assertive')
         return
       }
-    } else if (!f.username.trim() || !f.name.trim() || !f.password) {
-      setCreateError('Preencha usuário, nome e senha')
-      announce('Preencha usuário, nome e senha', 'assertive')
+    } else if (!f.username.trim() || !f.name.trim()) {
+      setCreateError('Preencha usuário e nome')
+      announce('Preencha usuário e nome', 'assertive')
       return
     } else if (!validateCpfDigits(f.cpf)) {
       setCreateError('Informe um CPF válido')
@@ -535,6 +535,7 @@ export function UsersPage() {
                             <tr key={u.id} className={readOnly ? 'opacity-60' : undefined}>
                               <td className="break-words [overflow-wrap:anywhere] px-4 py-3 align-top font-medium">
                                 <span>{u.name || u.username}</span>
+                                <span className="ml-2"><Badge tone={u.account_status === 'active' ? 'success' : u.account_status === 'pending_activation' ? 'warning' : 'danger'}>{u.account_status === 'active' ? 'Ativa' : u.account_status === 'pending_activation' ? 'Pendente' : 'Desativada'}</Badge></span>
                                 {currentUser?.id === u.id && <span className="ml-2 text-sm font-normal text-slate-600 dark:text-slate-300">(EU)</span>}
                                 <div className="mt-1 space-y-0.5 text-xs font-normal text-slate-600 dark:text-slate-300">
                                   <p className="break-words font-mono">{u.username}</p>
@@ -573,6 +574,7 @@ export function UsersPage() {
                                   <span className="@max-lg:sr-only @max-[80rem]:sr-only">Editar</span>
                                   <Tooltip className="left-1/2 right-auto -translate-x-1/2">Editar</Tooltip>
                                 </Button>
+                                <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
                               </td>
                             </tr>
                           )
@@ -613,7 +615,7 @@ export function UsersPage() {
               <>
                 <Input label="Nome completo" value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" />
                 <Input label="CPF" value={formatCpfInput(createForm.cpf)} onChange={(e) => setCreateForm((f) => ({ ...f, cpf: onlyDigits(e.target.value) }))} placeholder="000.000.000-00" required inputMode="numeric" autoComplete="off" />
-                <Input label="Nascimento" type="date" value={createForm.birthdate} onChange={(e) => setCreateForm((f) => ({ ...f, birthdate: e.target.value }))} required autoComplete="off" hint="A primeira senha do aluno será a data de nascimento como números (ddmmaaaa)." />
+                <Input label="Nascimento" type="date" value={createForm.birthdate} onChange={(e) => setCreateForm((f) => ({ ...f, birthdate: e.target.value }))} required autoComplete="off" hint="A senha será criada pelo aluno no primeiro acesso." />
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
                   <div className="min-w-0"><Input label="Turma — número" value={createForm.turmaNumero} onChange={(e) => setCreateForm((f) => ({ ...f, turmaNumero: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) }))} placeholder="ex: 7" required inputMode="numeric" autoComplete="off" /></div>
                   <div className="min-w-0"><Input label="Turma — letra" value={createForm.turmaLetra} onChange={(e) => setCreateForm((f) => ({ ...f, turmaLetra: e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) }))} placeholder="ex: A" required maxLength={1} autoComplete="off" /></div>
@@ -631,10 +633,6 @@ export function UsersPage() {
               </>
             )}
 
-            {createForm.type !== 'student' && (
-              <Input label="Senha" type="password" value={createForm.password} onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))} required autoComplete="new-password" />
-            )}
-
             <div className="flex flex-wrap gap-3 pt-2">
               <Button type="button" variant="danger-secondary" className="min-w-max flex-1" onClick={() => { setCreateError(''); setShowCreate(false) }}>
                 Cancelar
@@ -646,6 +644,8 @@ export function UsersPage() {
           </form>
         </ModalDialog>
       )}
+
+      {createdInvitation && <ActivationInvitationDialog created={createdInvitation} onClose={() => setCreatedInvitation(null)} />}
 
       {editing && (
         <ModalDialog variant="form" title={`Editar usuário — ${editing.name || editing.username}`} onClose={closeEdit}>

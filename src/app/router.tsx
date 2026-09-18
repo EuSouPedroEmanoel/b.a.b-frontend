@@ -38,6 +38,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: '/primeiro-acesso',
+        element: (
+          <PublicOnly>
+            <LoginPage />
+          </PublicOnly>
+        ),
+      },
+      {
         path: '/visitar/:schoolCode',
         element: <LoginPage />,
       },

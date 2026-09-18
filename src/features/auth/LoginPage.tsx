@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, Link, useParams } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { Eye, EyeOff } from 'lucide-react'
@@ -10,12 +10,15 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { getErrorMessage } from '@/lib/errors'
 import api from '@/lib/api'
 import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
+import { FirstAccessPanel } from './FirstAccessPanel'
 
 export function LoginPage() {
   const { login, loginGuest } = useAuth()
   const announce = useAnnouncer()
   const navigate = useNavigate()
+  const location = useLocation()
   const { schoolCode } = useParams<{ schoolCode: string }>()
+  const [accessTab, setAccessTab] = useState<'login' | 'first-access'>(() => location.pathname === '/primeiro-acesso' ? 'first-access' : 'login')
   const [mode, setMode] = useState<'account' | 'guest'>(schoolCode ? 'guest' : 'account')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -36,6 +39,13 @@ export function LoginPage() {
   const usernameRef = useRef<HTMLInputElement>(null)
   const guestComboboxRef = useRef<HTMLDivElement>(null)
   const errorRef = useRef<HTMLDivElement>(null)
+  const loginTabRef = useRef<HTMLButtonElement>(null)
+  const firstAccessTabRef = useRef<HTMLButtonElement>(null)
+
+  const switchAccessTab = (nextTab: 'login' | 'first-access', focusTab = false) => {
+    setAccessTab(nextTab)
+    if (focusTab) window.requestAnimationFrame(() => (nextTab === 'login' ? loginTabRef : firstAccessTabRef).current?.focus())
+  }
 
   const switchMode = (nextMode: 'account' | 'guest') => {
     setMode(nextMode)
@@ -217,38 +227,31 @@ export function LoginPage() {
   const submitTooltip = loading ? 'Entrando, aguarde' : 'Preencha usuário e senha para entrar'
   const guestSubmitDisabled = !guestSchoolCode || guestLoading
   const guestSubmitTooltip = guestLoading ? 'Entrando como visitante, aguarde' : 'Selecione uma escola para continuar'
+  const firstAccessParams = useMemo(() => new URLSearchParams(location.search), [location.search])
 
   return (
     <div className="mx-auto w-[min(100%,clamp(32rem,calc(20rem+var(--text-sm)*12),42rem))]">
       <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Entrar na Biblioteca</h1>
-      <p className="text-sm text-slate-500 mb-6">Entre com seu usuário, e-mail ou CPF.</p>
+      <p className="text-sm text-slate-500 mb-6">Entre com sua conta ou acesse o acervo como visitante.</p>
 
-      <div role="tablist" aria-label="Tipo de acesso" className={`${segmentedControlContainerClasses} mb-4`}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'account'}
-          onClick={() => switchMode('account')}
-          className={segmentedControlItemClasses(mode === 'account', 'primary')}
-        >
-          Entrar com conta
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'guest'}
-          onClick={() => switchMode('guest')}
-          className={segmentedControlItemClasses(mode === 'guest', 'primary')}
-        >
-          Acessar como visitante
-        </button>
+      <div
+        role="tablist"
+        aria-label="Acesso à conta"
+        className={`${segmentedControlContainerClasses} mb-4`}
+        onKeyDown={(event) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+          event.preventDefault()
+          const next = event.key === 'ArrowLeft' || event.key === 'Home' ? 'login' : 'first-access'
+          switchAccessTab(next, true)
+        }}
+      >
+        <button ref={loginTabRef} id="login-tab" type="button" role="tab" aria-selected={accessTab === 'login'} aria-controls="login-panel" tabIndex={accessTab === 'login' ? 0 : -1} onClick={() => switchAccessTab('login')} className={segmentedControlItemClasses(accessTab === 'login', 'primary')}>Entrar</button>
+        <button ref={firstAccessTabRef} id="first-access-tab" type="button" role="tab" aria-selected={accessTab === 'first-access'} aria-controls="first-access-panel" tabIndex={accessTab === 'first-access' ? 0 : -1} onClick={() => switchAccessTab('first-access')} className={segmentedControlItemClasses(accessTab === 'first-access', 'primary')}>Primeiro acesso</button>
       </div>
 
+      {accessTab === 'login' ? <div id="login-panel" role="tabpanel" aria-labelledby="login-tab">
+
       {mode === 'account' ? <Card>
-        <CardHeader>
-          <h2 className="text-lg font-semibold">Acesso restrito</h2>
-          <p className="text-sm text-slate-500">Todos os campos são obrigatórios.</p>
-        </CardHeader>
         <CardBody>
           <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4" aria-describedby={error ? 'login-error' : undefined}>
             {error && (
@@ -346,9 +349,14 @@ export function LoginPage() {
               </Button>
               {submitDisabled && <Tooltip>{submitTooltip}</Tooltip>}
             </span>
-            <p className="text-xs text-slate-500 text-center">
-              Problemas para acessar? <Link to="/" className="underline underline-offset-2">Voltar ao início</Link>
-            </p>
+            <div className="flex items-center gap-3" aria-hidden="true">
+              <span className="h-px flex-1 bg-slate-400 dark:bg-slate-500" />
+              <span className="px-1 text-base font-semibold text-slate-700 dark:text-slate-200">ou</span>
+              <span className="h-px flex-1 bg-slate-400 dark:bg-slate-500" />
+            </div>
+            <Button type="button" variant="secondary" className="w-full" onClick={() => switchMode('guest')}>
+              Acessar como visitante
+            </Button>
           </form>
         </CardBody>
       </Card> : <Card>
@@ -462,10 +470,27 @@ export function LoginPage() {
               {guestSubmitDisabled && <Tooltip>{guestSubmitTooltip}</Tooltip>}
             </span>
             <p className="text-center text-xs text-slate-500">O acesso é temporário e permite somente consultar o acervo.</p>
+            <Button type="button" variant="ghost" className="w-full" onClick={() => switchMode('account')}>
+              Voltar para entrar
+            </Button>
         </form>
         </CardBody>
       </section>
       </Card>}
+      </div> : <div id="first-access-panel" role="tabpanel" aria-labelledby="first-access-tab">
+        <FirstAccessPanel
+          initialUsername={firstAccessParams.get('username') ?? ''}
+          initialCode={firstAccessParams.get('code') ?? firstAccessParams.get('codigo') ?? ''}
+          onActivated={(activatedUsername) => {
+            setUsername(activatedUsername)
+            setPassword('')
+            setError(null)
+            setMode('account')
+            switchAccessTab('login')
+            window.requestAnimationFrame(() => usernameRef.current?.focus())
+          }}
+        />
+      </div>}
     </div>
   )
 }

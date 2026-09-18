@@ -30,7 +30,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input({ label,
         />
         {rightElement && <div className="flex max-w-full shrink-0 items-center">{rightElement}</div>}
       </div>
-      {hint && !error && (
+      {hint && (
         <p id={hintId} className={`text-xs text-slate-500 ${rowLayout ? 'sm:col-start-1 sm:row-start-2' : ''}`}>
           {hint}
         </p>
