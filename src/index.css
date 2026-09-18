@@ -2,6 +2,25 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Destaque laranja para textos selecionados pelo usuário. */
+::selection {
+  background-color: rgb(249 115 22 / 78%);
+  color: #1f2937;
+}
+
+::-moz-selection {
+  background-color: rgb(249 115 22 / 78%);
+  color: #1f2937;
+}
+
+html.dark ::selection {
+  color: #ffffff;
+}
+
+html.dark ::-moz-selection {
+  color: #ffffff;
+}
+
 /* Design tokens — W3C WCAG 2.2 AA (contraste 4.5:1+) */
 @theme {
   --color-primary: #075985;
@@ -340,6 +359,14 @@ html[data-high-contrast='true'] footer {
  * conteúdo textual parte do branco e somente links/ações recebem destaque. */
 html[data-high-contrast='true'] body * {
   color: var(--color-text) !important;
+}
+html[data-high-contrast='true'] ::selection {
+  background-color: #ff8c00 !important;
+  color: #000000 !important;
+}
+html[data-high-contrast='true'] ::-moz-selection {
+  background-color: #ff8c00 !important;
+  color: #000000 !important;
 }
 html[data-high-contrast='true'] .book-detail-page {
   background: var(--color-bg) !important;
