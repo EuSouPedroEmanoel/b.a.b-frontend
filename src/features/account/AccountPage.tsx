@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
-import { BookOpen, RefreshCw, ShieldCheck, UserRound } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowDown, ArrowUp, Funnel, ShieldCheck, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { ButtonLink } from '@/components/ui/ButtonLink'
@@ -10,36 +10,20 @@ import { GridCard } from '@/features/books/GridCard'
 import { responsiveBookGridClasses } from '@/features/books/bookGrid'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/lib/api'
+import { Pagination } from '@/components/ui/Pagination'
+import { Select } from '@/components/ui/Select'
+import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
+import { readingStatusLabel, readingStatusOptions, type ReadingStatus } from '@/features/reading/readingStatus'
 
-export type ProfileLoan = { id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; book_id: number; book_title: string; book_cover_url: string | null; book_details: CatalogBook }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
-type CatalogBook = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; cover_url: string | null; published_date: string | null; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
+type CatalogBook = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; cover_url: string | null; published_date: string | null; reading_status?: ReadingStatus | null; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
+type ReadingSortBy = 'created_at' | 'published_date' | 'title' | 'author'
+type ReadingSortOrder = 'asc' | 'desc'
 
 const accountRoleLabel = (role: string) => ({ student: 'Aluno', teacher: 'Professor', librarian: 'Bibliotecário', school_admin: 'Administrador escolar', super_admin: 'Superadministrador' }[role] ?? role)
-const formatDate = (value: string) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(new Date(`${value.slice(0, 10)}T12:00:00`))
-
 export function AccountPage() {
   const { user } = useAuth()
   const isStudent = user?.role === 'student'
-  const loadMoreRef = useRef<HTMLDivElement>(null)
-  const loans = useInfiniteQuery({
-    queryKey: ['loans', 'me', 'profile'],
-    queryFn: async ({ pageParam }) => (await api.get<Paginated<ProfileLoan>>(`/loans/me?page=${pageParam}&size=15`)).data,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => lastPage.page < lastPage.pages ? lastPage.page + 1 : undefined,
-    enabled: isStudent,
-  })
-  const loanHistory = useMemo(() => loans.data?.pages.flatMap((page) => page.items) ?? [], [loans.data])
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = loans
-  useEffect(() => {
-    const target = loadMoreRef.current
-    if (!target || !hasNextPage || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting) && !isFetchingNextPage) void fetchNextPage()
-    }, { rootMargin: '25%' })
-    observer.observe(target)
-    return () => observer.disconnect()
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage])
   if (!user) return null
   const displayName = user.name || user.username
 
@@ -53,22 +37,120 @@ export function AccountPage() {
 
     <section aria-labelledby="security-heading"><Card><CardBody className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center"><div><h2 id="security-heading" className="flex items-center gap-2 text-lg font-semibold"><ShieldCheck aria-hidden="true" className="h-5 w-5" /> Segurança</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Mantenha sua conta protegida com uma senha segura.</p></div><ButtonLink to={`/perfil/${user.id}#senha`} variant="secondary">Alterar senha</ButtonLink></CardBody></Card></section>
 
-    {isStudent && <section aria-labelledby="my-books-heading" aria-busy={loans.isLoading || loans.isFetchingNextPage}><div className="mb-4"><h2 id="my-books-heading" className="flex items-center gap-2 text-xl font-semibold"><BookOpen aria-hidden="true" className="h-5 w-5" /> Meus livros</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Seu histórico de empréstimos, dos mais recentes aos mais antigos.</p></div>
-      {loans.isLoading && <div role="status" className={responsiveBookGridClasses}><span className="sr-only">Carregando seus livros…</span>{[0, 1, 2].map((item) => <div key={item} aria-hidden="true" className="aspect-[2/3] animate-pulse rounded-2xl bg-slate-200 motion-reduce:animate-none dark:bg-slate-700" />)}</div>}
-      {loans.isError && <Card><CardBody><div role="alert"><p className="font-medium">Não foi possível carregar seus livros.</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Verifique sua conexão e tente novamente.</p></div><Button type="button" variant="secondary" className="mt-4 gap-2" onClick={() => void loans.refetch()}><RefreshCw aria-hidden="true" className="h-4 w-4" /> Tentar novamente</Button></CardBody></Card>}
-      {loans.data && loanHistory.length === 0 && <Card><CardBody><p className="font-medium">Você ainda não possui empréstimos no histórico.</p><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Explore o acervo para encontrar sua próxima leitura.</p><Link to="/acervo" className="profile-text-link mt-4">Explorar acervo</Link></CardBody></Card>}
-      {loanHistory.length > 0 && <ul role="list" aria-label="Histórico de livros emprestados" className={responsiveBookGridClasses}>{loanHistory.map((loan, index) => <LoanBookCard key={loan.id} loan={loan} book={loan.book_details} index={index} />)}</ul>}
-      <div ref={loadMoreRef} aria-hidden={!loans.hasNextPage} className="h-1" />
-      {loans.isFetchingNextPage && <p role="status" className="mt-4 text-center text-sm text-slate-600 dark:text-slate-300">Carregando mais livros…</p>}
-      {loans.hasNextPage && !loans.isFetchingNextPage && typeof IntersectionObserver === 'undefined' && <Button type="button" variant="secondary" className="mt-4" onClick={() => void loans.fetchNextPage()}>Carregar mais</Button>}
-    </section>}
+    {isStudent && <ReadingSection />}
   </main>
 }
 
-function ProfileField({ label, value }: { label: string; value: string }) { return <div className="min-w-0"><dt className="text-sm text-slate-500 dark:text-slate-400">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div> }
-
-function LoanBookCard({ loan, book, index }: { loan: ProfileLoan; book: CatalogBook; index: number }) {
-  const overdue = loan.status === 'overdue' || new Date(`${loan.due_date.slice(0, 10)}T23:59:59`) < new Date()
-  const returned = loan.status === 'returned' && loan.returned_at
-  return <li className="min-w-0"><GridCard book={book} index={index} portalHover /><p className={`mt-2 text-sm font-medium ${overdue && !returned ? 'text-red-700 dark:text-red-300' : 'text-slate-600 dark:text-slate-300'}`}>{returned ? <>Devolvido em <time dateTime={loan.returned_at ?? undefined}>{formatDate(loan.returned_at!)}</time></> : <><span className="sr-only">{overdue ? 'Empréstimo atrasado. ' : 'Empréstimo ativo. '}</span>Devolução: <time dateTime={loan.due_date}>{formatDate(loan.due_date)}</time></>}</p></li>
+function ReadingSection() {
+  const [section, setSection] = useState<'tracking' | 'all'>('tracking')
+  const [status, setStatus] = useState<ReadingStatus | null>(null)
+  const [genreFilter, setGenreFilter] = useState('')
+  const [allFilterOpen, setAllFilterOpen] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<'true' | 'false'>('true')
+  const [sortBy, setSortBy] = useState<ReadingSortBy>('created_at')
+  const [sortOrder, setSortOrder] = useState<ReadingSortOrder>('desc')
+  const [page, setPage] = useState(1)
+  const statusFilter = section === 'tracking' ? status : null
+  const query = useQuery({
+    queryKey: ['reading-statuses', section, statusFilter ?? 'all', genreFilter, activeFilter, sortBy, sortOrder, page],
+    queryFn: async () => {
+      const filter = statusFilter ? `&status=${statusFilter}` : ''
+      const genre = genreFilter ? `&genre_id=${genreFilter}` : ''
+      const borrowedOnly = section === 'all' ? '&borrowed_only=true' : ''
+      const active = `&is_active=${activeFilter}`
+      const sorting = `&sort_by=${sortBy}&sort_order=${sortOrder}`
+      return (await api.get<Paginated<CatalogBook>>(`/reading-statuses/me?page=${page}&size=15${filter}${genre}${borrowedOnly}${active}${sorting}`)).data
+    },
+  })
+  const { data: genreOptions } = useQuery({
+    queryKey: ['genres-list'],
+    queryFn: async () => (await api.get<{ items: { id: number; name: string }[] }>('/genres/?size=50')).data.items,
+    enabled: allFilterOpen,
+  })
+  const allFiltersActive = !!genreFilter || activeFilter !== 'true' || sortBy !== 'created_at'
+  return (
+    <section aria-labelledby="my-reading-heading" aria-busy={query.isLoading}>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 id="my-reading-heading" className="text-xl font-semibold">Minhas leituras</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Acompanhe suas obras e consulte todas as leituras registradas.</p>
+        </div>
+        {section === 'tracking' && <div className="flex items-end gap-2">
+          <div className="w-48 shrink-0">
+          <Select label="Acompanhamento" id="reading-status-filter" value={status ?? 'all'} onChange={(value) => { setStatus(value === 'all' ? null : value as ReadingStatus); setPage(1) }} options={[{ value: 'all', label: 'Todos' }, ...readingStatusOptions]} />
+          </div>
+          <ReadingFiltersButton open={allFilterOpen} onToggle={() => setAllFilterOpen((open) => !open)} active={allFiltersActive} genreFilter={genreFilter} genreOptions={genreOptions ?? []} setGenreFilter={(value) => { setGenreFilter(value); setPage(1) }} activeFilter={activeFilter} setActiveFilter={(value) => { setActiveFilter(value); setPage(1) }} sortBy={sortBy} setSortBy={(value) => { setSortBy(value); setPage(1) }} sortOrder={sortOrder} setSortOrder={(value) => { setSortOrder(value); setPage(1) }} />
+        </div>}
+        {section === 'all' && <ReadingFiltersButton open={allFilterOpen} onToggle={() => setAllFilterOpen((open) => !open)} active={allFiltersActive} genreFilter={genreFilter} genreOptions={genreOptions ?? []} setGenreFilter={(value) => { setGenreFilter(value); setPage(1) }} activeFilter={activeFilter} setActiveFilter={(value) => { setActiveFilter(value); setPage(1) }} sortBy={sortBy} setSortBy={(value) => { setSortBy(value); setPage(1) }} sortOrder={sortOrder} setSortOrder={(value) => { setSortOrder(value); setPage(1) }} />}
+      </div>
+      <div className={`${segmentedControlContainerClasses} mb-4`} role="tablist" aria-label="Seções de leitura">
+        <button type="button" role="tab" aria-selected={section === 'tracking'} aria-controls="reading-tracking-panel" className={segmentedControlItemClasses(section === 'tracking')} onClick={() => { setSection('tracking'); setPage(1) }}>
+          Acompanhamento de leitura
+        </button>
+        <button type="button" role="tab" aria-selected={section === 'all'} aria-controls="reading-all-panel" className={segmentedControlItemClasses(section === 'all')} onClick={() => { setSection('all'); setPage(1) }}>
+          Todos os empréstimos
+        </button>
+      </div>
+      <div id={section === 'tracking' ? 'reading-tracking-panel' : 'reading-all-panel'} role="tabpanel">
+      {query.isLoading && <p role="status" className="py-8 text-center text-sm text-slate-500">Carregando suas leituras…</p>}
+      {query.isError && <Card><CardBody><p role="alert">Não foi possível carregar suas leituras.</p><Button type="button" variant="secondary" className="mt-4" onClick={() => void query.refetch()}>Tentar novamente</Button></CardBody></Card>}
+      {query.data && query.data.items.length === 0 && <Card><CardBody><p className="font-medium">{section === 'tracking' ? (status ? `Nenhum livro em “${readingStatusLabel(status)}”.` : 'Você ainda não possui acompanhamentos.') : 'Você ainda não possui livros emprestados.'}</p><Link to="/acervo" className="profile-text-link mt-4">Explorar acervo</Link></CardBody></Card>}
+      {query.data && query.data.items.length > 0 && <>
+        <ul role="list" aria-label={section === 'tracking' ? (status ? `Livros: ${readingStatusLabel(status)}` : 'Todos os acompanhamentos') : 'Todas as leituras'} className={responsiveBookGridClasses}>
+          {query.data.items.map((book, index) => <li key={book.id} className="min-w-0"><GridCard book={book} index={index} portalHover />{section === 'tracking' && <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">{readingStatusLabel(book.reading_status)}</p>}</li>)}
+        </ul>
+        <Pagination page={query.data.page} pages={query.data.pages} total={query.data.total} onChange={setPage} />
+      </>}
+      </div>
+    </section>
+  )
 }
+
+function ReadingFiltersButton({ open, onToggle, active, genreFilter, genreOptions, setGenreFilter, activeFilter, setActiveFilter, sortBy, setSortBy, sortOrder, setSortOrder }: {
+  open: boolean
+  onToggle: () => void
+  active: boolean
+  genreFilter: string
+  genreOptions: { id: number; name: string }[]
+  setGenreFilter: (value: string) => void
+  activeFilter: 'true' | 'false'
+  setActiveFilter: (value: 'true' | 'false') => void
+  sortBy: ReadingSortBy
+  setSortBy: (value: ReadingSortBy) => void
+  sortOrder: ReadingSortOrder
+  setSortOrder: (value: ReadingSortOrder) => void
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) onToggle()
+    }
+    document.addEventListener('pointerdown', handleOutsidePointer)
+    return () => document.removeEventListener('pointerdown', handleOutsidePointer)
+  }, [onToggle, open])
+
+  return <div ref={wrapperRef} className="relative shrink-0">
+    <div className="flex items-stretch gap-2">
+      <Button type="button" variant={active ? 'primary' : 'secondary'} className="gap-2" aria-haspopup="dialog" aria-expanded={open} aria-controls="reading-filters" onClick={onToggle}>
+        <Funnel aria-hidden="true" className="h-4 w-4" /> Filtros
+        {active && <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600" aria-hidden="true">1</span>}
+      </Button>
+      <Button type="button" variant="secondary" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} aria-label={sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'} title={sortOrder === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'} className="min-w-0 shrink-0 !px-2 hover:!bg-slate-100 dark:hover:!bg-slate-700">
+        {sortOrder === 'asc' ? <ArrowUp className="h-5 w-5" aria-hidden="true" /> : <ArrowDown className="h-5 w-5" aria-hidden="true" />}
+      </Button>
+    </div>
+    {open && <div id="reading-filters" role="dialog" aria-label="Filtros" className="absolute right-0 z-30 mt-2 grid w-72 gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+      <Select label="Gênero" id="reading-genre-filter" value={genreFilter} onChange={setGenreFilter} options={[{ value: '', label: 'Todos' }, ...genreOptions.map((genre) => ({ value: String(genre.id), label: genre.name }))]} />
+      <Select label="Situação" id="reading-active-filter" value={activeFilter} onChange={(value) => setActiveFilter(value as 'true' | 'false')} options={[{ value: 'true', label: 'Ativo' }, { value: 'false', label: 'Inativo' }]} />
+      <Select label="Ordenar por" id="reading-sort" value={sortBy} onChange={(value) => setSortBy(value as ReadingSortBy)} options={[{ value: 'created_at', label: 'Cadastro' }, { value: 'published_date', label: 'Data de lançamento' }, { value: 'title', label: 'Nome' }, { value: 'author', label: 'Autor' }]} />
+      <div className="flex justify-between gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+        <Button type="button" variant="secondary" onClick={() => { setGenreFilter(''); setActiveFilter('true'); setSortBy('created_at') }}>Limpar filtros</Button>
+        <Button type="button" onClick={onToggle}>Aplicar</Button>
+      </div>
+    </div>}
+  </div>
+}
+
+function ProfileField({ label, value }: { label: string; value: string }) { return <div className="min-w-0"><dt className="text-sm text-slate-500 dark:text-slate-400">{label}</dt><dd className="mt-1 break-words font-medium">{value}</dd></div> }

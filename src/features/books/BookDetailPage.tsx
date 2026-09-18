@@ -23,6 +23,7 @@ import { GridCard } from '@/features/books/GridCard'
 import { ReservationConfirmDialog } from '@/features/books/ReservationConfirmDialog'
 import { catalogRouteState, getCatalogOrigin } from '@/lib/catalogNavigation'
 import { hasPersonalReaderCapability } from '@/lib/permissions'
+import { ReadingStatusControl } from '@/features/reading/ReadingStatusControl'
 import { canViewBookCirculation, selectBookLoansForCopies, selectMyBookLoans, shouldShowMyBookLoans } from '@/lib/bookLoanSections'
 
 type Book = {
@@ -42,6 +43,7 @@ type Book = {
   derived_state: string
   total_copies?: number
   available_copies?: number
+  reading_status?: 'want_to_read' | 'reading' | 'rereading' | 'read' | null
 }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
 type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code?: string; book_id?: number; book_title?: string; borrower_username?: string }
@@ -706,6 +708,7 @@ export function BookDetailPage() {
                   {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
                 </Badge>
               </div>
+              {user?.role === 'student' && <div className="pt-2"><ReadingStatusControl bookId={book.id} status={book.reading_status} /></div>}
               <p className={`text-sm leading-relaxed mt-3 ${isDark ? 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]' : 'text-slate-600'}`}>
                 {book.description || 'Sem descrição disponível.'}
               </p>
