@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Bookmark, Heart } from 'lucide-react'
 import api from '@/lib/api'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { getErrorMessage } from '@/lib/errors'
 import { readingStatusLabel, readingStatusOptions, type ReadingStatus } from './readingStatus'
 
@@ -59,10 +61,118 @@ export function ReadingStatusControl({
         }}
         className="min-h-10 min-w-0 max-w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 font-medium text-[var(--color-text)] shadow-sm focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:cursor-wait disabled:opacity-60"
       >
-        <option value="">Sem acompanhamento</option>
-        {readingStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        <option value="">Remover acompanhamento</option>
+        {readingStatusOptions.filter((option) => option.value !== 'want_to_read').map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
       {mutation.isPending && <span role="status" className="shrink-0">Salvando…</span>}
     </label>
   )
+}
+
+export function ReadingWantToReadControl({
+  bookId,
+  active = false,
+}: {
+  bookId: number
+  active?: boolean
+}) {
+  const queryClient = useQueryClient()
+  const announce = useAnnouncer()
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (active) {
+        await api.delete(`/books/${bookId}/reading-status`)
+        return false
+      }
+      await api.put(`/books/${bookId}/reading-status`, { status: 'want_to_read' })
+      return true
+    },
+    onSuccess: async (next) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+        queryClient.invalidateQueries({ queryKey: ['book', bookId] }),
+        queryClient.invalidateQueries({ queryKey: ['student-home'] }),
+        queryClient.invalidateQueries({ queryKey: ['reading-statuses'] }),
+      ])
+      await announce(next ? 'Livro marcado como Quero ler.' : 'Livro removido de Quero ler.', 'polite')
+    },
+    onError: (error: unknown) => {
+      void announce(`Não foi possível atualizar Quero ler. ${getErrorMessage(error, 'Tente novamente.')}`, 'assertive')
+    },
+  })
+
+  const buttonTone = active
+    ? 'text-[var(--color-primary)]'
+    : 'text-[var(--color-primary-hover)]'
+  const buttonSpacing = active ? 'px-0 py-1' : 'px-1 py-1'
+
+  return <button
+    type="button"
+    aria-label={active ? 'Remover livro de Quero ler' : 'Marcar livro como Quero ler'}
+    aria-describedby={`reading-want-to-read-tooltip-${bookId}`}
+    aria-pressed={active}
+    aria-busy={mutation.isPending}
+    disabled={mutation.isPending}
+    onClick={() => mutation.mutate()}
+    className={`reading-want-to-read-button group inline-flex min-h-10 shrink-0 flex-col items-center justify-center gap-0.5 border-0 bg-transparent ${buttonSpacing} shadow-none transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:cursor-wait disabled:opacity-60 ${buttonTone}`}
+  >
+    <span className="rounded-full p-2 transition-colors group-hover:bg-[var(--color-primary)] group-hover:text-[var(--color-primary-contrast)]">
+      <Bookmark aria-hidden="true" className="h-5 w-5" fill={active ? 'currentColor' : 'none'} />
+    </span>
+    <span className="grid w-fit text-xs font-medium leading-tight whitespace-nowrap">
+      <span className={`col-start-1 row-start-1 ${active ? '' : 'invisible'}`}>Não quero ler</span>
+      <span className={`col-start-1 row-start-1 ${active ? 'invisible' : ''}`}>Quero ler</span>
+    </span>
+    <Tooltip id={`reading-want-to-read-tooltip-${bookId}`}>{active ? 'Remover de Quero ler' : 'Quero ler'}</Tooltip>
+  </button>
+}
+
+export function BookFavoriteControl({
+  bookId,
+  active = false,
+}: {
+  bookId: number
+  active?: boolean
+}) {
+  const queryClient = useQueryClient()
+  const announce = useAnnouncer()
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (active) {
+        await api.delete(`/books/${bookId}/favorite`)
+        return false
+      }
+      await api.put(`/books/${bookId}/favorite`)
+      return true
+    },
+    onSuccess: async (next) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', bookId] }),
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+      ])
+      await announce(next ? 'Livro adicionado aos favoritos.' : 'Livro removido dos favoritos.', 'polite')
+    },
+    onError: (error: unknown) => {
+      void announce(`Não foi possível atualizar o favorito. ${getErrorMessage(error, 'Tente novamente.')}`, 'assertive')
+    },
+  })
+
+  const buttonTone = active
+    ? 'text-[var(--color-primary)]'
+    : 'text-[var(--color-primary-hover)]'
+
+  return <button
+    type="button"
+    aria-label={active ? 'Desfavoritar livro' : 'Favoritar livro'}
+    aria-pressed={active}
+    aria-busy={mutation.isPending}
+    disabled={mutation.isPending}
+    onClick={() => mutation.mutate()}
+    className={`group inline-flex min-h-10 shrink-0 flex-col items-center justify-center gap-0.5 border-0 bg-transparent px-1 py-1 shadow-none transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:cursor-wait disabled:opacity-60 ${buttonTone}`}
+  >
+    <span className="rounded-full p-2 transition-colors group-hover:bg-[var(--color-primary)] group-hover:text-[var(--color-primary-contrast)]">
+      <Heart aria-hidden="true" className="h-5 w-5" fill={active ? 'currentColor' : 'none'} />
+    </span>
+    <span className="text-xs font-medium leading-tight whitespace-nowrap">{active ? 'Desfavoritar' : 'Favoritar'}</span>
+  </button>
 }

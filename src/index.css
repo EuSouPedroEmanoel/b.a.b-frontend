@@ -425,6 +425,11 @@ html[data-high-contrast='true'] :is(button, [role='button'], [role='switch']):no
   border-style: solid;
   border-width: 1px;
 }
+html[data-high-contrast='true'] .reading-want-to-read-button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
 html[data-high-contrast='true'] :is(button, [role='button']):hover:not(:disabled) {
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;

@@ -23,7 +23,7 @@ import { GridCard } from '@/features/books/GridCard'
 import { ReservationConfirmDialog } from '@/features/books/ReservationConfirmDialog'
 import { catalogRouteState, getCatalogOrigin } from '@/lib/catalogNavigation'
 import { hasPersonalReaderCapability } from '@/lib/permissions'
-import { ReadingStatusControl } from '@/features/reading/ReadingStatusControl'
+import { BookFavoriteControl, ReadingStatusControl, ReadingWantToReadControl } from '@/features/reading/ReadingStatusControl'
 import { canViewBookCirculation, selectBookLoansForCopies, selectMyBookLoans, shouldShowMyBookLoans } from '@/lib/bookLoanSections'
 
 type Book = {
@@ -41,9 +41,12 @@ type Book = {
   added_by: number
   edited_by: number | null
   derived_state: string
+  has_been_borrowed?: boolean
+  has_active_loan?: boolean
   total_copies?: number
   available_copies?: number
   reading_status?: 'want_to_read' | 'reading' | 'rereading' | 'read' | null
+  is_favorite?: boolean
 }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
 type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code?: string; book_id?: number; book_title?: string; borrower_username?: string }
@@ -707,8 +710,12 @@ export function BookDetailPage() {
                 <Badge tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)} className={`${responsiveStatusBadgeClasses} ${isGuest ? '' : 'cursor-pointer'}`} role={isGuest ? undefined : 'button'} tabIndex={isGuest ? undefined : 0} onClick={() => { if (!isGuest) openCatalogQuery(`/acervo?state=${book.derived_state}`) }} onKeyDown={(e) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCatalogQuery(`/acervo?state=${book.derived_state}`) } }} title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por ${bookStateLabel(book.derived_state)}`}>
                   {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
                 </Badge>
+                {user?.role === 'student' && <span className="ml-auto flex items-start gap-2">
+                  {book.has_been_borrowed && <BookFavoriteControl bookId={book.id} active={book.is_favorite} />}
+                  {!book.has_active_loan && <ReadingWantToReadControl bookId={book.id} active={book.reading_status === 'want_to_read'} />}
+                </span>}
               </div>
-              {user?.role === 'student' && <div className="pt-2"><ReadingStatusControl bookId={book.id} status={book.reading_status} /></div>}
+              {user?.role === 'student' && book.has_been_borrowed && <div className="pt-2"><ReadingStatusControl bookId={book.id} status={book.reading_status} /></div>}
               <p className={`text-sm leading-relaxed mt-3 ${isDark ? 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]' : 'text-slate-600'}`}>
                 {book.description || 'Sem descrição disponível.'}
               </p>
