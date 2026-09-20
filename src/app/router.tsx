@@ -3,7 +3,7 @@ import { Layout } from '@/components/layout/Layout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
 import { HomePage, DiscoveryHome } from '@/features/home/HomePage'
-import { AccountOnly, Protected, PublicOnly, RedirectBookCopies } from './RouteGuards'
+import { AccountOnly, Protected, PublicOnly, RedirectBookCopies, UserManagementOnly } from './RouteGuards'
 import {
   AccountManagementPage,
   AccountPage,
@@ -128,9 +128,9 @@ export const router = createBrowserRouter([
       {
         path: '/usuarios',
         element: (
-          <AccountOnly>
+          <UserManagementOnly>
             <LazyRoute><UsersPage /></LazyRoute>
-          </AccountOnly>
+          </UserManagementOnly>
         ),
       },
       {

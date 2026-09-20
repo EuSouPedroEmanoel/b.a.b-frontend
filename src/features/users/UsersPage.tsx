@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Users, Pencil, Plus, AlertTriangle, MonitorCog, RefreshCw } from 'lucide-react'
 import api from '@/lib/api'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
-import { getErrorMessage } from '@/lib/errors'
+import { getErrorFieldMessages, getErrorMessage } from '@/lib/errors'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -99,7 +99,8 @@ function validateBirthdate(value: string): { ok: boolean; message?: string } {
   const dt = parseDate(value)
   if (!dt) return { ok: false, message: 'Data de nascimento inválida' }
   const now = new Date()
-  if (dt > now) return { ok: false, message: 'Nascimento deve ser uma data no passado' }
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (dt >= today) return { ok: false, message: 'Nascimento deve ser uma data no passado' }
   let age = now.getFullYear() - dt.getFullYear()
   const m = now.getMonth() - dt.getMonth()
   if (m < 0 || (m === 0 && now.getDate() < dt.getDate())) age--
@@ -115,6 +116,7 @@ type CreateForm = {
   birthdate: string
   turmaNumero: string
   turmaLetra: string
+  schoolId: string
 }
 
 const emptyCreate: CreateForm = {
@@ -125,6 +127,7 @@ const emptyCreate: CreateForm = {
   birthdate: '',
   turmaNumero: '',
   turmaLetra: '',
+  schoolId: '',
 }
 
 export function UsersPage() {
@@ -136,6 +139,7 @@ export function UsersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate)
   const [createError, setCreateError] = useState('')
+  const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({})
   const [createdInvitation, setCreatedInvitation] = useState<CreatedUserInvitation | null>(null)
   const [editing, setEditing] = useState<AppUser | null>(null)
   const [editForm, setEditForm] = useState({ name: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
@@ -159,19 +163,11 @@ export function UsersPage() {
     },
     enabled: isSuperAdmin,
   })
-  const schoolOptions: AutocompleteOption<School>[] = (schoolsData?.items ?? []).map((school) => ({
+  const schoolOptions: AutocompleteOption<School>[] = (schoolsData?.items ?? []).filter((school) => school.is_active).map((school) => ({
     value: String(school.id),
     label: school.name,
     data: school,
   }))
-  const createSchoolLabel = useMemo(() => {
-    if (!isSuperAdmin) return ''
-    const selected = schoolFilter
-      ? schoolsData?.items.find((school) => school.id === Number(schoolFilter))
-      : schoolsData?.items[0]
-    return selected ? schoolLabel(selected.name, selected.code) : ''
-  }, [isSuperAdmin, schoolFilter, schoolsData])
-
   const queryKey = ['users', role, schoolFilter, page]
   const { data, isLoading, isError, error } = useQuery({
     queryKey,
@@ -187,6 +183,10 @@ export function UsersPage() {
   const create = useMutation({
     mutationFn: async () => {
       const f = createForm
+      if (isSuperAdmin && !f.schoolId) {
+        throw new Error('Selecione a escola do novo usuário.')
+      }
+      const schoolId = isSuperAdmin ? Number(f.schoolId) : undefined
       if (f.type === 'student') {
         const { data } = await api.post<AppUser & CreatedUserInvitation>('/users/', {
           name: f.name.trim(),
@@ -195,11 +195,11 @@ export function UsersPage() {
           turma_numero: Number(f.turmaNumero),
           turma_letra: f.turmaLetra,
           role: 'student',
+          ...(schoolId ? { school_id: schoolId } : {}),
         })
         return data
       }
       if (f.type === 'school_admin' && isSuperAdmin) {
-        const schoolId = schoolFilter || (schoolsData?.items[0]?.id ?? 0)
         const { data } = await api.post<AppUser & CreatedUserInvitation>(`/schools/${schoolId}/admins`, {
           username: f.username.trim(),
           name: f.name.trim(),
@@ -212,7 +212,7 @@ export function UsersPage() {
         name: f.name.trim(),
         cpf: f.cpf,
         role: f.type,
-        ...(isSuperAdmin && schoolFilter ? { school_id: Number(schoolFilter) } : {}),
+        ...(schoolId ? { school_id: schoolId } : {}),
       })
       return data
     },
@@ -221,12 +221,15 @@ export function UsersPage() {
       setShowCreate(false)
       setCreateForm(emptyCreate)
       setCreateError('')
+      setCreateFieldErrors({})
       setCreatedInvitation(createdUser)
       qc.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (err: unknown) => {
-      setCreateError(getErrorMessage(err, 'Erro ao criar usuário'))
-      announce(getErrorMessage(err, 'Erro ao criar usuário'), 'assertive')
+      const message = getErrorMessage(err, 'Erro ao criar usuário')
+      setCreateError(message)
+      setCreateFieldErrors(getErrorFieldMessages(err))
+      announce(message, 'assertive')
     },
   })
 
@@ -284,32 +287,29 @@ export function UsersPage() {
   const submitCreate = (e: React.FormEvent) => {
     e.preventDefault()
     setCreateError('')
+    setCreateFieldErrors({})
     const f = createForm
+    const fail = (field: string, message: string) => {
+      setCreateError(message)
+      setCreateFieldErrors({ [field]: message })
+      announce(message, 'assertive')
+      window.requestAnimationFrame(() => document.getElementById(`create-${field}`)?.focus())
+    }
+    if (isSuperAdmin && !f.schoolId) {
+      fail('school', 'Selecione a escola do novo usuário')
+      return
+    }
     if (f.type === 'student') {
-      if (!f.name.trim() || !f.turmaNumero || !f.turmaLetra.trim()) {
-        setCreateError('Preencha nome e turma (número e letra)')
-        announce('Preencha nome e turma (número e letra)', 'assertive')
-        return
-      }
-      if (!validateCpfDigits(f.cpf)) {
-        setCreateError('Informe um CPF válido')
-        announce('Informe um CPF válido', 'assertive')
-        return
-      }
+      if (!f.name.trim()) return fail('name', 'Informe o nome completo')
+      if (!validateCpfDigits(f.cpf)) return fail('cpf', 'Informe um CPF válido')
       const bd = validateBirthdate(f.birthdate)
-      if (!bd.ok) {
-        setCreateError(bd.message ?? 'Data de nascimento inválida')
-        announce(bd.message ?? 'Data de nascimento inválida', 'assertive')
-        return
-      }
-    } else if (!f.username.trim() || !f.name.trim()) {
-      setCreateError('Preencha usuário e nome')
-      announce('Preencha usuário e nome', 'assertive')
-      return
-    } else if (!validateCpfDigits(f.cpf)) {
-      setCreateError('Informe um CPF válido')
-      announce('Informe um CPF válido', 'assertive')
-      return
+      if (!bd.ok) return fail('birthdate', bd.message ?? 'Data de nascimento inválida')
+      if (!f.turmaNumero) return fail('turmaNumero', 'Informe o número da turma')
+      if (!f.turmaLetra.trim()) return fail('turmaLetra', 'Informe a letra da turma')
+    } else {
+      if (!f.username.trim()) return fail('username', 'Informe o nome de usuário')
+      if (!f.name.trim()) return fail('name', 'Informe o nome completo')
+      if (!validateCpfDigits(f.cpf)) return fail('cpf', 'Informe um CPF válido')
     }
     create.mutate()
   }
@@ -334,12 +334,10 @@ export function UsersPage() {
   }
 
   const availableCreateTypes = useMemo(() => {
-    if (isSuperAdmin) {
-      return ROLE_OPTIONS.filter((o) => o.value === 'school_admin')
-    }
-    return ROLE_OPTIONS.filter(
-      (o) => o.value === '' || (o.value !== 'super_admin' && (o.value !== 'school_admin' || isSuperAdmin)),
-    )
+    const allowed = isSuperAdmin
+      ? ['student', 'librarian', 'teacher', 'school_admin']
+      : ['student', 'librarian', 'teacher']
+    return ROLE_OPTIONS.filter((o) => allowed.includes(o.value))
   }, [isSuperAdmin])
 
   const filterRoleOptions = useMemo(() => {
@@ -457,8 +455,8 @@ export function UsersPage() {
               : 'Usuários da sua escola — filtre por tipo.'}
           </PageDescription>
         </div>
-        <Button onClick={() => { setCreateError(''); setCreateForm(isSuperAdmin ? { ...emptyCreate, type: 'school_admin' } : emptyCreate); setShowCreate(true) }}>
-          <Plus className="h-4 w-4 mr-2" aria-hidden="true" /> {isSuperAdmin ? 'Criar admin da escola' : 'Criar usuário'}
+        <Button onClick={() => { setCreateError(''); setCreateFieldErrors({}); setCreateForm({ ...emptyCreate, type: isSuperAdmin ? 'school_admin' : 'student' }); setShowCreate(true) }}>
+          <Plus className="h-4 w-4 mr-2" aria-hidden="true" /> Criar usuário
         </Button>
       </header>
 
@@ -638,10 +636,10 @@ export function UsersPage() {
       )}
 
       {showCreate && (
-        <ModalDialog variant="form" title="Criar usuário" onClose={() => { setCreateError(''); setShowCreate(false) }}>
+        <ModalDialog variant="form" title="Criar usuário" onClose={() => { setCreateError(''); setCreateFieldErrors({}); setShowCreate(false) }}>
           <form onSubmit={submitCreate} className="grid gap-4">
             {createError && (
-              <p role="alert" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-200">
+              <p id="create-error" role="alert" aria-live="assertive" className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-800 dark:text-red-200">
                 {createError}
               </p>
             )}
@@ -649,33 +647,46 @@ export function UsersPage() {
               label="Tipo de usuário"
               id="create-type"
               value={createForm.type}
-              onChange={(v) => setCreateForm((f) => ({ ...f, type: v }))}
+              onChange={(v) => { setCreateFieldErrors({}); setCreateError(''); setCreateForm((f) => ({ ...f, type: v })) }}
               options={availableCreateTypes.filter((o) => o.value !== '').map((o) => ({ value: o.value, label: o.label }))}
             />
 
+            {isSuperAdmin && (
+              <div>
+                <Select
+                  label="Escola"
+                  id="create-school"
+                  value={createForm.schoolId}
+                  onChange={(value) => setCreateForm((f) => ({ ...f, schoolId: value }))}
+                  options={schoolOptions.map((option) => ({ value: option.value, label: schoolLabel(option.data.name, option.data.code) }))}
+                  placeholder="Selecione uma escola"
+                  disabled={!schoolOptions.length}
+                />
+                {createFieldErrors.school && <p role="alert" className="mt-1 text-sm text-red-700 dark:text-red-300">{createFieldErrors.school}</p>}
+                {!schoolOptions.length && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Nenhuma escola ativa disponível.</p>}
+              </div>
+            )}
+
             {createForm.type === 'student' ? (
               <>
-                <Input label="Nome completo" value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" />
-                <Input label="CPF" value={formatCpfInput(createForm.cpf)} onChange={(e) => setCreateForm((f) => ({ ...f, cpf: onlyDigits(e.target.value) }))} placeholder="000.000.000-00" required inputMode="numeric" autoComplete="off" />
-                <Input label="Nascimento" type="date" value={createForm.birthdate} onChange={(e) => setCreateForm((f) => ({ ...f, birthdate: e.target.value }))} required autoComplete="off" hint="A senha será criada pelo aluno no primeiro acesso." />
+                <Input id="create-name" label="Nome completo" value={createForm.name} error={createFieldErrors.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" maxLength={120} />
+                <Input id="create-cpf" label="CPF" value={formatCpfInput(createForm.cpf)} error={createFieldErrors.cpf} onChange={(e) => setCreateForm((f) => ({ ...f, cpf: onlyDigits(e.target.value) }))} placeholder="000.000.000-00" required inputMode="numeric" autoComplete="off" />
+                <Input id="create-birthdate" label="Nascimento" type="date" value={createForm.birthdate} error={createFieldErrors.birthdate} onChange={(e) => setCreateForm((f) => ({ ...f, birthdate: e.target.value }))} required autoComplete="off" hint="A senha será criada pelo aluno no primeiro acesso." />
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
-                  <div className="min-w-0"><Input label="Turma — número" value={createForm.turmaNumero} onChange={(e) => setCreateForm((f) => ({ ...f, turmaNumero: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) }))} placeholder="ex: 7" required inputMode="numeric" autoComplete="off" /></div>
-                  <div className="min-w-0"><Input label="Turma — letra" value={createForm.turmaLetra} onChange={(e) => setCreateForm((f) => ({ ...f, turmaLetra: e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) }))} placeholder="ex: A" required maxLength={1} autoComplete="off" /></div>
+                  <div className="min-w-0"><Input id="create-turmaNumero" label="Turma — número" value={createForm.turmaNumero} error={createFieldErrors.turmaNumero} onChange={(e) => setCreateForm((f) => ({ ...f, turmaNumero: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) }))} placeholder="ex: 7" required inputMode="numeric" autoComplete="off" /></div>
+                  <div className="min-w-0"><Input id="create-turmaLetra" label="Turma — letra" value={createForm.turmaLetra} error={createFieldErrors.turmaLetra} onChange={(e) => setCreateForm((f) => ({ ...f, turmaLetra: e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1) }))} placeholder="ex: A" required maxLength={1} autoComplete="off" /></div>
                 </div>
               </>
             ) : (
               <>
-                <Input label="Nome de usuário" value={createForm.username} onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))} required autoComplete="off" />
-                <Input label="Nome completo" value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" />
-                <Input label="CPF" value={formatCpfInput(createForm.cpf)} onChange={(e) => setCreateForm((f) => ({ ...f, cpf: onlyDigits(e.target.value) }))} placeholder="000.000.000-00" required inputMode="numeric" autoComplete="off" />
-                {isSuperAdmin && createForm.type === 'school_admin' && (
-                  <Input label="Escola" value={createSchoolLabel} disabled autoComplete="off" />
-                )}
+                <Input id="create-username" label="Nome de usuário" value={createForm.username} error={createFieldErrors.username} onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))} required autoComplete="off" maxLength={120} />
+                <Input id="create-name" label="Nome completo" value={createForm.name} error={createFieldErrors.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} required autoComplete="off" maxLength={120} />
+                <Input id="create-cpf" label="CPF" value={formatCpfInput(createForm.cpf)} error={createFieldErrors.cpf} onChange={(e) => setCreateForm((f) => ({ ...f, cpf: onlyDigits(e.target.value) }))} placeholder="000.000.000-00" required inputMode="numeric" autoComplete="off" />
               </>
             )}
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <Button type="button" variant="danger-secondary" className="min-w-max flex-1" onClick={() => { setCreateError(''); setShowCreate(false) }}>
+              <Button type="button" variant="danger-secondary" className="min-w-max flex-1" onClick={() => { setCreateError(''); setCreateFieldErrors({}); setShowCreate(false) }}>
                 Cancelar
               </Button>
               <Button type="submit" variant="blue-secondary" className="min-w-max flex-1" disabled={create.isPending} aria-busy={create.isPending}>

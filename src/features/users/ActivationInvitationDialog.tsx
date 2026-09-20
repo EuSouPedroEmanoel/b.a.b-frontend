@@ -8,6 +8,7 @@ import { ModalDialog } from '@/components/ui/ModalDialog'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import api from '@/lib/api'
+import { getErrorMessage } from '@/lib/errors'
 
 export type ActivationInvitation = {
   code: string
@@ -77,6 +78,8 @@ export function ActivationInvitationDialog({ created, onClose }: { created: Crea
       const printWindow = window.open(url, '_blank', 'noopener,noreferrer')
       if (!printWindow) announce('Permita a abertura da janela para imprimir o convite.', 'assertive')
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (error: unknown) {
+      announce(getErrorMessage(error, 'Não foi possível preparar o convite para impressão.'), 'assertive')
     } finally {
       setPrinting(false)
     }
@@ -171,6 +174,8 @@ export function ActivationActions({ user, onUpdated }: { user: { id: number; nam
       setCreated({ ...user, activation_invitation: data })
       announce('Novo convite criado. O código anterior foi revogado.', 'polite')
       onUpdated()
+    } catch (error: unknown) {
+      announce(getErrorMessage(error, 'Não foi possível gerar um novo convite.'), 'assertive')
     } finally {
       setPending(false)
     }
