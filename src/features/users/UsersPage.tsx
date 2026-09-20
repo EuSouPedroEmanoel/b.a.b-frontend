@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Pencil, Plus, AlertTriangle, MonitorCog } from 'lucide-react'
+import { Users, Pencil, Plus, AlertTriangle, MonitorCog, RefreshCw } from 'lucide-react'
 import api from '@/lib/api'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { getErrorMessage } from '@/lib/errors'
@@ -17,6 +17,7 @@ import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ModalDialog } from '@/components/ui/ModalDialog'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { Pagination } from '@/components/ui/Pagination'
+import { UndoSnackbar } from '@/components/feedback/UndoSnackbar'
 import { ActivationActions, ActivationInvitationDialog, ResetPasswordAction, type CreatedUserInvitation } from './ActivationInvitationDialog'
 
 type AppUser = {
@@ -138,6 +139,11 @@ export function UsersPage() {
   const [createdInvitation, setCreatedInvitation] = useState<CreatedUserInvitation | null>(null)
   const [editing, setEditing] = useState<AppUser | null>(null)
   const [editForm, setEditForm] = useState({ name: '', birthdate: '', turmaNumero: '', turmaLetra: '', password: '', manageLibraryCalendar: false, manageCirculationRules: false })
+  const [changingSituation, setChangingSituation] = useState<AppUser | null>(null)
+  const [situationJustification, setSituationJustification] = useState('')
+  const [situationError, setSituationError] = useState('')
+  const [confirmSituation, setConfirmSituation] = useState<AppUser | null>(null)
+  const [undoSituation, setUndoSituation] = useState<AppUser | null>(null)
 
   const { user: currentUser } = useAuth()
 
@@ -251,6 +257,28 @@ export function UsersPage() {
     onError: (err: unknown) => {
       announce(getErrorMessage(err, 'Erro ao atualizar usuário'), 'assertive')
     },
+  })
+
+  const situation = useMutation({
+    mutationFn: async ({ target, active, justification }: { target: AppUser; active: boolean; justification?: string }) => (await api.post<AppUser>(`/users/${target.id}/situation`, { is_active: active, justification })).data,
+    onSuccess: (_, variables) => {
+      setChangingSituation(null)
+      setConfirmSituation(null)
+      setUndoSituation(variables.target)
+      setSituationError('')
+      qc.invalidateQueries({ queryKey: ['users'] })
+      announce(variables.active ? 'Usuário reativado.' : 'Usuário desativado.', 'polite')
+    },
+    onError: (error) => {
+      const message = getErrorMessage(error, 'Não foi possível alterar a situação do usuário.')
+      setSituationError(message)
+      announce(message, 'assertive')
+    },
+  })
+  const undoSituationMutation = useMutation({
+    mutationFn: async (target: AppUser) => (await api.post<AppUser>(`/users/${target.id}/situation/undo`)).data,
+    onSuccess: () => { setUndoSituation(null); qc.invalidateQueries({ queryKey: ['users'] }); announce('Situação anterior do usuário restaurada.', 'polite') },
+    onError: (error) => announce(getErrorMessage(error, 'Não foi possível desfazer a alteração.'), 'assertive'),
   })
 
   const submitCreate = (e: React.FormEvent) => {
@@ -583,6 +611,10 @@ export function UsersPage() {
                                     <Tooltip id={`configure-user-tooltip-${u.id}`}>Configurar usuário</Tooltip>
                                   </Button>
                                   <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
+                                  <Button size="sm" variant="secondary" className="!px-3 @max-lg:!px-2.5" onClick={() => { if (u.is_active) { setChangingSituation(u); setSituationJustification(''); setSituationError('') } else setConfirmSituation(u) }} disabled={readOnly || currentUser?.id === u.id} aria-label={u.is_active ? `Alterar situação de ${u.name || u.username}` : `Reativar usuário ${u.name || u.username}`}>
+                                    <RefreshCw className="hidden h-4 w-4 @max-lg:block" aria-hidden="true" />
+                                    <span className="@max-lg:hidden">{u.is_active ? 'Alterar situação' : 'Reativar usuário'}</span>
+                                  </Button>
                                 </div>
                               </td>
                             </tr>
@@ -726,6 +758,9 @@ export function UsersPage() {
           </form>
         </ModalDialog>
       )}
+      {changingSituation && <ModalDialog variant="form" title={`Alterar situação — ${changingSituation.name || changingSituation.username}`} onClose={() => setChangingSituation(null)} describedBy="user-situation-description"><div id="user-situation-description" className="grid gap-4"><p className="text-sm text-slate-600 dark:text-slate-300">Situação atual: Ativo.</p><Select label="Nova situação" value="inactive" onChange={() => undefined} options={[{ value: 'inactive', label: 'Desativar usuário' }]} /><div><label htmlFor="user-situation-justification" className="text-sm font-medium text-slate-700 dark:text-slate-200">Justificativa</label><textarea id="user-situation-justification" value={situationJustification} onChange={(event) => setSituationJustification(event.target.value)} required className="mt-1.5 min-h-28 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-field)] px-3 py-2 text-sm focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]" /></div>{situationError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{situationError}</p>}<div className="flex flex-wrap gap-3"><Button type="button" variant="blue-secondary" className="min-w-max flex-1" onClick={() => setChangingSituation(null)}>Cancelar</Button><Button type="button" variant="danger-secondary" className="min-w-max flex-1" onClick={() => { if (!situationJustification.trim()) { setSituationError('Informe uma justificativa.'); return } setConfirmSituation(changingSituation) }}>Confirmar</Button></div></div></ModalDialog>}
+      {confirmSituation && <ModalDialog title={confirmSituation.is_active ? 'Confirmar desativação?' : 'Confirmar reativação?'} onClose={() => !situation.isPending && setConfirmSituation(null)} describedBy="user-situation-confirmation"><div id="user-situation-confirmation" className="space-y-3 text-sm text-slate-600 dark:text-slate-300"><p><strong>{confirmSituation.name || confirmSituation.username}</strong></p><p>{confirmSituation.is_active ? 'O usuário será desativado. Seu histórico será preservado e ele não poderá utilizar normalmente o sistema; a situação poderá ser revertida posteriormente.' : 'O mesmo usuário será reativado, preservando seu identificador e histórico.'}</p></div><div className="mt-6 flex flex-wrap gap-3"><Button type="button" variant="blue-secondary" className="min-w-max flex-1" onClick={() => setConfirmSituation(null)} disabled={situation.isPending}>Cancelar</Button><Button type="button" variant="danger-secondary" className="min-w-max flex-1" onClick={() => situation.mutate({ target: confirmSituation, active: !confirmSituation.is_active, justification: confirmSituation.is_active ? situationJustification.trim() : undefined })} disabled={situation.isPending} aria-busy={situation.isPending}>{situation.isPending ? 'Confirmando…' : confirmSituation.is_active ? 'Confirmar desativação' : 'Confirmar reativação'}</Button></div></ModalDialog>}
+      {undoSituation && <UndoSnackbar message={undoSituation.is_active ? 'Usuário desativado.' : 'Usuário reativado.'} onUndo={() => undoSituationMutation.mutate(undoSituation)} onClose={() => setUndoSituation(null)} />}
     </div>
   )
 }
