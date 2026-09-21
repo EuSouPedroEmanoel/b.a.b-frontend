@@ -100,7 +100,7 @@ describe('GridCard title identification', () => {
 
     const description = screen.getByText(longDescription, { selector: 'p' })
     expect(description).toHaveClass('line-clamp-3')
-    expect(description.parentElement?.querySelector('[role="tooltip"]')).toHaveTextContent(longDescription)
+    expect(screen.getAllByRole('tooltip', { hidden: true }).find((tooltip) => tooltip.textContent === longDescription)).toBeTruthy()
     expect(description.parentElement?.parentElement).not.toHaveClass('overflow-y-auto')
     expect(description.closest('a')).not.toHaveClass('overflow-y-auto')
   })

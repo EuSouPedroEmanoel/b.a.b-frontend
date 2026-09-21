@@ -190,8 +190,8 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
           : {}
         if (isDark) {
           return (
-            <span key={it.id} title={clickable ? undefined : it.name} {...clickableProps} className={`group/category relative shrink min-w-0 whitespace-nowrap rounded-full bg-white/15 px-3 py-0.5 text-xs font-medium text-white backdrop-blur-sm border border-white/10 max-w-[14ch] truncate overflow-visible transition-colors duration-200 hover:brightness-110 hover:bg-white/20 ${clickable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-white' : ''}`}>
-              {it.name}{clickable && <Tooltip variant="category">{it.name}</Tooltip>}
+            <span key={it.id} {...clickableProps} className={`group/category relative shrink min-w-0 whitespace-nowrap rounded-full bg-white/15 px-3 py-0.5 text-xs font-medium text-white backdrop-blur-sm border border-white/10 max-w-[14ch] truncate overflow-visible transition-colors duration-200 hover:brightness-110 hover:bg-white/20 ${clickable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-white' : ''}`}>
+              {it.name}<Tooltip variant="category">Buscar por gênero: {it.name}</Tooltip>
             </span>
           )
         }

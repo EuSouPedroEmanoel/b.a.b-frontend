@@ -33,7 +33,7 @@ function yearFromDate(dateStr: string | null): string | null {
   return String(d.getFullYear())
 }
 
-const previewStatusBadgeClasses = 'inline-flex max-w-full min-w-0 items-center justify-center rounded-full bg-white px-2 py-0.5 text-center text-xs font-bold leading-snug text-slate-900 shadow-sm whitespace-nowrap'
+const previewStatusBadgeClasses = 'inline-flex max-w-full min-w-0 items-center justify-center rounded-full bg-white px-2 py-0.5 text-center text-xs font-bold leading-snug !text-slate-900 shadow-sm whitespace-nowrap'
 
 const previewStatusLabels: Record<string, { full: string; compact: string; minimal: string }> = {
   available: { full: 'Disponível', compact: 'Livre', minimal: 'Disp.' },
@@ -256,7 +256,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
               <span className="truncate text-xs font-medium leading-snug text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
             </div>
             <div className="flex min-w-0 flex-wrap gap-1">
-              <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /></span>
+              <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /><Tooltip variant="category">{isGuest ? stateLabel : `Buscar por estado: ${stateLabel}`}</Tooltip></span>
             </div>
           </div>
         </div>
@@ -351,7 +351,7 @@ function GridCardContent({ book, index = 0, disableHover = false, portalHover = 
                 <span className="truncate text-xs font-medium leading-snug text-white/70">{year ? `Ano ${year}` : 'Ano —'}</span>
               </div>
               <div className="flex min-w-0 flex-wrap gap-1">
-                <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /></span>
+                <span data-preview-status-badge className={previewStatusBadgeClasses}><PreviewStatusLabel state={book.derived_state} label={stateLabel} isGuest={isGuest} /><Tooltip variant="category">{isGuest ? stateLabel : `Buscar por estado: ${stateLabel}`}</Tooltip></span>
               </div>
             </div>
           </div>

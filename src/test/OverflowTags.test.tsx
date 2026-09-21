@@ -4,9 +4,9 @@ import { OverflowTags } from '@/components/ui/OverflowTags'
 
 describe('OverflowTags mobile overflow', () => {
   it('renders the hidden genre names in the +1 tooltip trigger', () => {
-    const { container } = render(<OverflowTags items={[{ id: 1, name: 'Fantasia' }, { id: 2, name: 'Ficção científica' }]} maxVisibleFallback={1} maxVisible={1} hiddenLabel="gêneros adicionais" />)
+    render(<OverflowTags items={[{ id: 1, name: 'Fantasia' }, { id: 2, name: 'Ficção científica' }]} maxVisibleFallback={1} maxVisible={1} hiddenLabel="gêneros adicionais" />)
     const trigger = screen.getByRole('button', { name: 'Mostrar 1 gêneros adicionais' })
-    const tooltip = container.querySelector('[role="tooltip"]')
+    const tooltip = screen.getByRole('tooltip', { hidden: true })
 
     expect(trigger).toBeInTheDocument()
     expect(tooltip).toHaveTextContent('Ficção científica')
