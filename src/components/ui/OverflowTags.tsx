@@ -161,7 +161,7 @@ export function OverflowTags({ items, tone = 'neutral', variant = 'light', maxVi
   const measurementMaxWidthClass = isDark ? 'max-w-[14ch]' : itemMaxWidthClass
   return (
     <div ref={containerRef} className={`relative flex w-full flex-nowrap gap-1 items-center overflow-visible min-w-0 ${className}`}>
-      <div ref={measurementRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 flex h-0 w-0 invisible flex-nowrap gap-1 overflow-clip whitespace-nowrap">
+      <div ref={measurementRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 flex h-0 w-0 invisible flex-nowrap gap-1 overflow-hidden whitespace-nowrap">
         {items.map((item) => <span key={item.id} data-overflow-tag-measure={item.name} className={`shrink-0 rounded-full px-3 py-0.5 text-xs font-medium whitespace-nowrap border after:content-[attr(data-overflow-tag-measure)] ${measurementMaxWidthClass}`} />)}
         {Array.from({ length: Math.max(0, items.length - 1) }, (_, index) => {
           const hiddenCount = index + 1

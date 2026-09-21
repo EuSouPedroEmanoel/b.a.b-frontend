@@ -1,4 +1,5 @@
-import { Outlet } from 'react-router-dom'
+import { useLayoutEffect } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Header } from './Header'
 import { SkipLink } from './SkipLink'
 import { AccessibilityMenu } from '../accessibility/AccessibilityMenu'
@@ -6,6 +7,13 @@ import { NavigationFocusIntentProvider } from '../navigation/NavigationFocusInte
 import { ResponsiveLayoutProvider } from './ResponsiveLayoutProvider'
 
 export function Layout() {
+  const { pathname, search, hash } = useLocation()
+
+  useLayoutEffect(() => {
+    if (hash) return
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior })
+  }, [hash, pathname, search])
+
   return (
     <ResponsiveLayoutProvider>
       <NavigationFocusIntentProvider>
@@ -13,7 +21,7 @@ export function Layout() {
         <AccessibilityMenu />
         <div className="min-h-dvh flex flex-col">
           <Header />
-          <main id="main-content" tabIndex={-1} className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             <Outlet />
           </main>
           <footer className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">

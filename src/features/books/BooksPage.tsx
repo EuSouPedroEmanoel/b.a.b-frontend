@@ -629,7 +629,7 @@ export function BooksPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 overflow-x-clip">
+    <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl sm:text-3xl font-bold">Acervo</h1>
@@ -741,7 +741,7 @@ export function BooksPage() {
                   Buscar
                 </Button>
               </div>
-            <div className="order-[2] mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] ml-auto flex shrink-0 flex-wrap items-stretch gap-2 px-5">
+            <div className="order-[2] mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] flex w-full basis-full shrink-0 flex-wrap items-stretch justify-end gap-2 px-0 sm:ml-auto sm:w-auto sm:basis-auto sm:px-5">
               <div ref={filterWrapperRef} className="relative shrink-0 self-stretch">
                 <Button
                   ref={filterTriggerRef}

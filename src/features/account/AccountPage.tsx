@@ -75,8 +75,8 @@ function ReadingSection() {
           <h2 id="my-reading-heading" className="text-xl font-semibold">Minhas leituras</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Acompanhe suas obras e consulte todas as leituras registradas.</p>
         </div>
-        {section === 'tracking' && <div className="flex items-end gap-2">
-          <div className="w-48 shrink-0">
+        {section === 'tracking' && <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+          <div className="w-44 max-w-full shrink-0 sm:w-48">
           <Select label="Acompanhamento" id="reading-status-filter" value={status ?? 'all'} onChange={(value) => { setStatus(value === 'all' ? null : value as ReadingStatus); setPage(1) }} options={[{ value: 'all', label: 'Todos' }, ...readingStatusOptions]} />
           </div>
           <ReadingFiltersButton open={allFilterOpen} onToggle={() => setAllFilterOpen((open) => !open)} active={allFiltersActive} genreFilter={genreFilter} genreOptions={genreOptions ?? []} setGenreFilter={(value) => { setGenreFilter(value); setPage(1) }} activeFilter={activeFilter} setActiveFilter={(value) => { setActiveFilter(value); setPage(1) }} sortBy={sortBy} setSortBy={(value) => { setSortBy(value); setPage(1) }} sortOrder={sortOrder} setSortOrder={(value) => { setSortOrder(value); setPage(1) }} />
@@ -121,19 +121,30 @@ function ReadingFiltersButton({ open, onToggle, active, genreFilter, genreOption
   setSortOrder: (value: ReadingSortOrder) => void
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
     const handleOutsidePointer = (event: PointerEvent) => {
       if (!wrapperRef.current?.contains(event.target as Node)) onToggle()
     }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onToggle()
+      requestAnimationFrame(() => triggerRef.current?.focus())
+    }
     document.addEventListener('pointerdown', handleOutsidePointer)
-    return () => document.removeEventListener('pointerdown', handleOutsidePointer)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointer)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [onToggle, open])
 
   return <div ref={wrapperRef} className="relative shrink-0">
     <div className="flex items-stretch gap-2">
-      <Button type="button" variant={active ? 'primary' : 'secondary'} className="gap-2" aria-haspopup="dialog" aria-expanded={open} aria-controls="reading-filters" onClick={onToggle}>
+      <Button ref={triggerRef} type="button" variant={active ? 'primary' : 'secondary'} className="gap-2" aria-haspopup="dialog" aria-expanded={open} aria-controls="reading-filters" onClick={onToggle}>
         <Funnel aria-hidden="true" className="h-4 w-4" /> Filtros
         {active && <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600" aria-hidden="true">1</span>}
       </Button>

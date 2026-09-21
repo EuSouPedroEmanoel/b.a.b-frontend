@@ -130,7 +130,7 @@ export function BookCopiesPage() {
               {copyError}
             </div>
           )}
-          <form onSubmit={onSubmit} className="flex flex-col sm:flex-row gap-3 items-end">
+          <form onSubmit={onSubmit} className="flex flex-col items-start gap-3 sm:flex-row">
             <div className="flex-1 w-full">
               <Input
                 label="Código do exemplar"
@@ -145,7 +145,7 @@ export function BookCopiesPage() {
               />
               <p className="text-xs text-slate-500 mt-1">O leitor envia Enter automaticamente.</p>
             </div>
-            <Button type="submit" disabled={createCopy.isPending} aria-busy={createCopy.isPending} className="w-full sm:w-auto">
+            <Button type="submit" disabled={createCopy.isPending} aria-busy={createCopy.isPending} className="w-full sm:mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)] sm:w-auto">
               <Plus className="h-4 w-4 mr-2" aria-hidden="true" /> Adicionar
             </Button>
           </form>

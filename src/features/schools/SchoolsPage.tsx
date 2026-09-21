@@ -65,11 +65,11 @@ export function SchoolsPage() {
               }
               mut.mutate()
             }}
-            className="grid gap-4 sm:grid-cols-3 items-end"
+            className="grid items-start gap-4 sm:grid-cols-3"
           >
             <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
             <Input label="Código" value={code} onChange={(e) => setCode(e.target.value)} required minLength={2} placeholder="ex: ginasio-sp" />
-            <Button type="submit" disabled={mut.isPending}>
+            <Button type="submit" disabled={mut.isPending} className="sm:mt-[calc(var(--text-sm)*var(--text-sm--line-height)+0.375rem)]">
               {mut.isPending ? 'Criando…' : 'Criar escola'}
             </Button>
           </form>
@@ -78,7 +78,7 @@ export function SchoolsPage() {
 
       {data && (
         <>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 md:block">
             <table className="w-full text-sm">
               <caption className="sr-only">Escolas cadastradas</caption>
               <thead className="bg-slate-50 dark:bg-slate-700/50">
@@ -120,6 +120,30 @@ export function SchoolsPage() {
               </tbody>
             </table>
           </div>
+          <ul className="grid gap-3 md:hidden" aria-label="Escolas cadastradas">
+            {data.items.map((s) => (
+              <li key={s.id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="break-words font-semibold">{s.name}</h2>
+                    <p className="mt-1 break-all font-mono text-xs text-slate-600 dark:text-slate-300">{s.code}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-slate-300 px-2 py-1 text-xs font-medium dark:border-slate-600">
+                    {s.is_active ? 'Ativa' : 'Inativa'}
+                  </span>
+                </div>
+                <dl className="mt-3 grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+                  <div className="flex gap-2"><dt className="font-medium">ID:</dt><dd>#{s.id}</dd></div>
+                </dl>
+                <Link
+                  to={`/gerenciar-escola?tab=rules&school=${s.id}`}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-300 px-3 py-2 text-center text-sm font-medium text-[#0f4c75] underline-offset-2 hover:bg-slate-50 hover:underline focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2 dark:border-slate-600 dark:text-sky-300 dark:hover:bg-slate-700"
+                >
+                  Regras de circulação
+                </Link>
+              </li>
+            ))}
+          </ul>
           <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
         </>
       )}

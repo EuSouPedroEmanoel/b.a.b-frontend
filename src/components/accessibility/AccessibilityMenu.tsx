@@ -58,6 +58,13 @@ function clampLeft(left: number, width = BUTTON_SIZE) {
   return Math.min(Math.max(left, minimumLeft), maximumLeft)
 }
 
+function isDefaultPosition(top: number) {
+  if (top === 0.5) return true
+  if (top <= 1) return false
+  const defaultTop = (window.innerHeight - BUTTON_SIZE) * 0.5
+  return Math.abs(top - defaultTop) <= BUTTON_SIZE
+}
+
 export function AccessibilityMenu() {
   const { user } = useAuth()
   const preferenceKey = user?.id ? `${STORAGE_KEY}:user:${user.id}` : `${STORAGE_KEY}:guest`
@@ -71,6 +78,8 @@ export function AccessibilityMenu() {
   const [open, setOpen] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [snapping, setSnapping] = useState(false)
+  const [narrowViewport, setNarrowViewport] = useState(() => window.innerWidth <= 480)
+  const [customPosition, setCustomPosition] = useState(() => !isDefaultPosition(initial.top))
   const [suppressExpansion, setSuppressExpansion] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -96,6 +105,7 @@ export function AccessibilityMenu() {
     setSide(next.side)
     setLeft(initialLeft(next.side))
     setTop(clampTop(next.top <= 1 ? (window.innerHeight - BUTTON_SIZE) * next.top : next.top))
+    setCustomPosition(!isDefaultPosition(next.top))
     setTextScale(next.textScale as FontSizeLevel)
     setPreviewScale(next.textScale as FontSizeLevel)
     setHighContrast(next.highContrast)
@@ -122,6 +132,7 @@ export function AccessibilityMenu() {
 
   useEffect(() => {
     const handleResize = () => {
+      setNarrowViewport(window.innerWidth <= 480)
       setTop((current) => {
         const next = clampTop(current)
         if (next !== current) persist({ top: next })
@@ -271,6 +282,7 @@ export function AccessibilityMenu() {
       drag.startTop = event.clientY - BUTTON_SIZE / 2
     }
     drag.moved = true
+    setCustomPosition(true)
     setDragging(true)
     setSuppressExpansion(true)
     drag.lastX = event.clientX
@@ -354,6 +366,11 @@ export function AccessibilityMenu() {
     persist({ side: nextSide, top: nextTop })
   }
 
+  const useNarrowDefaultPosition = narrowViewport && !customPosition
+  const effectiveTop = useNarrowDefaultPosition
+    ? Math.max(VIEWPORT_MARGIN, window.innerHeight - BUTTON_SIZE - VIEWPORT_MARGIN)
+    : top
+
   return (
     <>
       <button
@@ -384,7 +401,11 @@ export function AccessibilityMenu() {
         }}
         onPointerLeave={() => setSuppressExpansion(false)}
         className={`accessibility-trigger group fixed z-[60] flex h-12 w-12 aspect-square touch-none select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full border border-blue-900 bg-blue-800 text-white leading-none shadow-md outline-none transition-[top,left,right,width,border-radius,transform,background-color,box-shadow,opacity] duration-200 hover:bg-blue-900 hover:text-white active:bg-blue-900 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-50 dark:hover:bg-blue-950 dark:hover:text-white ${open ? 'pointer-events-none opacity-0' : ''} ${side === 'left' ? 'flex-row-reverse' : ''} ${dragging ? '!cursor-grabbing gap-0 transition-none' : suppressExpansion || snapping ? '!cursor-pointer gap-0' : '!cursor-pointer gap-0 focus-visible:w-40 focus-visible:gap-2 focus-visible:rounded-xl'}`}
-        style={dragging ? { top, left } : { top, [side]: VIEWPORT_MARGIN }}
+        style={dragging
+          ? { top, left }
+          : useNarrowDefaultPosition
+            ? { bottom: VIEWPORT_MARGIN, [side]: VIEWPORT_MARGIN }
+            : { top, [side]: VIEWPORT_MARGIN }}
       >
         <PersonStanding aria-hidden="true" className="block h-8 w-8 shrink-0" strokeWidth={2.5} />
         {!dragging && !suppressExpansion && (
@@ -401,7 +422,7 @@ export function AccessibilityMenu() {
           aria-labelledby="accessibility-panel-title"
           className="accessibility-panel fixed z-[70] min-w-0 max-h-[calc(100dvh-1.5rem)] max-w-[calc(100vw-0.75rem)] overflow-y-auto overscroll-contain rounded-xl border border-slate-500 bg-white px-1 py-2 text-slate-900 shadow-xl sm:p-4 dark:border-slate-400 dark:bg-slate-800 dark:text-slate-100"
           style={{
-            top: Math.min(top, Math.max(VIEWPORT_MARGIN, window.innerHeight - (panelHeight || 310) - VIEWPORT_MARGIN)),
+            top: Math.min(effectiveTop, Math.max(VIEWPORT_MARGIN, window.innerHeight - (panelHeight || 310) - VIEWPORT_MARGIN)),
             [side]: 'clamp(0.25rem, 2vw, 1rem)',
             width: 'min(32rem, calc(100vw - clamp(0.25rem, 2vw, 0.5rem)))',
           }}

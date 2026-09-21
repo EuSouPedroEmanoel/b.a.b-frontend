@@ -15,6 +15,7 @@ import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
 import { Tooltip } from '@/components/ui/Tooltip'
+import { ModalDialog } from '@/components/ui/ModalDialog'
 
 type ReaderRole = 'student' | 'teacher'
 
@@ -193,19 +194,6 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
     }
   }, [policyQuery.data])
 
-  useEffect(() => {
-    if (!restoreOpen) return
-    restoreCancelRef.current?.focus()
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setRestoreOpen(false)
-      requestAnimationFrame(() => restoreTriggerRef.current?.focus())
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [restoreOpen])
-
   const save = useMutation({
     mutationFn: async (nextPolicies: Policy[] = policies) => (await api.put<{ policies: Policy[] }>(`/circulation-policies/${effectiveSchoolId}`, { policies: nextPolicies })).data.policies,
     onSuccess: (savedPolicies) => {
@@ -351,16 +339,18 @@ export function CirculationPoliciesPage({ schoolIdOverride, showSchoolSelector =
           </div>}
         </form>
       )}
-      {restoreOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) closeRestoreDialog() }}>
-        <section role="dialog" aria-modal="true" aria-labelledby="restore-defaults-title" aria-describedby="restore-defaults-description" className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800" onMouseDown={(event) => event.stopPropagation()}>
-          <h2 id="restore-defaults-title" className="text-lg font-semibold">Restaurar regras padrão?</h2>
-          <p id="restore-defaults-description" className="mt-2 text-sm text-slate-600 dark:text-slate-300">Esta ação substituirá as regras de circulação atuais pelos valores padrão do sistema. Após a restauração, as configurações administrativas específicas desta escola precisarão ser ajustadas novamente, se necessário.</p>
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button ref={restoreCancelRef} type="button" variant="blue-secondary" onClick={closeRestoreDialog} disabled={save.isPending}>Cancelar</Button>
-            <Button type="button" variant="danger-secondary" onClick={restoreDefaults} disabled={save.isPending} aria-busy={save.isPending}>{save.isPending ? 'Restaurando…' : 'Restaurar padrões'}</Button>
-          </div>
-        </section>
-      </div>}
+      {restoreOpen && <ModalDialog
+        title="Restaurar regras padrão?"
+        onClose={closeRestoreDialog}
+        describedBy="restore-defaults-description"
+        variant="form"
+      >
+        <p id="restore-defaults-description" className="text-sm text-slate-600 dark:text-slate-300">Esta ação substituirá as regras de circulação atuais pelos valores padrão do sistema. Após a restauração, as configurações administrativas específicas desta escola precisarão ser ajustadas novamente, se necessário.</p>
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button ref={restoreCancelRef} type="button" variant="blue-secondary" onClick={closeRestoreDialog} disabled={save.isPending}>Cancelar</Button>
+          <Button type="button" variant="danger-secondary" onClick={restoreDefaults} disabled={save.isPending} aria-busy={save.isPending}>{save.isPending ? 'Restaurando…' : 'Restaurar padrões'}</Button>
+        </div>
+      </ModalDialog>}
       {restoreUndo && <UndoSnackbar message="Regras de circulação restauradas." onUndo={undoRestoreDefaults} onClose={clearRestoreUndo} />}
     </div>
   )

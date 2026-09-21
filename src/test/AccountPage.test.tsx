@@ -27,6 +27,9 @@ describe('AccountPage', () => {
     expect(screen.getAllByText('Ana Silva')).toHaveLength(2)
     expect(screen.getAllByText('Aluno').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: 'Editar perfil' })).toHaveAttribute('href', '/perfil/7#perfil')
+    const statusFilter = screen.getByRole('combobox', { name: 'Acompanhamento' })
+    expect(statusFilter.parentElement?.parentElement?.parentElement).toHaveClass('w-full', 'flex-wrap')
+    expect(statusFilter.parentElement?.parentElement).toHaveClass('w-44', 'max-w-full', 'shrink-0')
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/reading-statuses/me?page=1&size=15&is_active=true&sort_by=created_at&sort_order=desc'))
   })
 

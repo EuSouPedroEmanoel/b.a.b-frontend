@@ -534,8 +534,8 @@ export function UsersPage() {
                   <Badge tone="info">{`${sec.items.length} registro(s)`}</Badge>
                 </CardHeader>
                 <CardBody className="p-0">
-                  <div className="@container max-w-full">
-                    <table className="w-full table-fixed border-spacing-0 min-w-0 text-sm">
+                  <div className="@container w-full max-w-full min-w-0">
+                    <table className="w-full table-fixed border-spacing-0 min-w-0 text-sm @max-lg:hidden">
                       <caption className="sr-only">{sec.title}</caption>
                       <thead className="bg-slate-50 dark:bg-slate-700/50">
                         <tr>
@@ -544,7 +544,7 @@ export function UsersPage() {
                           {sec.showSchool && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Escola</th>}
                           {sec.showTurma && <th scope="col" className="px-4 py-3 text-left font-semibold">Turma</th>}
                           {sec.showNascimento && <th scope="col" className="px-4 py-3 text-left font-semibold @max-lg:hidden">Nascimento</th>}
-                          <th scope="col" className="w-44 whitespace-nowrap px-4 py-3 text-right font-semibold">Ações</th>
+                          <th scope="col" className="w-44 whitespace-nowrap px-4 py-3 text-right font-semibold @max-lg:w-auto">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -580,7 +580,7 @@ export function UsersPage() {
                               {sec.showNascimento && (
                                 <td className="px-4 py-3 align-top @max-lg:hidden">{formatDate(u.birthdate)}</td>
                               )}
-                              <td className="whitespace-nowrap px-4 py-3 text-right align-top">
+                              <td className="whitespace-nowrap px-4 py-3 text-right align-top @max-lg:w-auto">
                                 <div className="flex flex-nowrap items-center justify-end gap-2">
                                   <Button
                                     size="sm"
@@ -589,7 +589,7 @@ export function UsersPage() {
                                     disabled={readOnly}
                                     aria-label={`Editar usuário ${u.name || u.username}`}
                                     aria-describedby={`edit-user-tooltip-${u.id}`}
-                                    className={`relative ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-500' : ''}`}
+                                    className={`relative ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400' : ''}`}
                                   >
                                     <Pencil className="h-5 w-5" aria-hidden="true" />
                                     <span className="sr-only">Editar</span>
@@ -620,6 +620,42 @@ export function UsersPage() {
                         })}
                       </tbody>
                     </table>
+                    <div className="hidden w-full min-w-0 gap-3 p-3 @max-lg:grid">
+                      {sec.items.map((u) => {
+                        const deprecated = u.role === 'student' && isDeprecatedTurma(u.updated_at)
+                        const readOnly = !canEditUser(u)
+                        return (
+                          <article key={u.id} className={`w-full min-w-0 rounded-lg border border-slate-200 p-3 dark:border-slate-700 ${readOnly ? 'opacity-60' : ''}`}>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <strong className="break-words [overflow-wrap:anywhere]">{u.name || u.username}</strong>
+                                <Badge tone={u.account_status === 'active' ? 'success' : u.account_status === 'pending_activation' ? 'warning' : 'danger'}>{u.account_status === 'active' ? 'Ativa' : u.account_status === 'pending_activation' ? 'Pendente' : 'Desativada'}</Badge>
+                                {currentUser?.id === u.id && <span className="text-sm text-slate-600 dark:text-slate-300">(EU)</span>}
+                              </div>
+                              <dl className="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+                                <div><dt className="inline font-semibold">Usuário: </dt><dd className="inline break-words font-mono">{u.username}</dd></div>
+                                {sec.showCpf && <div><dt className="inline font-semibold">CPF: </dt><dd className="inline font-mono">{u.cpf_masked ?? '—'}</dd></div>}
+                                {sec.showSchool && <div><dt className="inline font-semibold">Escola: </dt><dd className="inline break-words">{schoolLabel(u.school_name, u.school_code)}</dd></div>}
+                                {sec.showTurma && <div><dt className="inline font-semibold">Turma: </dt><dd className="inline">{turmaLabel(u.turma_numero, u.turma_letra)}{deprecated ? ' · Atualizar' : ''}</dd></div>}
+                                {sec.showNascimento && <div><dt className="inline font-semibold">Nascimento: </dt><dd className="inline">{formatDate(u.birthdate)}</dd></div>}
+                              </dl>
+                            </div>
+                            <div className="mt-3 flex flex-wrap justify-end gap-2">
+                              <Button size="sm" variant="secondary" onClick={() => openEdit(u)} disabled={readOnly} aria-label={`Editar usuário ${u.name || u.username}`} className={`!px-3 ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400' : ''}`}>
+                                <Pencil className="h-5 w-5" aria-hidden="true" /><span className="sr-only">Editar</span>
+                              </Button>
+                              <Button type="button" size="sm" variant="secondary" disabled aria-label={`Configurar usuário ${u.name || u.username}`} className="!px-3">
+                                <MonitorCog className="h-5 w-5" aria-hidden="true" /><span className="sr-only">Configurar usuário</span>
+                              </Button>
+                              <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
+                              <Button size="sm" variant="secondary" className="!px-3" onClick={() => { if (u.is_active) { setChangingSituation(u); setSituationJustification(''); setSituationError('') } else setConfirmSituation(u) }} disabled={readOnly || currentUser?.id === u.id} aria-label={u.is_active ? `Alterar situação de ${u.name || u.username}` : `Reativar usuário ${u.name || u.username}`}>
+                                <RefreshCw className="h-4 w-4" aria-hidden="true" /><span className="sr-only">{u.is_active ? 'Alterar situação' : 'Reativar usuário'}</span>
+                              </Button>
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
                   </div>
                 </CardBody>
               </Card>

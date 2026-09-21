@@ -23,8 +23,8 @@ html.dark ::-moz-selection {
 
 /* Design tokens — W3C WCAG 2.2 AA (contraste 4.5:1+) */
 @theme {
-  --color-primary: #075985;
-  --color-primary-hover: #0c4a6e;
+  --color-primary: #003f5f;
+  --color-primary-hover: #003b5c;
   --color-primary-active: #0c4a6e;
   --color-primary-contrast: #ffffff;
   --color-accent: #075985;
@@ -45,7 +45,7 @@ html.dark ::-moz-selection {
   --color-warning-bg: #fef3c7;
   --color-danger: #7f1d1d;
   --color-danger-bg: #fee2e2;
-  --color-focus: #facc15;
+  --color-focus: #7c2d12;
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --leading-page-description: 1.5rem;
 }
@@ -239,10 +239,28 @@ html.dark {
   --color-field: #1e293b;
   --color-text: #f1f5f9;
   --color-text-muted: #94a3b8;
-  --color-border: #334155;
+  --color-border: #64748b;
   --color-primary: #38bdf8;
   --color-primary-hover: #7dd3fc;
   --color-primary-contrast: #0f172a;
+  --color-focus: #facc15;
+}
+
+/* Keep legacy Tailwind text and border utilities aligned with the theme tokens. */
+html.dark :is(.text-slate-400, .text-slate-500, .text-slate-600):not([class*="dark:text-slate-"]) {
+  color: var(--color-text-muted);
+}
+
+html.dark :is(.text-slate-700, .text-slate-800, .text-slate-900, .text-slate-950):not([class*="dark:text-slate-"]) {
+  color: var(--color-text);
+}
+
+html.dark :is([class*="dark:border-slate-700"], [class*="dark:border-slate-600"], [class*="dark:border-slate-500"]) {
+  border-color: var(--color-border);
+}
+
+html:not(.dark) :is(header, nav) :focus-visible {
+  outline-color: #facc15;
 }
 
 /*

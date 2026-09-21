@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/hooks/useTheme'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ModalDialog } from '@/components/ui/ModalDialog'
 import { buttonVariantClasses } from '@/components/ui/Button.styles'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { Badge } from '@/components/ui/Badge'
@@ -102,6 +103,9 @@ export function BookDetailPage() {
   const shouldFocusReservationLinkRef = useRef(false)
   const shouldFocusAvailabilityRef = useRef(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const lightboxDialogRef = useRef<HTMLDivElement>(null)
+  const lightboxCloseRef = useRef<HTMLButtonElement>(null)
+  const lightboxPreviousFocusRef = useRef<HTMLElement | null>(null)
   const [zoomLevel, setZoomLevel] = useState(0) // 0:1.0, 1:1.5, 2:2.5
   const [origin, setOrigin] = useState({ x: '50%', y: '50%' })
   const imgRef = useRef<HTMLImageElement>(null)
@@ -129,6 +133,7 @@ export function BookDetailPage() {
   }, [])
 
   const openLightbox = useCallback(() => {
+    lightboxPreviousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setLightboxImgError(false)
     setLightboxTriedDirect(false)
     resetLightbox()
@@ -138,6 +143,7 @@ export function BookDetailPage() {
   const closeLightbox = useCallback(() => {
     setLightboxOpen(false)
     resetLightbox()
+    window.requestAnimationFrame(() => lightboxPreviousFocusRef.current?.focus())
   }, [resetLightbox])
 
   useLayoutEffect(() => {
@@ -148,9 +154,24 @@ export function BookDetailPage() {
     if (!lightboxOpen) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    window.requestAnimationFrame(() => lightboxCloseRef.current?.focus())
       const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault()
         closeLightbox()
+        return
+      }
+      if (e.key !== 'Tab' || !lightboxDialogRef.current) return
+      const focusable = Array.from(lightboxDialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -491,34 +512,6 @@ export function BookDetailPage() {
     setLoanConfirmOpen(false)
     window.requestAnimationFrame(() => loanTriggerRef.current?.focus())
   }, [])
-
-  useEffect(() => {
-    if (!loanConfirmOpen) return
-    loanCancelRef.current?.focus()
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        closeLoanConfirmation()
-        return
-      }
-      if (e.key !== 'Tab') return
-      const dialog = document.getElementById('loan-confirmation-dialog')
-      if (!dialog) return
-      const focusable = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])'))
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [closeLoanConfirmation, loanConfirmOpen])
 
   if (!Number.isFinite(id)) {
     return <div role="alert" className="p-8 text-center">ID de livro inválido</div>
@@ -891,45 +884,27 @@ export function BookDetailPage() {
       ) : null}
 
       {loanConfirmOpen && canManage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="loan-confirmation-title"
-          aria-describedby="loan-confirmation-description"
-          id="loan-confirmation-dialog"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeLoanConfirmation()
-          }}
+        <ModalDialog
+          title={`Emprestar livro ${book.title}?`}
+          onClose={closeLoanConfirmation}
+          describedBy="loan-confirmation-description"
         >
-          <div className="w-full max-w-md rounded-xl bg-white dark:bg-slate-800 shadow-xl">
-            <CardHeader>
-              <h2 id="loan-confirmation-title" className="text-lg font-semibold">Emprestar livro {book.title}?</h2>
-            </CardHeader>
-            <CardBody>
-              <p id="loan-confirmation-description" className="text-sm text-slate-600 dark:text-slate-300">
-                Você será redirecionado para preencher os dados restantes do empréstimo.
-              </p>
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  ref={loanCancelRef}
-                  type="button"
-                  className="inline-flex items-center justify-center font-medium rounded-md transition-colors min-h-[44px] min-w-[44px] px-4 py-2 text-sm bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-200 focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] focus-visible:outline-offset-2"
-                  onClick={closeLoanConfirmation}
-                >
-                  Cancelar
-                </button>
-                <Button
-                  type="button"
-                  aria-label={`Continuar empréstimo do livro ${book.title}`}
-                  onClick={() => navigate(`/emprestimos?book_id=${book.id}`)}
-                >
-                  Continuar
-                </Button>
-              </div>
-            </CardBody>
+          <p id="loan-confirmation-description" className="text-sm text-slate-600 dark:text-slate-300">
+            Você será redirecionado para preencher os dados restantes do empréstimo.
+          </p>
+          <div className="flex flex-wrap justify-end gap-3 pt-4">
+            <Button ref={loanCancelRef} type="button" variant="secondary" onClick={closeLoanConfirmation}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              aria-label={`Continuar empréstimo do livro ${book.title}`}
+              onClick={() => navigate(`/emprestimos?book_id=${book.id}`)}
+            >
+              Continuar
+            </Button>
           </div>
-        </div>
+        </ModalDialog>
       )}
 
       <ReservationConfirmDialog
@@ -950,6 +925,7 @@ export function BookDetailPage() {
       <AnimatePresence>
         {lightboxOpen && (
           <motion.div
+            ref={lightboxDialogRef}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
             role="dialog"
             aria-modal="true"
@@ -963,6 +939,7 @@ export function BookDetailPage() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
           >
             <motion.button
+              ref={lightboxCloseRef}
               type="button"
               aria-label="Fechar"
               onClick={closeLightbox}
