@@ -635,6 +635,9 @@ export function BookDetailPage() {
           </Button>
         ) : null
       )}
+      {user?.role === 'student' && !book.has_active_loan && (
+        <ReadingWantToReadControl bookId={book.id} active={book.reading_status === 'want_to_read'} />
+      )}
         </div>
 
       {reservationFeedback && (
@@ -710,9 +713,8 @@ export function BookDetailPage() {
                 <Badge tone={isGuest ? publicBookStateTone(book.derived_state) : bookStateTone(book.derived_state)} className={`${responsiveStatusBadgeClasses} ${isGuest ? '' : 'cursor-pointer'}`} role={isGuest ? undefined : 'button'} tabIndex={isGuest ? undefined : 0} onClick={() => { if (!isGuest) openCatalogQuery(`/acervo?state=${book.derived_state}`) }} onKeyDown={(e) => { if (!isGuest && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCatalogQuery(`/acervo?state=${book.derived_state}`) } }} title={isGuest ? publicBookStateLabel(book.derived_state) : `Buscar por ${bookStateLabel(book.derived_state)}`}>
                   {isGuest ? publicBookStateLabel(book.derived_state) : bookStateLabel(book.derived_state)}
                 </Badge>
-                {user?.role === 'student' && <span className="ml-auto flex items-start gap-2">
-                  {book.has_been_borrowed && <BookFavoriteControl bookId={book.id} active={book.is_favorite} />}
-                  {!book.has_active_loan && <ReadingWantToReadControl bookId={book.id} active={book.reading_status === 'want_to_read'} />}
+                {user?.role === 'student' && book.has_been_borrowed && <span className="ml-auto flex items-start gap-2">
+                  <BookFavoriteControl bookId={book.id} active={book.is_favorite} />
                 </span>}
               </div>
               {user?.role === 'student' && book.has_been_borrowed && <div className="pt-2"><ReadingStatusControl bookId={book.id} status={book.reading_status} /></div>}

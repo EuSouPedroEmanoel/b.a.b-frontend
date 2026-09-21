@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Bookmark, Heart } from 'lucide-react'
 import api from '@/lib/api'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
-import { Tooltip } from '@/components/ui/Tooltip'
 import { getErrorMessage } from '@/lib/errors'
 import { readingStatusLabel, readingStatusOptions, type ReadingStatus } from './readingStatus'
 
@@ -101,29 +100,19 @@ export function ReadingWantToReadControl({
     },
   })
 
-  const buttonTone = active
-    ? 'text-[var(--color-primary)]'
-    : 'text-[var(--color-primary-hover)]'
-  const buttonSpacing = active ? 'px-0 py-1' : 'px-1 py-1'
-
   return <button
     type="button"
     aria-label={active ? 'Remover livro de Quero ler' : 'Marcar livro como Quero ler'}
-    aria-describedby={`reading-want-to-read-tooltip-${bookId}`}
     aria-pressed={active}
     aria-busy={mutation.isPending}
     disabled={mutation.isPending}
     onClick={() => mutation.mutate()}
-    className={`reading-want-to-read-button group inline-flex min-h-10 shrink-0 flex-col items-center justify-center gap-0.5 border-0 bg-transparent ${buttonSpacing} shadow-none transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:cursor-wait disabled:opacity-60 ${buttonTone}`}
+    className={`reading-want-to-read-button group inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium shadow-sm transition-colors focus-visible:outline-3 focus-visible:outline-[var(--color-focus)] disabled:cursor-wait disabled:opacity-60 ${active
+      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-contrast)] hover:bg-[var(--color-primary-hover)]'
+      : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:bg-[var(--color-surface-muted)]'}`}
   >
-    <span className="rounded-full p-2 transition-colors group-hover:bg-[var(--color-primary)] group-hover:text-[var(--color-primary-contrast)]">
-      <Bookmark aria-hidden="true" className="h-5 w-5" fill={active ? 'currentColor' : 'none'} />
-    </span>
-    <span className="grid w-fit text-xs font-medium leading-tight whitespace-nowrap">
-      <span className={`col-start-1 row-start-1 ${active ? '' : 'invisible'}`}>Não quero ler</span>
-      <span className={`col-start-1 row-start-1 ${active ? 'invisible' : ''}`}>Quero ler</span>
-    </span>
-    <Tooltip id={`reading-want-to-read-tooltip-${bookId}`}>{active ? 'Remover de Quero ler' : 'Quero ler'}</Tooltip>
+    <Bookmark aria-hidden="true" className="h-4 w-4" fill={active ? 'currentColor' : 'none'} />
+    <span className="whitespace-nowrap">{active ? 'Não quero ler' : 'Quero ler'}</span>
   </button>
 }
 
