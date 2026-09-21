@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import api from '@/lib/api'
 import { getErrorMessage } from '@/lib/errors'
@@ -30,6 +31,14 @@ export function FirstAccessPanel({ onActivated, initialUsername = '', initialCod
 
   const codeComplete = code.replace(/-/g, '').length === 9
   const passwordValid = password.length >= 8 && /[A-Za-zÀ-ÿ]/.test(password) && /\d/.test(password)
+  const validationDisabled = pending || !username.trim() || !codeComplete || !!error
+  const validationTooltip = pending
+    ? 'Validando convite, aguarde'
+    : error
+      ? error
+      : !username.trim()
+        ? 'Informe o usuário para continuar'
+        : 'Digite o código de ativação completo para continuar'
 
   const validateInvitation = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -109,7 +118,10 @@ export function FirstAccessPanel({ onActivated, initialUsername = '', initialCod
             spellCheck={false}
             required
           />
-          <Button type="submit" disabled={pending || !username.trim() || !codeComplete || !!error} aria-busy={pending}>{pending ? 'Validando…' : 'Continuar'}</Button>
+          <span className="group relative block">
+            <Button type="submit" className="w-full" disabled={validationDisabled} aria-busy={pending}>{pending ? 'Validando…' : 'Continuar'}</Button>
+            {validationDisabled && <Tooltip>{validationTooltip}</Tooltip>}
+          </span>
           <p className="text-sm text-slate-600 dark:text-slate-300">O código expirou ou foi perdido? Procure a biblioteca para solicitar um novo convite.</p>
         </form>
       </CardBody>

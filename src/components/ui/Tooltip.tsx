@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 export function Tooltip({ children, className = '', id, variant = 'default' }: { children: ReactNode; className?: string; id?: string; variant?: 'default' | 'category' }) {
   const tooltipRef = useRef<HTMLSpanElement>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
   const [position, setPosition] = useState<{ left: number; top: number }>()
   const [visible, setVisible] = useState(false)
   const categoryClasses = variant === 'category' ? 'border-[#6b4f3a] bg-[#30231d] text-[#f5eee5] shadow-[0_2px_5px_rgba(38,24,16,0.35)] dark:border-slate-600 dark:bg-[#111827] dark:text-slate-100 dark:shadow-[0_2px_5px_rgba(0,0,0,0.5)]' : 'border-slate-300 bg-white text-slate-900 shadow-lg dark:border-slate-600 dark:bg-slate-800 dark:text-white'
@@ -9,8 +12,15 @@ export function Tooltip({ children, className = '', id, variant = 'default' }: {
 
   useLayoutEffect(() => {
     const tooltip = tooltipRef.current
-    const trigger = tooltip?.parentElement
+    const trigger = triggerRef.current ?? tooltip?.parentElement
     if (!tooltip || !trigger) return
+    triggerRef.current = trigger
+
+    if (!portalTarget) {
+      // oxlint-disable-next-line react/set-state-in-effect -- move the mounted tooltip out of transformed triggers.
+      setPortalTarget(document.body)
+      return
+    }
 
     const updatePosition = () => {
       const triggerRect = trigger.getBoundingClientRect()
@@ -31,7 +41,8 @@ export function Tooltip({ children, className = '', id, variant = 'default' }: {
       })
     }
 
-    updatePosition()
+    if (visible) updatePosition()
+
     const show = () => {
       updatePosition()
       setVisible(true)
@@ -45,7 +56,6 @@ export function Tooltip({ children, className = '', id, variant = 'default' }: {
     window.addEventListener('scroll', updatePosition, true)
     const resizeObserver = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updatePosition)
     resizeObserver?.observe(trigger)
-    resizeObserver?.observe(tooltip)
 
     return () => {
       window.removeEventListener('resize', updatePosition)
@@ -56,9 +66,13 @@ export function Tooltip({ children, className = '', id, variant = 'default' }: {
       trigger.removeEventListener('focusout', hide)
       resizeObserver?.disconnect()
     }
-  }, [children])
+  }, [children, portalTarget, visible])
 
-  return <span ref={tooltipRef} id={id} role="tooltip" aria-hidden={id ? undefined : true} style={position ? { left: position.left, top: position.top, right: 'auto', bottom: 'auto', transform: 'none' } : undefined} className={`pointer-events-none fixed z-30 max-h-[calc(100vh-1rem)] w-max max-w-[min(28rem,calc(100vw-1rem))] overflow-y-auto whitespace-normal break-words rounded-md border px-3 py-2 text-xs transition-[opacity,transform] duration-150 [overflow-wrap:anywhere] ${visibilityClasses} ${categoryClasses} ${className}`}>
+  const safePosition = visible && position ? position : { left: 0, top: 0 }
+
+  const tooltip = <span ref={tooltipRef} id={id} role="tooltip" aria-hidden={id ? undefined : true} style={{ left: safePosition.left, top: safePosition.top, right: 'auto', bottom: 'auto', transform: 'none' }} className={`pointer-events-none fixed z-30 max-h-[calc(100vh-1rem)] w-max max-w-[min(28rem,calc(100vw-1rem))] overflow-y-auto whitespace-normal break-words rounded-md border px-3 py-2 text-xs transition-[opacity,transform] duration-150 [overflow-wrap:anywhere] ${visibilityClasses} ${categoryClasses} ${className}`}>
     {children}
   </span>
+
+  return portalTarget ? createPortal(tooltip, portalTarget) : tooltip
 }
