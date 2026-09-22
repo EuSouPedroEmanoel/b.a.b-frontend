@@ -19,11 +19,13 @@ type Paginated<T> = { items: T[]; total: number; page: number; size: number; pag
 type CatalogBook = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; cover_url: string | null; published_date: string | null; reading_status?: ReadingStatus | null; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
 type ReadingSortBy = 'created_at' | 'published_date' | 'title' | 'author'
 type ReadingSortOrder = 'asc' | 'desc'
+type Activity = { id: string; occurred_at: string; actor_display_name: string; actor_role: string; school_id: number | null; operation: string; entity_type: string; entity_id: string | null; summary: string; justification: string | null }
 
 const accountRoleLabel = (role: string) => ({ student: 'Aluno', teacher: 'Professor', librarian: 'Bibliotecário', school_admin: 'Administrador escolar', super_admin: 'Superadministrador' }[role] ?? role)
 export function AccountPage() {
   const { user } = useAuth()
   const isStudent = user?.role === 'student'
+  const isActivityViewer = user?.role === 'super_admin' || user?.role === 'school_admin'
   if (!user) return null
   const displayName = user.name || user.username
 
@@ -38,8 +40,50 @@ export function AccountPage() {
     <section aria-labelledby="security-heading"><Card><CardBody className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center"><div><h2 id="security-heading" className="flex items-center gap-2 text-lg font-semibold"><ShieldCheck aria-hidden="true" className="h-5 w-5" /> Segurança</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Mantenha sua conta protegida com uma senha segura.</p></div><ButtonLink to={`/perfil/${user.id}#senha`} variant="secondary">Alterar senha</ButtonLink></CardBody></Card></section>
 
     {isStudent && <ReadingSection />}
+    {isActivityViewer && <AdministrativeActivitySection isSuperAdmin={user.role === 'super_admin'} />}
   </main>
 }
+
+function AdministrativeActivitySection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const [page, setPage] = useState(1)
+  const [entityType, setEntityType] = useState('')
+  const [operation, setOperation] = useState('')
+  const query = useQuery({
+    queryKey: ['administrative-activities', page, entityType, operation],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), size: '10' })
+      if (entityType) params.set('entity_type', entityType)
+      if (operation) params.set('operation', operation)
+      return (await api.get<Paginated<Activity>>(`/administrative-activities/?${params.toString()}`)).data
+    },
+  })
+  const resetFilters = () => { setEntityType(''); setOperation(''); setPage(1) }
+  return <section aria-labelledby="activity-log-heading">
+    <Card><CardBody>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div><h2 id="activity-log-heading" className="flex items-center gap-2 text-xl font-semibold">Registro de atividades</h2><PageDescription>Alterações administrativas relacionadas ao seu escopo de acesso.</PageDescription></div>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Select label="Categoria" id="activity-entity-filter" value={entityType} onChange={(value) => { setEntityType(value); setPage(1) }} options={[{ value: '', label: 'Todas' }, { value: 'book', label: 'Livros' }, { value: 'copy', label: 'Exemplares' }, { value: 'user', label: 'Usuários' }, { value: 'loan', label: 'Empréstimos' }]} />
+          <Select label="Operação" id="activity-operation-filter" value={operation} onChange={(value) => { setOperation(value); setPage(1) }} options={[{ value: '', label: 'Todas' }, { value: 'created', label: 'Cadastro' }, { value: 'updated', label: 'Edição' }, { value: 'returned', label: 'Devolução' }, { value: 'deactivated', label: 'Desativação' }, { value: 'restored', label: 'Restauração' }]} />
+          {(entityType || operation) && <Button type="button" variant="secondary" onClick={resetFilters}>Limpar</Button>}
+        </div>
+      </div>
+      {query.isLoading && <p role="status" className="py-8 text-center text-sm text-slate-500">Carregando atividades…</p>}
+      {query.isError && <p role="alert" className="mt-6 rounded-md border border-red-200 p-4 text-sm text-red-800">Não foi possível carregar o registro de atividades.</p>}
+      {query.data && query.data.items.length === 0 && <p className="mt-6 rounded-md border border-slate-200 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">Nenhuma atividade encontrada.</p>}
+      {query.data && query.data.items.length > 0 && <>
+        <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+          <table className="w-full min-w-[42rem] text-sm"><caption className="sr-only">Atividades administrativas</caption><thead className="bg-slate-50 dark:bg-slate-700/50"><tr><th scope="col" className="px-4 py-3 text-left">Data e hora</th><th scope="col" className="px-4 py-3 text-left">Responsável</th><th scope="col" className="px-4 py-3 text-left">Categoria</th><th scope="col" className="px-4 py-3 text-left">Operação</th><th scope="col" className="px-4 py-3 text-left">Descrição</th></tr></thead><tbody className="divide-y divide-slate-200 dark:divide-slate-700">{query.data.items.map((item) => <tr key={item.id}><td className="px-4 py-3 align-top whitespace-nowrap">{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(item.occurred_at))}</td><td className="px-4 py-3 align-top">{item.actor_display_name}</td><td className="px-4 py-3 align-top">{activityEntityLabel(item.entity_type)}</td><td className="px-4 py-3 align-top">{activityOperationLabel(item.operation)}</td><td className="px-4 py-3 align-top">{item.summary}</td></tr>)}</tbody></table>
+        </div>
+        <Pagination page={query.data.page} pages={query.data.pages} total={query.data.total} onChange={setPage} />
+      </>}
+      {!isSuperAdmin && <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">Você visualiza somente atividades da sua escola.</p>}
+    </CardBody></Card>
+  </section>
+}
+
+function activityEntityLabel(value: string): string { return ({ book: 'Livro', copy: 'Exemplar', user: 'Usuário', loan: 'Empréstimo', school: 'Escola' }[value] ?? value) }
+function activityOperationLabel(value: string): string { return ({ created: 'Cadastro', updated: 'Edição', archived: 'Arquivamento', restored: 'Restauração', returned: 'Devolução', deactivated: 'Desativação', activated: 'Ativação', customized: 'Personalização', permissions_changed: 'Permissões alteradas', return_undone: 'Devolução desfeita' }[value] ?? value) }
 
 function ReadingSection() {
   const [section, setSection] = useState<'tracking' | 'all'>('tracking')
