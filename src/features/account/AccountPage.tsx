@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { ButtonLink } from '@/components/ui/ButtonLink'
 import { Card, CardBody } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { GridCard } from '@/features/books/GridCard'
 import { responsiveBookGridClasses } from '@/features/books/bookGrid'
@@ -19,7 +20,9 @@ type Paginated<T> = { items: T[]; total: number; page: number; size: number; pag
 type CatalogBook = { id: number; title: string; description: string | null; derived_state: string; isbn: string | null; cover_url: string | null; published_date: string | null; reading_status?: ReadingStatus | null; genres: { id: number; name: string; slug: string }[]; authors: { id: number; name: string; slug: string }[] }
 type ReadingSortBy = 'created_at' | 'published_date' | 'title' | 'author'
 type ReadingSortOrder = 'asc' | 'desc'
-type Activity = { id: string; occurred_at: string; actor_display_name: string; actor_role: string; school_id: number | null; operation: string; entity_type: string; entity_id: string | null; summary: string; justification: string | null }
+type Activity = { id: string; occurred_at: string; actor_id: number | null; actor_display_name: string; actor_role: string; school_id: number | null; operation: string; entity_type: string; entity_id: string | null; summary: string; justification: string | null }
+type ActivitySchool = { id: number; name: string; code: string }
+type ActivityUser = { id: number; name: string; username: string }
 
 const accountRoleLabel = (role: string) => ({ student: 'Aluno', teacher: 'Professor', librarian: 'Bibliotecário', school_admin: 'Administrador escolar', super_admin: 'Superadministrador' }[role] ?? role)
 export function AccountPage() {
@@ -48,24 +51,45 @@ function AdministrativeActivitySection({ isSuperAdmin }: { isSuperAdmin: boolean
   const [page, setPage] = useState(1)
   const [entityType, setEntityType] = useState('')
   const [operation, setOperation] = useState('')
+  const [schoolId, setSchoolId] = useState('')
+  const [actorId, setActorId] = useState('')
+  const [startAt, setStartAt] = useState('')
+  const [endAt, setEndAt] = useState('')
+  const schools = useQuery({
+    queryKey: ['activity-schools'],
+    queryFn: async () => (await api.get<{ items: ActivitySchool[] }>('/schools/?size=100')).data.items,
+    enabled: isSuperAdmin,
+  })
+  const actors = useQuery({
+    queryKey: ['activity-actors'],
+    queryFn: async () => (await api.get<Paginated<ActivityUser>>('/users/?size=100')).data.items,
+  })
   const query = useQuery({
-    queryKey: ['administrative-activities', page, entityType, operation],
+    queryKey: ['administrative-activities', page, entityType, operation, schoolId, actorId, startAt, endAt],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), size: '10' })
       if (entityType) params.set('entity_type', entityType)
       if (operation) params.set('operation', operation)
+      if (schoolId && isSuperAdmin) params.set('school_id', schoolId)
+      if (actorId) params.set('actor_id', actorId)
+      if (startAt) params.set('start_at', `${startAt}T00:00:00`)
+      if (endAt) params.set('end_at', `${endAt}T23:59:59`)
       return (await api.get<Paginated<Activity>>(`/administrative-activities/?${params.toString()}`)).data
     },
   })
-  const resetFilters = () => { setEntityType(''); setOperation(''); setPage(1) }
+  const resetFilters = () => { setEntityType(''); setOperation(''); setSchoolId(''); setActorId(''); setStartAt(''); setEndAt(''); setPage(1) }
   return <section aria-labelledby="activity-log-heading">
     <Card><CardBody>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><h2 id="activity-log-heading" className="flex items-center gap-2 text-xl font-semibold">Registro de atividades</h2><PageDescription>Alterações administrativas relacionadas ao seu escopo de acesso.</PageDescription></div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          {isSuperAdmin && <Select label="Escola" id="activity-school-filter" value={schoolId} onChange={(value) => { setSchoolId(value); setPage(1) }} options={[{ value: '', label: 'Todas' }, ...(schools.data ?? []).map((school) => ({ value: String(school.id), label: school.name }))]} />}
+          <Select label="Responsável" id="activity-actor-filter" value={actorId} onChange={(value) => { setActorId(value); setPage(1) }} options={[{ value: '', label: 'Todos' }, ...(actors.data ?? []).map((actor) => ({ value: String(actor.id), label: actor.name || actor.username }))]} />
           <Select label="Categoria" id="activity-entity-filter" value={entityType} onChange={(value) => { setEntityType(value); setPage(1) }} options={[{ value: '', label: 'Todas' }, { value: 'book', label: 'Livros' }, { value: 'copy', label: 'Exemplares' }, { value: 'user', label: 'Usuários' }, { value: 'loan', label: 'Empréstimos' }]} />
           <Select label="Operação" id="activity-operation-filter" value={operation} onChange={(value) => { setOperation(value); setPage(1) }} options={[{ value: '', label: 'Todas' }, { value: 'created', label: 'Cadastro' }, { value: 'updated', label: 'Edição' }, { value: 'returned', label: 'Devolução' }, { value: 'deactivated', label: 'Desativação' }, { value: 'restored', label: 'Restauração' }]} />
-          {(entityType || operation) && <Button type="button" variant="secondary" onClick={resetFilters}>Limpar</Button>}
+          <Input label="De" id="activity-start-date" type="date" value={startAt} onChange={(event) => { setStartAt(event.target.value); setPage(1) }} />
+          <Input label="Até" id="activity-end-date" type="date" value={endAt} onChange={(event) => { setEndAt(event.target.value); setPage(1) }} />
+          {(entityType || operation || schoolId || actorId || startAt || endAt) && <Button type="button" variant="secondary" onClick={resetFilters}>Limpar</Button>}
         </div>
       </div>
       {query.isLoading && <p role="status" className="py-8 text-center text-sm text-slate-500">Carregando atividades…</p>}
