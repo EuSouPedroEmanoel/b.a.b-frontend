@@ -50,4 +50,22 @@ describe('LoansPage', () => {
     expect(screen.queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument()
     expect(fixtures.post).not.toHaveBeenCalled()
   })
+
+  it('keeps the quick circulation controls usable on narrow layouts', async () => {
+    fixtures.get.mockResolvedValue({
+      data: { items: [], total: 0, page: 1, size: 10, pages: 0 },
+    })
+    fixtures.user.role = 'librarian'
+    renderPage()
+
+    const copyInput = await screen.findByLabelText(/Código interno do exemplar/)
+    const cpfInput = screen.getByLabelText(/CPF do leitor/)
+    const confirm = screen.getByRole('button', { name: 'Confirmar empréstimo' })
+
+    expect(copyInput).toHaveClass('w-full')
+    expect(cpfInput).toHaveClass('w-full')
+    expect(confirm).toHaveClass('w-full', 'sm:w-auto')
+    expect(screen.getByText('Aguardando código do exemplar.')).toBeInTheDocument()
+    expect(screen.getByText('Aguardando CPF do leitor.')).toBeInTheDocument()
+  })
 })

@@ -59,4 +59,56 @@ describe('AccessibilityMenu high contrast', () => {
     expect(steps[0]).not.toHaveClass('accessibility-font-step--active')
     expect(steps[1]).toHaveClass('accessibility-font-step--active')
   })
+
+  it('supports pointer dragging, snapping and does not open after a drag', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 })
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      bottom: 324,
+      height: 48,
+      left: 900,
+      right: 948,
+      top: 276,
+      width: 48,
+      x: 900,
+      y: 276,
+      toJSON: () => ({}),
+    } as DOMRect)
+    Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+      configurable: true,
+      value: vi.fn(),
+    })
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      configurable: true,
+      value: vi.fn(() => ({
+      finished: Promise.resolve(),
+      cancel: vi.fn(),
+      })),
+    })
+
+    render(<AccessibilityMenu />)
+    const trigger = screen.getByRole('button', { name: 'Abrir menu de acessibilidade' })
+
+    fireEvent.pointerDown(trigger, { pointerId: 1, clientX: 900, clientY: 300 })
+    fireEvent.pointerMove(trigger, { pointerId: 1, clientX: 100, clientY: 300 })
+    expect(trigger.className).toContain('cursor-grabbing')
+    fireEvent.pointerUp(trigger, { pointerId: 1, clientX: 100, clientY: 300 })
+    fireEvent.click(trigger)
+
+    expect(screen.queryByRole('heading', { name: 'Acessibilidade' })).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toHaveProperty('side')
+  })
+
+  it('opens with Enter and Space without starting a drag', () => {
+    render(<AccessibilityMenu />)
+    const trigger = screen.getByRole('button', { name: 'Abrir menu de acessibilidade' })
+
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    expect(screen.getByRole('heading', { name: 'Acessibilidade' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar menu de acessibilidade' }))
+    fireEvent.keyDown(trigger, { key: ' ' })
+
+    expect(screen.getByRole('heading', { name: 'Acessibilidade' })).toBeInTheDocument()
+  })
 })
