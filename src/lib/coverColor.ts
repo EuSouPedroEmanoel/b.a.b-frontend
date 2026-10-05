@@ -47,9 +47,9 @@ export function categoricalTagColor(input: string, kind: 'author' | 'genre', dar
     : { background: `hsl(${hue}, 42%, 52%)`, color: '#29221d', border: `hsl(${hue}, 38%, 38%)` }
 }
 
-const CAPPUCCINO_BASE = [191, 168, 137] as const
+const LAVENDER_BASE = [211, 205, 234] as const
 
-function mixCappuccino(hex: string, minLightness: number, maxLightness: number, baseWeight: number): string | null {
+function mixLavender(hex: string, minLightness: number, maxLightness: number, baseWeight: number): string | null {
   const match = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex.trim())
   if (!match) return null
   const rgb = match.slice(1).map((part) => Number.parseInt(part, 16) / 255)
@@ -73,20 +73,20 @@ function mixCappuccino(hex: string, minLightness: number, maxLightness: number, 
   const m = adaptedLightness - chroma / 2
   const coverRgb = [r1 + m, g1 + m, b1 + m].map((channel) => Math.round(channel * 255))
   const coverWeight = 1 - baseWeight
-  const mixed = CAPPUCCINO_BASE.map((base, index) => Math.round(base * baseWeight + coverRgb[index] * coverWeight))
+  const mixed = LAVENDER_BASE.map((base, index) => Math.round(base * baseWeight + coverRgb[index] * coverWeight))
   return `rgb(${mixed[0]}, ${mixed[1]}, ${mixed[2]})`
 }
 
-/** Adapta a cor média da capa ao fundo Cappuccino sem apagar sua identidade. */
+/** Adapta a cor média da capa ao fundo lilás sem apagar sua identidade. */
 export function cappuccinoCoverBackground(hex: string): string {
-  return mixCappuccino(hex, 0.4, 0.68, 0.6) ?? '#BFA889'
+  return mixLavender(hex, 0.56, 0.78, 0.68) ?? '#D3CDEA'
 }
 
 /** Superfície da mesma família cromática, sempre mais clara que o fundo. */
 export function cappuccinoCoverSurface(hex: string): string {
-  // Superfícies usam 50% da cor adaptada (antes 40%), mantendo a base
-  // Cappuccino dominante e reforçando sutilmente a identidade da capa.
-  return mixCappuccino(hex, 0.64, 0.82, 0.5) ?? '#D8C5AC'
+  // Superfícies mantêm a base lilás dominante e reforçam sutilmente
+  // a identidade da capa.
+  return mixLavender(hex, 0.72, 0.9, 0.58) ?? '#E6E2F4'
 }
 
 // aliases exigidos pelo enunciado

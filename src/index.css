@@ -23,29 +23,29 @@ html.dark ::-moz-selection {
 
 /* Design tokens — W3C WCAG 2.2 AA (contraste 4.5:1+) */
 @theme {
-  --color-primary: #003f5f;
-  --color-primary-hover: #003b5c;
-  --color-primary-active: #0c4a6e;
+  --color-primary: #4c3b8f;
+  --color-primary-hover: #3f3278;
+  --color-primary-active: #352966;
   --color-primary-contrast: #ffffff;
-  --color-accent: #075985;
-  --color-surface: #d8c5ac;
-  --color-surface-elevated: #e5d5c0;
-  --color-field: #eadbc8;
-  --color-surface-muted: #bfa889;
-  --color-bg: #bfa889;
-  --color-text: #29221d;
-  --color-text-muted: #4a3d35;
-  --color-border: #685443;
-  --color-field-border-hover: #5b4838;
-  --color-disabled-bg: #c6b192;
-  --color-disabled-text: #4a3d35;
+  --color-accent: #5b4aa3;
+  --color-surface: #e6e2f4;
+  --color-surface-elevated: #f1effa;
+  --color-field: #f8f7fd;
+  --color-surface-muted: #d3cdea;
+  --color-bg: #d3cdea;
+  --color-text: #292342;
+  --color-text-muted: #51496d;
+  --color-border: #8178a6;
+  --color-field-border-hover: #675b91;
+  --color-disabled-bg: #dcd8eb;
+  --color-disabled-text: #51496d;
   --color-success: #14532d;
   --color-success-bg: #dcfce7;
   --color-warning: #7c2d12;
   --color-warning-bg: #fef3c7;
   --color-danger: #7f1d1d;
   --color-danger-bg: #fee2e2;
-  --color-focus: #7c2d12;
+  --color-focus: #4c3b8f;
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --leading-page-description: 1.5rem;
 }
@@ -266,7 +266,7 @@ html:not(.dark) :is(header, nav) :focus-visible {
 /*
  * Ponte temporária para as utilidades claras legadas. O projeto ainda usa
  * classes Tailwind neutras em páginas e componentes; concentrar o mapeamento
- * aqui evita espalhar a paleta Cappuccino e mantém as variantes dark:* intactas.
+ * aqui evita espalhar a paleta lilás e mantém as variantes dark:* intactas.
  */
 html:not(.dark) :is(.bg-white, .bg-slate-50, .bg-slate-100, .bg-slate-200,
   .bg-slate-300, .bg-slate-400) {
@@ -327,7 +327,7 @@ html:not(.dark) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="
   color: var(--color-text-muted);
   opacity: 1;
 }
-/* Disabled usa apenas neutros Cappuccino; não mantém aparência de ação primária. */
+/* Disabled usa apenas neutros lilás; não mantém aparência de ação primária. */
 html:not(.dark) :is(button, input, textarea, select):disabled {
   opacity: 1;
   background-color: var(--color-disabled-bg);

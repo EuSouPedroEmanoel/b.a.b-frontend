@@ -9,6 +9,7 @@ import { getErrorMessage } from '@/lib/errors'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { buildSchoolCustomizationPayload, customizationFieldStatus, type BookEditFormState, type CustomizationField } from './bookCustomization'
 
 type Genre = { id: number; name: string; slug: string }
 type Author = { id: number; name: string; slug: string }
@@ -27,16 +28,7 @@ type CustomizationState = {
   overridden_fields: string[]
 }
 
-type FormState = {
-  title: string
-  description: string
-  cover_url: string
-  published_date: string
-  authors: string
-  genres: string
-}
-
-function formFromBook(book: Book): FormState {
+function formFromBook(book: Book): BookEditFormState {
   return {
     title: book.title,
     description: book.description ?? '',
@@ -45,13 +37,6 @@ function formFromBook(book: Book): FormState {
     authors: book.authors.map((author) => author.name).join(', '),
     genres: book.genres.map((genre) => genre.name).join(', '),
   }
-}
-
-function splitNames(value: string): string[] {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
 }
 
 export function BookEditPage() {
@@ -107,18 +92,31 @@ function BookEditForm({ book, id, isSuperAdmin, customization }: BookEditFormPro
   const qc = useQueryClient()
   const announce = useAnnouncer()
   const endpoint = isSuperAdmin ? `/books/${id}/global` : `/books/${id}/customization`
-  const [form, setForm] = useState<FormState>(() => formFromBook(book))
+  const [initialForm] = useState(() => formFromBook(book))
+  const [form, setForm] = useState<BookEditFormState>(initialForm)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const fieldStatus = (field: CustomizationField) => {
+    if (isSuperAdmin || !customization) return undefined
+    return customizationFieldStatus(customization.overridden_fields, field) === 'customized'
+      ? 'Personalizado nesta escola.'
+      : 'Herdado do catálogo global.'
+  }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const schoolPayload = buildSchoolCustomizationPayload(initialForm, form)
+      const payload = isSuperAdmin
+        ? {
+            title: form.title.trim(),
+            description: form.description.trim() || null,
+            cover_url: form.cover_url.trim() || null,
+            published_date: form.published_date || null,
+            author_names: form.authors.split(',').map((item) => item.trim()).filter(Boolean),
+            genre_names: form.genres.split(',').map((item) => item.trim()).filter(Boolean),
+          }
+        : schoolPayload
       const { data } = await api.patch<Book>(endpoint, {
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        cover_url: form.cover_url.trim() || null,
-        published_date: form.published_date || null,
-        author_names: splitNames(form.authors),
-        genre_names: splitNames(form.genres),
+        ...payload,
       })
       return data
     },
@@ -184,7 +182,9 @@ function BookEditForm({ book, id, isSuperAdmin, customization }: BookEditFormPro
               : 'Estas alterações serão exibidas somente para a escola da sua conta.'}
           </p>
           {customization?.has_override && !isSuperAdmin && (
-            <p className="mt-2 text-sm text-sky-700 dark:text-sky-300">Este livro já possui uma personalização nesta escola.</p>
+            <p className="mt-2 text-sm text-sky-700 dark:text-sky-300">
+              Este livro já possui uma personalização nesta escola. Restaurar os dados globais removerá todos os overrides locais.
+            </p>
           )}
         </CardHeader>
         <CardBody>
@@ -197,15 +197,16 @@ function BookEditForm({ book, id, isSuperAdmin, customization }: BookEditFormPro
               saveMutation.mutate()
             }}
           >
-            <Input label="Título" id="book-edit-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required autoFocus />
+            <Input label="Título" id="book-edit-title" hint={fieldStatus('title')} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required autoFocus />
             <div className="flex flex-col gap-1.5">
               <label htmlFor="book-edit-description" className="text-sm font-medium text-slate-700 dark:text-slate-200">Descrição</label>
               <textarea id="book-edit-description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={5} className="w-full rounded-md border border-[var(--color-field-border-hover)] bg-[var(--color-field)] px-3 py-2.5 text-base focus-visible:outline-3 focus-visible:outline-[var(--color-focus)]" />
+              {fieldStatus('description') && <p className="text-xs text-slate-500 dark:text-slate-400">{fieldStatus('description')}</p>}
             </div>
-            <Input label="Link da capa" id="book-edit-cover" type="url" value={form.cover_url} onChange={(event) => setForm({ ...form, cover_url: event.target.value })} />
-            <Input label="Data de lançamento" id="book-edit-date" type="date" value={form.published_date} onChange={(event) => setForm({ ...form, published_date: event.target.value })} />
-            <Input label="Autores" id="book-edit-authors" hint="Separe vários autores por vírgula." value={form.authors} onChange={(event) => setForm({ ...form, authors: event.target.value })} />
-            <Input label="Gêneros" id="book-edit-genres" hint="Separe vários gêneros por vírgula." value={form.genres} onChange={(event) => setForm({ ...form, genres: event.target.value })} />
+            <Input label="Link da capa" id="book-edit-cover" type="url" hint={fieldStatus('cover_url')} value={form.cover_url} onChange={(event) => setForm({ ...form, cover_url: event.target.value })} />
+            <Input label="Data de lançamento" id="book-edit-date" type="date" hint={fieldStatus('published_date')} value={form.published_date} onChange={(event) => setForm({ ...form, published_date: event.target.value })} />
+            <Input label="Autores" id="book-edit-authors" hint={[fieldStatus('authors'), 'Separe vários autores por vírgula.'].filter(Boolean).join(' ')} value={form.authors} onChange={(event) => setForm({ ...form, authors: event.target.value })} />
+            <Input label="Gêneros" id="book-edit-genres" hint={[fieldStatus('genres'), 'Separe vários gêneros por vírgula.'].filter(Boolean).join(' ')} value={form.genres} onChange={(event) => setForm({ ...form, genres: event.target.value })} />
             <p className="text-sm text-slate-500 dark:text-slate-400">ISBN: <span className="font-mono">{book.isbn ?? '—'}</span></p>
             <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
               <Button type="submit" disabled={saveMutation.isPending || restoreMutation.isPending} aria-busy={saveMutation.isPending}>

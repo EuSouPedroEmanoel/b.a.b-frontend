@@ -440,11 +440,11 @@ export function BookDetailPage() {
     return 220
   }, [avgHex])
   const cardBg = useMemo(() => {
-    if (!coverThemeReady) return resolved === 'dark' ? '#1e293b' : '#D8C5AC'
+    if (!coverThemeReady) return resolved === 'dark' ? '#1e293b' : '#E6E2F4'
     return resolved === 'dark' ? `hsl(${baseHue}, 65%, 20%)` : cappuccinoCoverSurface(avgHex ?? '')
   }, [avgHex, baseHue, coverThemeReady, resolved])
   const pageBg = useMemo(() => {
-    if (!coverThemeReady) return resolved === 'dark' ? '#0f172a' : '#BFA889'
+    if (!coverThemeReady) return resolved === 'dark' ? '#0f172a' : '#D3CDEA'
     return resolved === 'dark' ? `hsl(${baseHue}, 65%, 14%)` : cappuccinoCoverBackground(avgHex ?? '')
   }, [avgHex, baseHue, coverThemeReady, resolved])
 
