@@ -70,7 +70,11 @@ api.interceptors.response.use(
         return api(original)
       } catch (e) {
         processQueue(e, null)
-        localStorage.clear()
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('session_kind')
+        sessionStorage.removeItem('guest_school_name')
+        sessionStorage.removeItem('guest_school_code')
         window.location.href = '/entrar'
         return Promise.reject(e)
       } finally {

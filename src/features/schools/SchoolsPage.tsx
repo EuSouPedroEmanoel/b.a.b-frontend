@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Pagination } from '@/components/ui/Pagination'
 import { PageDescription } from '@/components/ui/PageDescription'
+import { getErrorMessage } from '@/lib/errors'
 
 type School = { id: number; name: string; code: string; is_active: boolean }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
@@ -19,7 +20,7 @@ export function SchoolsPage() {
   const announce = useAnnouncer()
   const qc = useQueryClient()
 
-  const { data } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['schools', page],
     queryFn: async () => {
       const { data } = await api.get<Paginated<School>>(`/schools/?page=${page}&size=10`)
@@ -76,8 +77,11 @@ export function SchoolsPage() {
         </CardBody>
       </Card>
 
+      {isLoading && <p role="status" className="rounded-xl border border-slate-200 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">Carregando escolas…</p>}
+      {isError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"><span>{getErrorMessage(error, 'Não foi possível carregar as escolas.')}</span><Button type="button" size="sm" variant="secondary" onClick={() => void refetch()}>Tentar novamente</Button></div>}
       {data && (
         <>
+          {data.items.length === 0 && <p role="status" className="rounded-xl border border-slate-200 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">Nenhuma escola cadastrada.</p>}
           <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 md:block">
             <table className="w-full text-sm">
               <caption className="sr-only">Escolas cadastradas</caption>

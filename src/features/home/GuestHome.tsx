@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { ProgressiveCarouselSection } from './ProgressiveCarouselSection'
 import { GridCard } from '@/features/books/GridCard'
+import { Button } from '@/components/ui/Button'
 
 // Mantém o mesmo tamanho mínimo da grade do Acervo em cada breakpoint.
 const homeCarouselItemClasses = 'relative w-[min(var(--carousel-viewport-width,100vw),calc(4rem_+_var(--text-sm)_*_3))] shrink-0 md:w-[min(var(--carousel-viewport-width,100vw),calc(9rem_+_var(--text-sm)_*_3.5))]'
@@ -17,7 +18,7 @@ function measureBook() {
 }
 
 export function GuestHome() {
-  const { data } = useQuery({ queryKey: ['guest-home'], queryFn: async () => (await api.get('/books/home')).data })
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['guest-home'], queryFn: async () => (await api.get('/books/home')).data })
   return (
     <div className="flex flex-col gap-6">
       <header>
@@ -39,9 +40,12 @@ export function GuestHome() {
           Ver acervo
         </Link>
       </section>
+      {isLoading && <p role="status" className="rounded-xl border border-slate-200 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">Carregando destaques do acervo…</p>}
+      {isError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"><span>Não foi possível carregar os destaques do acervo.</span><Button type="button" size="sm" variant="secondary" onClick={() => void refetch()}>Tentar novamente</Button></div>}
       {(data?.carousels ?? []).map((section: { type: string; title: string; books: any[]; ranking?: boolean }, index: number) => (
         <ProgressiveCarouselSection key={section.type} title={section.title} items={section.books} circular renderItem={(book, cardIndex) => renderBook(book, cardIndex, section.ranking)} measureItem={measureBook} emptyText="Nenhum livro disponível nesta seção." priority={index === 0} />
       ))}
+      {!isLoading && !isError && (data?.carousels ?? []).length === 0 && <p className="rounded-xl border border-slate-200 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">Nenhum destaque disponível no momento.</p>}
     </div>
   )
 }

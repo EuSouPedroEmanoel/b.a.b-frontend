@@ -10,6 +10,8 @@ import { CirculationPoliciesPage } from '@/features/circulation/CirculationPolic
 import { LibraryCalendarPage } from './LibraryCalendarPage'
 import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
 import { Switch } from '@/components/ui/Switch'
+import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
+import { getErrorMessage } from '@/lib/errors'
 
 type School = { id: number; name: string; allow_student_condition_filter?: boolean; allow_student_restricted_availability?: boolean }
 type Paginated<T> = { items: T[] }
@@ -23,6 +25,7 @@ export function ManageSchoolPage() {
   const isSuperAdmin = user?.role === 'super_admin'
   const schoolId = isSuperAdmin ? params.get('school') ?? '' : String(user?.school_id ?? '')
   const queryClient = useQueryClient()
+  const announce = useAnnouncer()
   const schools = useQuery({
     queryKey: ['schools', 'manage-school'],
     queryFn: async () => (await api.get<Paginated<School>>('/schools/?size=100')).data.items,
@@ -43,6 +46,10 @@ export function ManageSchoolPage() {
     onSuccess: (data) => {
       queryClient.setQueryData(['school-settings', schoolId], data)
       queryClient.invalidateQueries({ queryKey: ['schools', 'manage-school'] })
+      void announce('Preferências da escola atualizadas.', 'polite')
+    },
+    onError: (error: unknown) => {
+      void announce(getErrorMessage(error, 'Não foi possível atualizar as preferências da escola.'), 'assertive')
     },
   })
   const selectSection = (next: Section) => {
@@ -85,6 +92,8 @@ export function ManageSchoolPage() {
       <section aria-labelledby="school-preferences-title" className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <h2 id="school-preferences-title" className="text-lg font-semibold">Preferências da escola</h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Defina quais filtros ficam disponíveis para os alunos no acervo.</p>
+        {schoolSettings.isError && <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"><span>Não foi possível carregar as preferências da escola.</span><button type="button" className="font-medium underline" onClick={() => void schoolSettings.refetch()}>Tentar novamente</button></div>}
+        {!schoolId && isSuperAdmin && <p role="status" className="mt-5 rounded-md border border-slate-200 p-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">Selecione uma escola para consultar suas preferências.</p>}
         <div className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700">
           <Switch
             controlOnRight

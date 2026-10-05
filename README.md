@@ -38,6 +38,11 @@ npm run test
 npm run build
 ```
 
+Em produção, publique o conteúdo de `dist/` em um servidor HTTPS com fallback
+de SPA para `index.html`. Configure `VITE_API_URL` para a origem da API ou para
+um proxy same-origin em `/api`; o proxy deve encaminhar os métodos e headers
+da API, incluindo `Authorization`.
+
 ## Segurança
 
 O frontend controla experiência e navegação, mas a autorização efetiva ocorre no backend. Não coloque segredos em variáveis `VITE_*`; elas são incorporadas ao bundle. Use somente dados fictícios no desenvolvimento.
