@@ -2,6 +2,8 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+html { overflow-x: clip; }
+
 /* Destaque laranja para textos selecionados pelo usuário. */
 ::selection {
   background-color: rgb(249 115 22 / 78%);
@@ -78,6 +80,56 @@ html.dark ::-moz-selection {
 .profile-error-message { border-color: var(--color-danger); background: var(--color-danger-bg); color: var(--color-danger); }
 .profile-success-message { border-color: var(--color-success); background: var(--color-success-bg); color: var(--color-success); }
 
+@media (max-width: 639px) {
+  .privacy-summary-value { text-align: center; }
+}
+
+.privacy-download-edge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 0 0 0.5rem 0.5rem;
+  background: rgb(96 165 250 / 25%);
+}
+
+.privacy-download-icon { display: contents; }
+.privacy-download-mobile-message { display: none; }
+
+.privacy-download-progress {
+  display: block;
+  width: 8%;
+  height: 100%;
+  border-radius: inherit;
+  background: #93c5fd;
+  animation: privacy-download-progress 3.2s ease-out forwards;
+}
+
+@keyframes privacy-download-progress {
+  0% { width: 8%; }
+  24% { width: 31%; }
+  43% { width: 48%; }
+  67% { width: 73%; }
+  82% { width: 84%; }
+  100% { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .privacy-download-progress { width: 100%; animation: none; }
+}
+
+@media (max-width: 639px) {
+  .privacy-security-card { text-align: center; }
+  .privacy-download-card { gap: 0.75rem; padding: 0.75rem; }
+  .privacy-download-content { gap: 0.625rem; }
+  .privacy-download-message { display: none; }
+  .privacy-download-mobile-message { display: inline; flex-shrink: 0; white-space: nowrap; }
+  .privacy-download-status { display: none; }
+}
+
 html[data-high-contrast='true'] .profile-primary-link {
   background: var(--color-primary) !important;
   border: 2px solid var(--color-primary) !important;
@@ -138,6 +190,26 @@ html[data-font-size='200'] {
 .accessibility-decrease-label { font-size: 0.9em; }
 .accessibility-increase-label { font-size: 1em; }
 html[data-font-size='200'] .accessibility-decrease-label { font-size: 0.8em; }
+
+html,
+body,
+#root {
+  min-width: 0;
+}
+
+/* A grade reage continuamente ao espaço disponível e à escala tipográfica:
+ * não há limiares fixos para trocar entre três, duas ou uma coluna. */
+.privacy-data-grid {
+  align-items: stretch;
+}
+
+.privacy-data-grid > .card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+
+body { overflow-x: clip; }
 
 @media (hover: hover) and (pointer: fine) {
   .accessibility-trigger:hover {

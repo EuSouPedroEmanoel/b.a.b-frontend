@@ -108,9 +108,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const acceptTerms = useCallback(async () => {
+    const { data } = await api.post<User>('/users/me/terms-acceptance')
+    setUser(data)
+  }, [])
+
   const value = useMemo(
-    () => ({ user, loading, login, loginGuest, logout, refreshUser: fetchMe, isAuthenticated: !!user }),
-    [user, loading, login, loginGuest, logout, fetchMe],
+    () => ({ user, loading, login, loginGuest, logout, refreshUser: fetchMe, acceptTerms, isAuthenticated: !!user }),
+    [user, loading, login, loginGuest, logout, fetchMe, acceptTerms],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

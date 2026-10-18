@@ -14,7 +14,7 @@ const refreshUser = vi.fn()
 
 function renderPage(path = '/perfil/7') {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
-  return render(<QueryClientProvider client={client}><AuthContext.Provider value={{ user, loading: false, isAuthenticated: true, login: vi.fn(), loginGuest: vi.fn(), logout: vi.fn(), refreshUser }}><MemoryRouter initialEntries={[path]}><Routes><Route path="/perfil/:id" element={<AccountManagementPage />} /><Route path="/perfil" element={<p>Perfil</p>} /></Routes></MemoryRouter></AuthContext.Provider></QueryClientProvider>)
+  return render(<QueryClientProvider client={client}><AuthContext.Provider value={{ user, loading: false, isAuthenticated: true, login: vi.fn(), loginGuest: vi.fn(), logout: vi.fn(), refreshUser, acceptTerms: vi.fn() }}><MemoryRouter initialEntries={[path]}><Routes><Route path="/perfil/:id" element={<AccountManagementPage />} /><Route path="/perfil" element={<p>Perfil</p>} /></Routes></MemoryRouter></AuthContext.Provider></QueryClientProvider>)
 }
 
 describe('AccountManagementPage', () => {

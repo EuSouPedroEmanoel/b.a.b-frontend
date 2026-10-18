@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 
 export const AccountPage = lazy(() => import('@/features/account/AccountPage').then((module) => ({ default: module.AccountPage })))
 export const AccountManagementPage = lazy(() => import('@/features/account/AccountManagementPage').then((module) => ({ default: module.AccountManagementPage })))
+export const PrivacyCenterPage = lazy(() => import('@/features/privacy/PrivacyCenterPage').then((module) => ({ default: module.PrivacyCenterPage })))
 export const BooksPage = lazy(() => import('@/features/books/BooksPage').then((module) => ({ default: module.BooksPage })))
 export const BookCreatePage = lazy(() => import('@/features/books/BookCreatePage').then((module) => ({ default: module.BookCreatePage })))
 export const BookDetailPage = lazy(() => import('@/features/books/BookDetailPage').then((module) => ({ default: module.BookDetailPage })))

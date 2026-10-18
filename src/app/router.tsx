@@ -2,11 +2,13 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RouteErrorFallback } from '@/components/feedback/ErrorBoundary'
+import { PrivacyPage } from '@/features/privacy/PrivacyPage'
 import { HomePage, DiscoveryHome } from '@/features/home/HomePage'
 import { AccountOnly, Protected, PublicOnly, RedirectBookCopies, UserManagementOnly } from './RouteGuards'
 import {
   AccountManagementPage,
   AccountPage,
+  PrivacyCenterPage,
   BookCopyCreatePage,
   BookCreatePage,
   BookDetailPage,
@@ -44,6 +46,7 @@ export const router = createBrowserRouter([
           </PublicOnly>
         ),
       },
+      { path: '/privacidade', element: <PrivacyPage /> },
       {
         path: '/visitar/:schoolCode',
         element: <LoginPage />,
@@ -138,6 +141,14 @@ export const router = createBrowserRouter([
         element: (
           <AccountOnly>
             <LazyRoute><AccountPage /></LazyRoute>
+          </AccountOnly>
+        ),
+      },
+      {
+        path: '/meus-dados-e-privacidade',
+        element: (
+          <AccountOnly>
+            <LazyRoute><PrivacyCenterPage /></LazyRoute>
           </AccountOnly>
         ),
       },

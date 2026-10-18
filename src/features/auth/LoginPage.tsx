@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { Link, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { Eye, EyeOff } from 'lucide-react'
@@ -491,6 +491,9 @@ export function LoginPage() {
           }}
         />
       </div>}
+      <p className="mt-5 text-center text-sm text-slate-600 dark:text-slate-300">
+        <Link to="/privacidade" className="underline underline-offset-2">Aviso de Privacidade</Link>
+      </p>
     </div>
   )
 }
