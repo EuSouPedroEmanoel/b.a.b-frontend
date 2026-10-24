@@ -13,7 +13,7 @@ const emptyReadings = { data: { items: [], total: 0, page: 1, size: 15, pages: 0
 
 function renderPage(user: User = student) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(<QueryClientProvider client={client}><AuthContext.Provider value={{ user, loading: false, isAuthenticated: true, login: vi.fn(), loginGuest: vi.fn(), logout: vi.fn(), refreshUser: vi.fn(), acceptTerms: vi.fn() }}><MemoryRouter initialEntries={['/perfil']}><AccountPage /></MemoryRouter></AuthContext.Provider></QueryClientProvider>)
+  return render(<QueryClientProvider client={client}><AuthContext.Provider value={{ user, loading: false, isAuthenticated: true, login: vi.fn(), loginGuest: vi.fn(), logout: vi.fn(), refreshUser: vi.fn() }}><MemoryRouter initialEntries={['/perfil']}><AccountPage /></MemoryRouter></AuthContext.Provider></QueryClientProvider>)
 }
 
 describe('AccountPage', () => {

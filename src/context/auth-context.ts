@@ -16,9 +16,6 @@ export type User = {
   school_allows_student_restricted_availability?: boolean
   is_active: boolean
   administrative_capabilities?: string[]
-  terms_accepted_version?: string | null
-  terms_accepted_at?: string | null
-  terms_current_version?: string | null
 }
 
 export type AuthContextType = {
@@ -28,7 +25,6 @@ export type AuthContextType = {
   loginGuest: (schoolCode: string, schoolName?: string) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
-  acceptTerms: () => Promise<void>
   isAuthenticated: boolean
 }
 
