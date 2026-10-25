@@ -16,6 +16,8 @@ describe('PrivacyPage', () => {
     expect(screen.getByText(/Buscamos limitar o uso de informações ao necessário/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Serviços externos' })).toBeInTheDocument()
     expect(screen.getByText('Para dúvidas gerais sobre o funcionamento da biblioteca, procure a equipe responsável em sua escola.')).toBeInTheDocument()
+    expect(screen.getByText('A escola responsável define como o vínculo com responsáveis legais será verificado e como eles participarão do exercício dos direitos do titular.')).toBeInTheDocument()
+    expect(screen.getByText('O sistema não cadastra responsáveis legais nem substitui os procedimentos institucionais da escola. Solicitações relacionadas a titulares menores podem depender de validação pela escola.')).toBeInTheDocument()
     expect(screen.queryByText(/publicadas nesta página assim que estiverem oficialmente disponíveis/)).not.toBeInTheDocument()
     expect(screen.getByRole('article')).toHaveClass('min-w-0')
     const dataGrid = screen.getByRole('heading', { name: 'Quais dados utilizamos' }).nextElementSibling

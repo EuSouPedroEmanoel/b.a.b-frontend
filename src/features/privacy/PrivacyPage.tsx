@@ -117,7 +117,8 @@ export function PrivacyPage() {
         <CardHeader><h2 className="text-lg font-semibold">Crianças e adolescentes</h2></CardHeader>
         <CardBody className="min-w-0 space-y-3 break-words text-sm leading-[inherit] [text-wrap:pretty]">
           <p>O sistema pode tratar dados de alunos menores de idade. Esse tratamento deve sempre considerar o melhor interesse e a proteção especial de crianças e adolescentes.</p>
-          <p>Quando aplicável, responsáveis legais podem participar do exercício dos direitos do titular e receber informações sobre o uso dos dados.</p>
+          <p>A escola responsável define como o vínculo com responsáveis legais será verificado e como eles participarão do exercício dos direitos do titular.</p>
+          <p>O sistema não cadastra responsáveis legais nem substitui os procedimentos institucionais da escola. Solicitações relacionadas a titulares menores podem depender de validação pela escola.</p>
         </CardBody>
       </Card>
 

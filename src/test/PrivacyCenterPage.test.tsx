@@ -27,6 +27,7 @@ describe('PrivacyCenterPage', () => {
     renderPage()
     expect(await screen.findByText('Ana')).toBeInTheDocument()
     expect(screen.getByText('Aluno')).toBeInTheDocument()
+    expect(screen.getByText('Para titulares menores, a escola pode validar a solicitação conforme suas regras institucionais e o melhor interesse do aluno.')).toBeInTheDocument()
     expect(screen.getByText('Ativa')).toBeInTheDocument()
     expect(screen.getByText('18/09/2015')).toBeInTheDocument()
     expect(screen.getByText(/senha e tokens de acesso, nunca são exibidas/)).toBeInTheDocument()
