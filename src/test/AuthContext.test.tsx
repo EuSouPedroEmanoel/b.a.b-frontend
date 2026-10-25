@@ -29,17 +29,18 @@ describe('AuthProvider', () => {
     sessionStorage.clear()
   })
 
-  it('hydrates an account session from /users/me without listing users', async () => {
-    localStorage.setItem('access_token', 'account-token')
+  it('hydrates an account session from /auth/session without listing users', async () => {
     api.get.mockResolvedValue({
       data: {
-        id: 7,
-        username: 'ana',
-        name: 'Ana',
-        role: 'student',
-        school_id: 3,
-        is_active: true,
-        administrative_capabilities: [],
+        user: {
+          id: 7,
+          username: 'ana',
+          name: 'Ana',
+          role: 'student',
+          school_id: 3,
+          is_active: true,
+          administrative_capabilities: [],
+        },
       },
     })
 
@@ -47,16 +48,15 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(screen.getByText('7:student')).toBeInTheDocument())
     expect(api.get).toHaveBeenCalledTimes(1)
-    expect(api.get).toHaveBeenCalledWith('/users/me')
+    expect(api.get).toHaveBeenCalledWith('/auth/session')
   })
 
-  it('does not create a partial user when /users/me fails', async () => {
-    localStorage.setItem('access_token', 'account-token')
+  it('does not create a partial user when /auth/session fails', async () => {
     api.get.mockRejectedValue(new Error('network error'))
 
     render(<AuthProvider><SessionState /></AuthProvider>)
 
     await waitFor(() => expect(screen.getByText('anonymous')).toBeInTheDocument())
-    expect(api.get).toHaveBeenCalledWith('/users/me')
+    expect(api.get).toHaveBeenCalledWith('/auth/session')
   })
 })
