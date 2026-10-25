@@ -13,7 +13,7 @@ const props = {
 afterEach(cleanup)
 
 function coverImage() {
-  const image = document.querySelector('img[src*="wsrv.nl"], img[src="https://example.com/book-cover.jpg"]')
+  const image = document.querySelector('img[src*="/images/proxy"], img[src="https://example.com/book-cover.jpg"]')
   if (!(image instanceof HTMLImageElement)) throw new Error('cover image not found')
   return image
 }
@@ -32,7 +32,7 @@ describe('CoverImage', () => {
 
     expect(placeholder()).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: props.alt })).not.toBeInTheDocument()
-    expect(coverImage().getAttribute('src')).toContain('wsrv.nl')
+    expect(coverImage().getAttribute('src')).toContain('/images/proxy')
     expect(coverImage()).toHaveClass('opacity-0')
   })
 
