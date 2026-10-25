@@ -65,10 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timeout)
   }, [fetchMe])
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string, schoolCode?: string) => {
     const form = new URLSearchParams()
     form.set('username', username)
     form.set('password', password)
+    if (schoolCode) form.set('school_code', schoolCode)
     const { data } = await api.post<{ access_token: string; refresh_token: string }>('/auth/token', form, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     })

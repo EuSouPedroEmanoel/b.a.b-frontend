@@ -4,16 +4,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { PageDescription } from '@/components/ui/PageDescription'
+import { Button } from '@/components/ui/Button'
 import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
 import { CirculationPoliciesPage } from '@/features/circulation/CirculationPoliciesPage'
 import { LibraryCalendarPage } from './LibraryCalendarPage'
 import { segmentedControlContainerClasses, segmentedControlItemClasses } from '@/components/ui/SegmentedControl'
 import { Switch } from '@/components/ui/Switch'
+import { Input } from '@/components/ui/Input'
 import { useAnnouncer } from '@/components/feedback/LiveRegionContext'
 import { getErrorMessage } from '@/lib/errors'
 
 type School = { id: number; name: string; allow_student_condition_filter?: boolean; allow_student_restricted_availability?: boolean }
+type PrivacyPolicy = { processing_mode: 'automatic_anonymization' | 'administrative_review'; privacy_contact_email: string | null }
 type Paginated<T> = { items: T[] }
 type Section = 'rules' | 'calendar' | 'settings'
 
@@ -22,6 +25,8 @@ export function ManageSchoolPage() {
   const [params, setParams] = useSearchParams()
   const initialSection: Section = params.get('tab') === 'calendar' ? 'calendar' : params.get('tab') === 'settings' ? 'settings' : 'rules'
   const [section, setSection] = useState<Section>(initialSection)
+  const [privacyEmail, setPrivacyEmail] = useState('')
+  const [privacyJustification, setPrivacyJustification] = useState('')
   const isSuperAdmin = user?.role === 'super_admin'
   const schoolId = isSuperAdmin ? params.get('school') ?? '' : String(user?.school_id ?? '')
   const queryClient = useQueryClient()
@@ -51,6 +56,25 @@ export function ManageSchoolPage() {
     onError: (error: unknown) => {
       void announce(getErrorMessage(error, 'Não foi possível atualizar as preferências da escola.'), 'assertive')
     },
+  })
+  const canManagePrivacy = ['super_admin', 'school_admin'].includes(user?.role ?? '')
+  const privacyPolicy = useQuery({
+    queryKey: ['privacy-policy', schoolId],
+    queryFn: async () => (await api.get<PrivacyPolicy>(`/privacy/schools/${schoolId}/policy`)).data,
+    enabled: !!schoolId && canManagePrivacy,
+  })
+  const updatePrivacyPolicy = useMutation({
+    mutationFn: async () => (await api.put<PrivacyPolicy>(`/privacy/schools/${schoolId}/policy`, {
+      processing_mode: privacyPolicy.data?.processing_mode ?? 'automatic_anonymization',
+      privacy_contact_email: privacyEmail.trim() || null,
+      justification: privacyJustification.trim(),
+    })).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['privacy-policy', schoolId], data)
+      setPrivacyJustification('')
+      void announce('Configuração de privacidade atualizada.', 'polite')
+    },
+    onError: (error: unknown) => void announce(getErrorMessage(error, 'Não foi possível atualizar o canal de privacidade.'), 'assertive'),
   })
   const selectSection = (next: Section) => {
     setSection(next)
@@ -116,6 +140,7 @@ export function ManageSchoolPage() {
             />
           </div>
         </div>
+        {canManagePrivacy && <div className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700"><h3 className="font-semibold">Canal de privacidade</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">O e-mail será exibido aos titulares da escola para dúvidas e solicitações de privacidade.</p><div className="mt-4 grid gap-4 sm:grid-cols-2"><Input label="E-mail institucional" type="email" value={privacyEmail || privacyPolicy.data?.privacy_contact_email || ''} onChange={(event) => setPrivacyEmail(event.target.value)} placeholder="privacidade@escola.edu.br" /><Input label="Justificativa da alteração" value={privacyJustification} onChange={(event) => setPrivacyJustification(event.target.value)} required /></div><Button className="mt-4" disabled={!privacyJustification.trim() || privacyPolicy.isLoading || updatePrivacyPolicy.isPending} onClick={() => updatePrivacyPolicy.mutate()}>Salvar canal de privacidade</Button></div>}
       </section>
     )}
   </div>

@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { PageDescription } from '@/components/ui/PageDescription'
+import api from '@/lib/api'
 
 export const PRIVACY_NOTICE_VERSION = '1.0.0'
 export const PRIVACY_NOTICE_LAST_UPDATED = '18 de outubro de 2026'
@@ -25,8 +26,20 @@ const dataSections = [
 ]
 
 export function PrivacyPage() {
+  const [params] = useSearchParams()
+  const [privacyContactEmail, setPrivacyContactEmail] = useState<string | null>(null)
   const dataGridRef = useRef<HTMLDivElement>(null)
   const [stackDataCards, setStackDataCards] = useState(false)
+
+  useEffect(() => {
+    const schoolCode = params.get('school')
+    if (!schoolCode) return
+    let active = true
+    void api.get<{ privacy_contact_email: string | null }>(`/privacy/public/${encodeURIComponent(schoolCode)}`)
+      .then(({ data }) => { if (active) setPrivacyContactEmail(data.privacy_contact_email) })
+      .catch(() => { if (active) setPrivacyContactEmail(null) })
+    return () => { active = false }
+  }, [params])
 
   useLayoutEffect(() => {
     const grid = dataGridRef.current
@@ -128,7 +141,7 @@ export function PrivacyPage() {
             <li>solicitar portabilidade, quando esse direito for aplicável; e</li>
             <li>revogar o consentimento quando o tratamento depender dele.</li>
           </ul>
-          <p>O canal oficial para solicitações relacionadas aos seus dados será informado nesta página assim que estiver disponível.</p>
+          <p>{privacyContactEmail ? <>O canal oficial para solicitações relacionadas aos seus dados é <a className="font-medium underline" href={`mailto:${privacyContactEmail}`}>{privacyContactEmail}</a>.</> : 'O canal oficial para solicitações relacionadas aos seus dados será informado nesta página assim que estiver disponível.'}</p>
         </CardBody>
       </Card>
 

@@ -3,6 +3,7 @@ import { createContext } from 'react'
 export type User = {
   id: number
   username: string
+  school_identifier?: string | null
   name: string
   cpf_masked?: string | null
   birthdate?: string | null
@@ -21,7 +22,7 @@ export type User = {
 export type AuthContextType = {
   user: User | null
   loading: boolean
-  login: (username: string, password: string) => Promise<void>
+  login: (username: string, password: string, schoolCode?: string) => Promise<void>
   loginGuest: (schoolCode: string, schoolName?: string) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>

@@ -21,6 +21,8 @@ export function LoginPage() {
   const [accessTab, setAccessTab] = useState<'login' | 'first-access'>(() => location.pathname === '/primeiro-acesso' ? 'first-access' : 'login')
   const [mode, setMode] = useState<'account' | 'guest'>(schoolCode ? 'guest' : 'account')
   const [username, setUsername] = useState('')
+  const [schoolCodeForLogin, setSchoolCodeForLogin] = useState('')
+  const [loginMethod, setLoginMethod] = useState<'username' | 'school'>('username')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -184,13 +186,23 @@ export function LoginPage() {
     if (loading) return
     // Validação cliente evita 422 array e melhora a11y — com clear para repetir anúncio
     if (!username.trim()) {
-      const msg = 'Informe o usuário, e-mail ou CPF'
+      const msg = loginMethod === 'school' ? 'Informe a identificação escolar' : 'Informe o usuário, e-mail ou CPF'
       setError(null)
       setTimeout(() => {
         setError(msg)
         announce(msg, 'assertive')
       }, 30)
       document.getElementById('username')?.focus()
+      return
+    }
+    if (loginMethod === 'school' && !schoolCodeForLogin.trim()) {
+      const msg = 'Informe o código da escola'
+      setError(null)
+      setTimeout(() => {
+        setError(msg)
+        announce(msg, 'assertive')
+      }, 30)
+      document.getElementById('school-code-login')?.focus()
       return
     }
     if (!password.trim()) {
@@ -206,7 +218,7 @@ export function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await login(username.trim(), password)
+      await login(username.trim(), password, loginMethod === 'school' ? schoolCodeForLogin.trim() : undefined)
       announce('Login realizado com sucesso', 'polite')
       navigate('/inicio')
     } catch (err: unknown) {
@@ -223,7 +235,7 @@ export function LoginPage() {
     }
   }
 
-  const submitDisabled = loading || !username.trim() || !password.trim()
+  const submitDisabled = loading || !username.trim() || !password.trim() || (loginMethod === 'school' && !schoolCodeForLogin.trim())
   const submitTooltip = loading ? 'Entrando, aguarde' : 'Preencha usuário e senha para entrar'
   const guestSubmitDisabled = !guestSchoolCode || guestLoading
   const guestSubmitTooltip = guestLoading ? 'Entrando como visitante, aguarde' : 'Selecione uma escola para continuar'
@@ -267,9 +279,22 @@ export function LoginPage() {
                 {error}
               </div>
             )}
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de identificação">
+              <button type="button" className={segmentedControlItemClasses(loginMethod === 'username', 'primary')} onClick={() => setLoginMethod('username')}>Usuário ou CPF</button>
+              <button type="button" className={segmentedControlItemClasses(loginMethod === 'school', 'primary')} onClick={() => setLoginMethod('school')}>Identificação escolar</button>
+            </div>
+            {loginMethod === 'school' && <Input
+              label="Código da escola"
+              id="school-code-login"
+              name="school_code"
+              autoComplete="organization"
+              required
+              value={schoolCodeForLogin}
+              onChange={(e) => setSchoolCodeForLogin(e.target.value)}
+            />}
             <Input
               ref={usernameRef}
-              label="Usuário, e-mail ou CPF"
+              label={loginMethod === 'school' ? 'Identificação escolar' : 'Usuário, e-mail ou CPF'}
               id="username"
               name="username"
               autoComplete="username"
