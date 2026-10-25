@@ -2,55 +2,16 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import api from '@/lib/api'
 import { AuthContext, type User } from './auth-context'
 
-function decodeClaim(token: string, claim: string): string | null {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return typeof payload[claim] === 'string' ? payload[claim] : null
-  } catch {
-    return null
-  }
-}
-
-function guestUser(token: string): User | null {
-  if (decodeClaim(token, 'role') !== 'guest') return null
-  const schoolCode = decodeClaim(token, 'school_code')
-  if (!schoolCode) return null
-  return {
-    id: 0,
-    username: 'Visitante',
-    name: 'Visitante',
-    cpf_masked: null,
-    birthdate: null,
-    turma_numero: null,
-    turma_letra: null,
-    role: 'guest',
-    school_id: null,
-    school_code: schoolCode,
-    school_name: sessionStorage.getItem('guest_school_name'),
-    is_active: true,
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchMe = useCallback(async () => {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      setUser(null)
-      setLoading(false)
-      return
-    }
-    const guest = guestUser(token)
-    if (guest) {
-      setUser(guest)
-      setLoading(false)
-      return
-    }
     try {
-      const { data } = await api.get<User>('/users/me')
-      setUser(data)
+      const { data } = await api.get<{ user: User }>('/auth/session')
+      const sessionUser = data.user
+      if (sessionUser.role === 'guest' && !sessionUser.school_name) sessionUser.school_name = sessionStorage.getItem('guest_school_name')
+      setUser(sessionUser)
     } catch {
       setUser(null)
     } finally {
@@ -70,23 +31,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     form.set('username', username)
     form.set('password', password)
     if (schoolCode) form.set('school_code', schoolCode)
-    const { data } = await api.post<{ access_token: string; refresh_token: string }>('/auth/token', form, {
+    await api.post('/auth/token', form, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     })
-    localStorage.setItem('access_token', data.access_token)
-    localStorage.setItem('refresh_token', data.refresh_token)
-    localStorage.setItem('session_kind', 'account')
     setLoading(true)
     await fetchMe()
   }, [fetchMe])
 
   const loginGuest = useCallback(async (schoolCode: string, schoolName?: string) => {
-    const { data } = await api.post<{ access_token: string }>('/auth/guest', {
+    await api.post('/auth/guest', {
       school_code: schoolCode,
     })
-    localStorage.setItem('access_token', data.access_token)
-    localStorage.removeItem('refresh_token')
-    localStorage.setItem('session_kind', 'guest')
     if (schoolName) sessionStorage.setItem('guest_school_name', schoolName)
     sessionStorage.setItem('guest_school_code', schoolCode)
     setLoading(true)
@@ -94,15 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchMe])
 
   const logout = useCallback(async () => {
-    const refresh = localStorage.getItem('refresh_token')
     try {
-      if (refresh) await api.post('/auth/logout', { refresh_token: refresh })
+      await api.post('/auth/logout')
     } catch {
       // ignora
     } finally {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      localStorage.removeItem('session_kind')
       sessionStorage.removeItem('guest_school_name')
       sessionStorage.removeItem('guest_school_code')
       setUser(null)

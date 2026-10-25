@@ -3,12 +3,19 @@ import axios from 'axios'
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 })
 
-// Attach access token
+function readCookie(name: string): string | null {
+  const prefix = `${encodeURIComponent(name)}=`
+  const value = document.cookie.split('; ').find((item) => item.startsWith(prefix))
+  return value ? decodeURIComponent(value.slice(prefix.length)) : null
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  const method = (config.method ?? 'get').toUpperCase()
+  const csrf = readCookie('csrf_token')
+  if (csrf && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) config.headers['X-CSRF-Token'] = csrf
   return config
 })
 
@@ -19,10 +26,10 @@ let failedQueue: Array<{
   reject: (e: unknown) => void
 }> = []
 
-function processQueue(error: unknown, token: string | null = null) {
+function processQueue(error: unknown) {
   failedQueue.forEach((p) => {
     if (error) p.reject(error)
-    else p.resolve(token)
+    else p.resolve(null)
   })
   failedQueue = []
 }
@@ -39,40 +46,23 @@ api.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject })
         })
-          .then((token) => {
-            original.headers.Authorization = `Bearer ${token}`
+          .then(() => {
             return api(original)
           })
           .catch((e) => Promise.reject(e))
       }
       original._retry = true
       isRefreshing = true
-      const refresh = localStorage.getItem('refresh_token')
-      const isGuest = localStorage.getItem('session_kind') === 'guest'
-      if (!refresh || isGuest) {
-        isRefreshing = false
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('session_kind')
-        window.location.href = '/entrar'
-        return Promise.reject(error)
-      }
       try {
-        const { data } = await axios.post<{ access_token: string; refresh_token: string }>(
+        await axios.post(
           `${import.meta.env.VITE_API_URL ?? '/api'}/auth/refresh`,
-          { refresh_token: refresh },
+          undefined,
+          { withCredentials: true, headers: { 'X-CSRF-Token': readCookie('csrf_token') ?? '' } },
         )
-        localStorage.setItem('access_token', data.access_token)
-        localStorage.setItem('refresh_token', data.refresh_token)
-        api.defaults.headers.common.Authorization = `Bearer ${data.access_token}`
-        processQueue(null, data.access_token)
-        original.headers.Authorization = `Bearer ${data.access_token}`
+        processQueue(null)
         return api(original)
       } catch (e) {
-        processQueue(e, null)
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('session_kind')
+        processQueue(e)
         sessionStorage.removeItem('guest_school_name')
         sessionStorage.removeItem('guest_school_code')
         window.location.href = '/entrar'
