@@ -24,17 +24,14 @@ export function Layout() {
           <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             <Outlet />
           </main>
-          <footer className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row justify-between gap-2 text-sm text-slate-500">
-              <p>© {new Date().getFullYear()} Base de Acesso Bibliotecário — FATEC TCC. Interface acessível WCAG 2.2 AA.</p>
-              <p className="flex flex-wrap gap-4">
-                <a href="/privacidade" className="underline underline-offset-2">
-                  Aviso de Privacidade
-                </a>
-                <a href="https://www.w3.org/WAI/standards-guidelines/wcag/" target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                  Diretrizes W3C
-                </a>
-              </p>
+          <footer className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
+            <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-end md:justify-between lg:px-8">
+              <div className="space-y-1">
+                <p className="text-sm text-slate-600 dark:text-slate-400">© {new Date().getFullYear()} Base de Acesso Bibliotecário</p>
+              </div>
+              <nav aria-label="Links do rodapé" className="flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium">
+                <a href="/privacidade" className="text-slate-700 underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 dark:text-slate-300">Privacidade</a>
+              </nav>
             </div>
           </footer>
         </div>

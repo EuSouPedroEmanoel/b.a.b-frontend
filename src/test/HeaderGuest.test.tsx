@@ -95,7 +95,7 @@ describe('Guest navigation', () => {
     const navigation = screen.getByRole('navigation', { name: 'Principal' })
     expect(navigation).toHaveTextContent('Empréstimos')
     expect(navigation).toHaveTextContent('Reservas')
-    expect(navigation).toHaveTextContent('Usuários')
+    expect(navigation).not.toHaveTextContent('Usuários')
   })
 
   it('closes the mobile menu with Escape and restores focus to its trigger', async () => {

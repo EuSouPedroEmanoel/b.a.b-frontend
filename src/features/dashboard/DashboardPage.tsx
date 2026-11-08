@@ -46,26 +46,25 @@ export function DashboardPage() {
           </CardHeader>
           <CardBody>
             <ol aria-labelledby="como-usar-heading" className="list-decimal pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <li>Faça login com seu usuário da escola.</li>
-              <li>Consulte o acervo em <em>Acervo</em> — busca por título (mín. 3 caracteres).</li>
-              <li>Bibliotecários cadastram livros por ISBN (auto-preenche via Google Books).</li>
-              <li>Exemplares são vinculados à sua escola — código único por unidade.</li>
-              <li>Empréstimos calculam prazo com penalidade por atrasos anteriores.</li>
+              <li>Consulte o acervo para encontrar livros e conferir seus exemplares.</li>
+              <li>Cadastre e atualize livros e exemplares da sua escola.</li>
+              <li>Registre empréstimos e devoluções na área de empréstimos.</li>
+              <li>Acompanhe as reservas e a fila de espera de cada título.</li>
+              <li>Confira os prazos e acompanhe empréstimos em atraso.</li>
             </ol>
           </CardBody>
         </Card>
 
         <Card>
           <CardHeader>
-            <h2 id="acessibilidade-heading" className="font-semibold">Acessibilidade</h2>
+            <h2 id="acessibilidade-heading" className="font-semibold">Dicas para o dia a dia</h2>
           </CardHeader>
           <CardBody>
             <ul aria-labelledby="acessibilidade-heading" className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <li><span aria-hidden="true">✓ </span>Skip link, landmarks e hierarquia de headings</li>
-              <li><span aria-hidden="true">✓ </span>Contraste AA, foco visível e tamanho mínimo 44×44px</li>
-              <li><span aria-hidden="true">✓ </span>Formulários com label, aria-invalid e live region</li>
-              <li><span aria-hidden="true">✓ </span>Tabelas responsivas <span aria-hidden="true">→</span> cards em mobile</li>
-              <li><span aria-hidden="true">✓ </span>Respeita prefers-reduced-motion e color-scheme</li>
+              <li>Confira a disponibilidade antes de registrar um empréstimo.</li>
+              <li>Mantenha os dados dos exemplares atualizados.</li>
+              <li>Consulte as reservas ao receber uma devolução.</li>
+              <li>Oriente os leitores sobre os prazos de devolução.</li>
             </ul>
           </CardBody>
         </Card>

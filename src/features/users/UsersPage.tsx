@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Pencil, Plus, AlertTriangle, MonitorCog, RefreshCw } from 'lucide-react'
+import { Users, Pencil, Plus, AlertTriangle, RefreshCw } from 'lucide-react'
 import api from '@/lib/api'
 import { formatCpfInput, onlyDigits, validateCpfDigits } from '@/lib/cpf'
 import { getErrorFieldMessages, getErrorMessage } from '@/lib/errors'
@@ -595,23 +595,10 @@ export function UsersPage() {
                                     <span className="sr-only">Editar</span>
                                     <Tooltip id={`edit-user-tooltip-${u.id}`}>Editar</Tooltip>
                                   </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="secondary"
-                                    disabled
-                                    aria-label={`Configurar usuário ${u.name || u.username}`}
-                                    aria-describedby={`configure-user-tooltip-${u.id}`}
-                                    className="relative"
-                                  >
-                                    <MonitorCog className="h-5 w-5" aria-hidden="true" />
-                                    <span className="sr-only">Configurar usuário</span>
-                                    <Tooltip id={`configure-user-tooltip-${u.id}`}>Configurar usuário</Tooltip>
-                                  </Button>
                                   <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
-                                  <Button size="sm" variant="secondary" className="!px-3 @max-lg:!px-2.5" onClick={() => { if (u.is_active) { setChangingSituation(u); setSituationJustification(''); setSituationError('') } else setConfirmSituation(u) }} disabled={readOnly || currentUser?.id === u.id} aria-label={u.is_active ? `Alterar situação de ${u.name || u.username}` : `Reativar usuário ${u.name || u.username}`}>
-                                    <RefreshCw className="hidden h-4 w-4 @max-lg:block" aria-hidden="true" />
-                                    <span className="@max-lg:hidden">{u.is_active ? 'Alterar situação' : 'Reativar usuário'}</span>
+                                  <Button size="sm" variant="secondary" className="relative !px-3 @max-lg:!px-2.5" onClick={() => { if (u.is_active) { setChangingSituation(u); setSituationJustification(''); setSituationError('') } else setConfirmSituation(u) }} disabled={readOnly || currentUser?.id === u.id} aria-label={u.is_active ? `Alterar situação de ${u.name || u.username}` : `Reativar usuário ${u.name || u.username}`} aria-describedby={`situation-tooltip-${u.id}`}>
+                                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                                    <Tooltip id={`situation-tooltip-${u.id}`}>{u.is_active ? 'Alterar situação' : 'Reativar usuário'}</Tooltip>
                                   </Button>
                                 </div>
                               </td>
@@ -644,12 +631,10 @@ export function UsersPage() {
                               <Button size="sm" variant="secondary" onClick={() => openEdit(u)} disabled={readOnly} aria-label={`Editar usuário ${u.name || u.username}`} className={`!px-3 ${readOnly ? 'bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400' : ''}`}>
                                 <Pencil className="h-5 w-5" aria-hidden="true" /><span className="sr-only">Editar</span>
                               </Button>
-                              <Button type="button" size="sm" variant="secondary" disabled aria-label={`Configurar usuário ${u.name || u.username}`} className="!px-3">
-                                <MonitorCog className="h-5 w-5" aria-hidden="true" /><span className="sr-only">Configurar usuário</span>
-                              </Button>
                               <ActivationActions user={u} onUpdated={() => void qc.invalidateQueries({ queryKey: ['users'] })} />
-                              <Button size="sm" variant="secondary" className="!px-3" onClick={() => { if (u.is_active) { setChangingSituation(u); setSituationJustification(''); setSituationError('') } else setConfirmSituation(u) }} disabled={readOnly || currentUser?.id === u.id} aria-label={u.is_active ? `Alterar situação de ${u.name || u.username}` : `Reativar usuário ${u.name || u.username}`}>
+                              <Button size="sm" variant="secondary" className="relative !px-3" onClick={() => { if (u.is_active) { setChangingSituation(u); setSituationJustification(''); setSituationError('') } else setConfirmSituation(u) }} disabled={readOnly || currentUser?.id === u.id} aria-label={u.is_active ? `Alterar situação de ${u.name || u.username}` : `Reativar usuário ${u.name || u.username}`} aria-describedby={`situation-mobile-tooltip-${u.id}`}>
                                 <RefreshCw className="h-4 w-4" aria-hidden="true" /><span className="sr-only">{u.is_active ? 'Alterar situação' : 'Reativar usuário'}</span>
+                                <Tooltip id={`situation-mobile-tooltip-${u.id}`}>{u.is_active ? 'Alterar situação' : 'Reativar usuário'}</Tooltip>
                               </Button>
                             </div>
                           </article>

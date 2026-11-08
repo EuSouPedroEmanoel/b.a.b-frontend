@@ -109,7 +109,7 @@ describe('Student management route guard', () => {
 describe('User management route guard', () => {
   afterEach(cleanup)
 
-  it.each(['librarian', 'school_admin', 'super_admin'])('allows %s into user management', (role) => {
+  it.each(['school_admin', 'super_admin'])('allows %s into user management', (role) => {
     authState.user = { role }
     authState.isAuthenticated = true
     authState.loading = false
@@ -123,7 +123,7 @@ describe('User management route guard', () => {
     expect(screen.getByText('Gestão de usuários')).toBeInTheDocument()
   })
 
-  it.each(['teacher', 'student', 'guest'])('redirects %s away from user management', (role) => {
+  it.each(['librarian', 'teacher', 'student', 'guest'])('redirects %s away from user management', (role) => {
     authState.user = { role }
     authState.isAuthenticated = true
     authState.loading = false

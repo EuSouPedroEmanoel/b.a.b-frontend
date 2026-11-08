@@ -153,7 +153,7 @@ export function Header() {
   }
 
   const isUsersManager =
-    !!user && (user.role === 'super_admin' || user.role === 'school_admin' || user.role === 'librarian')
+    !!user && (user.role === 'super_admin' || user.role === 'school_admin')
   const isLibrarian = user?.role === 'librarian'
   const isGuest = user?.role === 'guest'
   const homePath = user && ['student', 'teacher', 'guest'].includes(user.role) ? '/inicio' : '/'
