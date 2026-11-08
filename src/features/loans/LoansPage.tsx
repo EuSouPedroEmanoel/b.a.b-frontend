@@ -25,7 +25,7 @@ import { hasPersonalReaderCapability } from '@/lib/permissions'
 type Loan = { id: number; copy_id: number; user_id: number; school_id: number; status: string; borrowed_at: string; due_date: string; returned_at: string | null; late_days: number; internal_code: string; book_id: number; book_title: string; book_cover_url: string | null; borrower_username: string; borrower_cpf_masked: string | null }
 type Copy = { id: number; code: string; state: string; condition: string; book_id: number; school_id: number }
 type Book = { id: number; title: string; cover_url: string | null }
-type User = { id: number; username: string; role: string; school_id: number | null; school_name: string | null; turma_numero: number | null; turma_letra: string | null; is_active: boolean }
+type User = { id: number; name?: string; username: string; role: string; school_id: number | null; school_name: string | null; turma_numero: number | null; turma_letra: string | null; is_active: boolean }
 type Paginated<T> = { items: T[]; total: number; page: number; size: number; pages: number }
 type CopyPreview = Copy & { book: Book }
 type CopyLookupResult = { kind: 'copy'; copy: CopyPreview } | { kind: 'ambiguous'; copies: Copy[] }
@@ -205,6 +205,7 @@ function OperationalLoansPage() {
   const [copyLookupCode, setCopyLookupCode] = useState('')
   const [copySchoolId, setCopySchoolId] = useState('')
   const [userLookupCpf, setUserLookupCpf] = useState('')
+  const [selectedReaderId, setSelectedReaderId] = useState<number | null>(null)
   const [copyInputError, setCopyInputError] = useState<string | undefined>()
   const [userInputError, setUserInputError] = useState<string | undefined>()
   const [operation, setOperation] = useState<Operation>('borrow')
@@ -344,26 +345,26 @@ function OperationalLoansPage() {
   }, [internalCode, operation])
 
   const copyMatchesInput = copyLookupCode === internalCode.trim()
-  const userMatchesInput = userLookupCpf === cpf
+  const userMatchesInput = userLookupCpf === cpf.trim()
   const copy = copyMatchesInput && copyQuery.data?.kind === 'copy' ? copyQuery.data.copy : undefined
   const copyAmbiguous = copyMatchesInput && copyQuery.data?.kind === 'ambiguous' ? copyQuery.data : undefined
   const borrowSchoolId = isSuperAdmin ? (copySchoolId || (copy ? String(copy.school_id) : '')) : copySchoolId
 
   const userQuery = useQuery({
     queryKey: ['loan-user-preview', userLookupCpf, borrowSchoolId],
-    enabled: !!userLookupCpf,
+    enabled: !!userLookupCpf && !!copy,
     retry: false,
-    queryFn: async (): Promise<User> => {
-      const { data } = await api.get<Paginated<User>>('/users/', { params: { cpf: userLookupCpf, size: 1, ...(borrowSchoolId ? { school_id: borrowSchoolId } : {}) } })
-      if (data.total === 0) throw new Error('Usuário não encontrado para o CPF informado.')
-      return data.items[0]
+    queryFn: async (): Promise<Paginated<User>> => {
+      const isCpf = validateCpfDigits(userLookupCpf)
+      const { data } = await api.get<Paginated<User>>('/loans/readers', { params: { ...(isCpf ? { cpf: userLookupCpf } : { q: userLookupCpf }), size: 20 } })
+      return data
     },
   })
 
   useEffect(() => {
     if (operation !== 'borrow' || pickupReservation) return
-    const value = onlyDigits(cpf)
-    if (value.length !== 11) {
+    const value = cpf.trim()
+    if (!copy || value.length < 2) {
       // O valor é separado para preservar o debounce da consulta do leitor.
       // oxlint-disable-next-line react/set-state-in-effect -- estado de consulta debounced.
       setUserLookupCpf('')
@@ -376,7 +377,8 @@ function OperationalLoansPage() {
     return () => window.clearTimeout(timer)
   }, [copy, cpf, operation, pickupReservation])
 
-  const user = userMatchesInput ? userQuery.data : undefined
+  const userResults = userMatchesInput ? userQuery.data?.items ?? [] : []
+  const user = selectedReaderId !== null ? userResults.find((item) => item.id === selectedReaderId) : userResults.length === 1 && userQuery.data?.total === 1 ? userResults[0] : undefined
   const sameSchool = !!copy && !!user && copy.school_id === user.school_id
   const reader = useMemo(() => pickupReservation
     ? { id: pickupReservation.user_id, username: pickupReservation.reserver_username, role: pickupReservation.reserver_role, school_id: pickupReservation.school_id, school_name: null, turma_numero: pickupReservation.reserver_turma_numero, turma_letra: pickupReservation.reserver_turma_letra, is_active: pickupReservation.reserver_is_active }
@@ -394,7 +396,7 @@ function OperationalLoansPage() {
     ?? (!copyMatchesPickupReservation ? 'Este exemplar está reservado para outro atendimento.' : undefined)
     ?? (copyMatchesInput && copy && !copyAvailable && !pickupReservation ? 'Este exemplar não está disponível para empréstimo.' : undefined)
     ?? (copyMatchesInput && copyQuery.isError ? 'Exemplar não encontrado. Verifique o código e tente novamente.' : undefined)
-  const userError = userInputError ?? (userMatchesInput && (userQuery.isError || (!!copy && !!user && !reader)) ? 'Leitor não encontrado. Verifique o CPF e tente novamente.' : undefined)
+  const userError = userInputError ?? (userMatchesInput && (userQuery.isError || (!!userQuery.data && userResults.length === 0) || (!!copy && !!user && !reader)) ? 'Leitor não encontrado. Verifique os dados e tente novamente.' : undefined)
 
   const returnKind = returnLookupKind(returnLookup)
   const returnValue = returnKind === 'user' ? onlyDigits(returnLookup) : returnLookup.trim()
@@ -418,7 +420,7 @@ function OperationalLoansPage() {
     enabled: operation === 'return' && returnSearchMatchesInput && returnSearch?.kind === 'user',
     retry: false,
     queryFn: async (): Promise<ReturnSearchResult> => {
-      const { data: userData } = await api.get<Paginated<User>>('/users/', { params: { cpf: returnSearch?.value, size: 1 } })
+      const { data: userData } = await api.get<Paginated<User>>('/loans/readers', { params: { cpf: returnSearch?.value, size: 1 } })
       if (userData.total === 0) throw new Error('Usuário não encontrado para o CPF informado.')
       const user = userData.items[0]
       const firstPage = await api.get<Paginated<Loan>>('/loans/', { params: { user_id: user.id, situation: 'borrowed', page: 1, size: 100 } })
@@ -472,12 +474,13 @@ function OperationalLoansPage() {
   }, [announce, canCreate, copy, copyEligible, copyBelongsToSelectedBook, copyLookupCode, copyQuery.isError, copyQuery.isFetching, operation, pickupReservation])
 
   useEffect(() => {
-    if (operation !== 'borrow' || userQuery.isFetching || !userMatchesInput) return
+    if (operation !== 'borrow' || !userLookupCpf || userQuery.isFetching || !userMatchesInput) return
     if (!reader || userQuery.isError) {
+      if (userResults.length > 1 || (userQuery.data?.total ?? 0) > 1) return
       const key = `error:${userLookupCpf}`
       if (announcedUserKey.current !== key) {
         announcedUserKey.current = key
-        announce('Leitor não encontrado. Verifique o CPF e tente novamente.', 'assertive')
+        announce('Leitor não encontrado. Verifique os dados e tente novamente.', 'assertive')
       }
       if (focusCodeAfterLookup.current) {
         focusCodeAfterLookup.current = false
@@ -499,7 +502,7 @@ function OperationalLoansPage() {
       focusConfirmAfterLookup.current = false
       window.setTimeout(() => setLoanConfirmationOpen(true), 150)
     }
-  }, [announce, operation, reader, userEligible, userLookupCpf, userMatchesInput, userQuery.isError, userQuery.isFetching])
+  }, [announce, operation, reader, userEligible, userLookupCpf, userMatchesInput, userQuery.isError, userQuery.isFetching, userQuery.data?.total, userResults.length])
 
   const identifyCopy = (moveFocus = false) => {
     const code = internalCode.trim()
@@ -547,14 +550,14 @@ function OperationalLoansPage() {
         identifyCopy(true)
         return
       }
-      const message = 'Identifique um exemplar disponível antes de informar o CPF do leitor.'
+      const message = 'Identifique um exemplar disponível antes de buscar o leitor.'
       setUserInputError(message)
       announce(message, 'assertive')
       window.setTimeout(() => codeRef.current?.focus(), 150)
       return
     }
-    if (!validateCpfDigits(cpf)) {
-      const message = 'Informe um CPF válido com 11 dígitos.'
+    if (cpf.trim().length < 2) {
+      const message = 'Informe um nome, usuário ou CPF válido.'
       setUserInputError(message)
       announce(message, 'assertive')
       window.setTimeout(() => cpfRef.current?.focus(), 150)
@@ -567,7 +570,7 @@ function OperationalLoansPage() {
       if (userQuery.data && userEligible) setLoanConfirmationOpen(true)
       return
     }
-    setUserLookupCpf(cpf)
+    setUserLookupCpf(cpf.trim())
   }
 
   const closeLoanConfirmation = () => {
@@ -604,14 +607,14 @@ function OperationalLoansPage() {
   const createMut = useMutation({
     mutationFn: async () => (await api.post<Loan>('/loans/', pickupReservation
       ? { internal_code: internalCode.trim(), reservation_id: pickupReservation.id }
-      : { internal_code: internalCode.trim(), cpf, ...(borrowSchoolId ? { school_id: Number(borrowSchoolId) } : {}) })).data,
+      : { copy_id: copy!.id, user_id: reader!.id })).data,
     onSuccess: async (loan) => {
       const message = `Empréstimo realizado com sucesso. Livro ${loan.book_title}, exemplar ${loan.internal_code}, emprestado para ${loan.borrower_username}.`
       setLoanConfirmationOpen(false)
       setLoanConfirmationError(null)
       setLoanSuccessMessage(message)
       await announce(message, 'polite')
-      setInternalCode(''); setCpf(''); setCopyLookupCode(''); setUserLookupCpf('')
+      setInternalCode(''); setCpf(''); setSelectedReaderId(null); setCopyLookupCode(''); setUserLookupCpf('')
       setCopySchoolId(''); setCopyInputError(undefined); setUserInputError(undefined)
       announcedCopyKey.current = null
       announcedUserKey.current = null
@@ -788,8 +791,8 @@ function OperationalLoansPage() {
     </CardHeader><CardBody>
       {operation === 'borrow' ? <form onSubmit={(event) => { event.preventDefault(); if (!copy) { identifyCopy(false); return }; if (!reader) { identifyUser(); return }; if (canCreate) setLoanConfirmationOpen(true) }} className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:grid-rows-[auto_auto_auto] sm:items-start sm:gap-x-3 sm:gap-y-1.5">
-          <div className="w-full sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:[&>div]:contents"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para avançar ao CPF.'} aria-describedby="copy-identification" required autoComplete="off" placeholder={`Ex: ${copyPlaceholder}`} /></div>
-          <div className="w-full sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:[&>div]:contents">{pickupReservation ? <Input id="loan-reserved-reader" label="Leitor da reserva" value={pickupReservation.reserver_username} readOnly tabIndex={-1} hint={`${roleLabel(pickupReservation.reserver_role)}. Leitor já identificado pela reserva; o CPF não precisa ser informado novamente.`} /> : <Input ref={cpfRef} id="loan-cpf" label="CPF do leitor" type="password" inputMode="numeric" value={formatCpfInput(cpf)} onChange={(event) => { setCpf(onlyDigits(event.target.value)); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyUser() } }} error={userError} hint="O CPF permanece oculto. Digite e pressione Enter para identificar o leitor." aria-describedby="user-identification" required autoComplete="off" placeholder="000.000.000-00" />}</div>
+          <div className="w-full sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:[&>div]:contents"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para buscar o leitor.'} aria-describedby="copy-identification" required autoComplete="off" placeholder={`Ex: ${copyPlaceholder}`} /></div>
+          <div className="w-full sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:[&>div]:contents">{pickupReservation ? <Input id="loan-reserved-reader" label="Leitor da reserva" value={pickupReservation.reserver_username} readOnly tabIndex={-1} hint={`${roleLabel(pickupReservation.reserver_role)}. Leitor já identificado pela reserva; o CPF não precisa ser informado novamente.`} /> : <Input ref={cpfRef} id="loan-cpf" label="Nome, usuário ou CPF do leitor" type={/^\d+$/.test(cpf) ? "password" : "text"} value={/^\d+$/.test(cpf) ? formatCpfInput(cpf) : cpf} onChange={(event) => { const value = event.target.value; setCpf(/^[\d.\-\s]+$/.test(value) ? onlyDigits(value) : value); setSelectedReaderId(null); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyUser() } }} error={userError} hint="Busque pelo nome, usuário ou CPF. O CPF permanece oculto." aria-describedby="user-identification" required autoComplete="off" placeholder="Nome, usuário ou CPF" />}</div>
           <div className="flex w-full flex-col sm:col-start-3 sm:row-start-2 sm:self-stretch sm:w-auto">
             <Button ref={confirmLoanRef} type="submit" variant={canCreate ? 'primary' : 'secondary'} disabled={(!internalCode.trim() && !cpf) || createMut.isPending} className="loan-confirmation-button w-full whitespace-nowrap sm:h-full sm:w-auto" aria-describedby="loan-confirmation-status">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
           </div>
@@ -820,7 +823,7 @@ function OperationalLoansPage() {
         </section>}
         <div className="grid gap-3 sm:grid-cols-2">
           <section id="copy-identification" aria-busy={copyQuery.isFetching} className="rounded-lg border border-slate-200 bg-slate-100 p-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"><h3 className="text-sm font-semibold">Exemplar identificado</h3>{copyQuery.isFetching && copyMatchesInput ? <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Buscando exemplar…</p> : copy ? <div className="mt-1 text-sm"><p className="font-medium">{copy.book.title}</p><p className="text-slate-600 dark:text-slate-300">Exemplar: <span className="font-mono">{copy.code}</span></p><Badge tone={bookStateTone(copy.state)} className="mt-2">{bookStateLabel(copy.state)}</Badge>{!copyAvailable && <p className="mt-2 font-medium text-red-700 dark:text-red-300">Este exemplar não está disponível para empréstimo.</p>}</div> : copyAmbiguous && isSuperAdmin ? <div className="mt-2"><p className="text-sm text-amber-800 dark:text-amber-200">Este código existe em mais de uma escola. Escolha uma para continuar.</p><div className="mt-3"><Autocomplete label="Escola do exemplar" id="loan-copy-school" value={copySchoolId} onChange={setCopySchoolId} options={schoolOptions} placeholder="Busque uma escola" renderOption={(option) => <SchoolSuggestion option={option} />} /></div></div> : <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Aguardando código do exemplar.</p>}</section>
-          <section id="user-identification" aria-busy={userQuery.isFetching} className="rounded-lg border border-slate-200 bg-slate-100 p-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"><h3 className="text-sm font-semibold">Leitor identificado</h3>{userQuery.isFetching && userMatchesInput ? <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Buscando leitor…</p> : reader ? <div className="mt-1 text-sm"><p className="font-medium">{reader.username}</p><p className="text-slate-600 dark:text-slate-300">{roleLabel(reader.role)}{reader.turma_numero && reader.turma_letra ? ` — ${reader.turma_numero}º ${reader.turma_letra}` : ''}{reader.school_name ? ` · ${reader.school_name}` : ''}</p>{!reader.is_active ? <p className="mt-2 font-medium text-red-700 dark:text-red-300">Leitor inativo: não pode realizar empréstimos.</p> : <p className="mt-2 font-medium text-emerald-800 dark:text-emerald-200">Nenhum impedimento identificado para empréstimo.</p>}</div> : userMatchesInput && userError ? <p className="mt-1 text-sm font-medium text-red-700 dark:text-red-300">Leitor não encontrado. Verifique o CPF e tente novamente.</p> : <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Aguardando CPF do leitor.</p>}</section>
+          <section id="user-identification" aria-busy={userQuery.isFetching} className="rounded-lg border border-slate-200 bg-slate-100 p-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"><h3 className="text-sm font-semibold">Leitor identificado</h3>{userQuery.isFetching && userMatchesInput ? <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Buscando leitor…</p> : reader ? <div className="mt-1 text-sm"><p className="font-medium">{reader.username}</p><p className="text-slate-600 dark:text-slate-300">{roleLabel(reader.role)}{reader.turma_numero && reader.turma_letra ? ` — ${reader.turma_numero}º ${reader.turma_letra}` : ''}{reader.school_name ? ` · ${reader.school_name}` : ''}</p>{!reader.is_active ? <p className="mt-2 font-medium text-red-700 dark:text-red-300">Leitor inativo: não pode realizar empréstimos.</p> : <p className="mt-2 font-medium text-emerald-800 dark:text-emerald-200">Nenhum impedimento identificado para empréstimo.</p>}</div> : userMatchesInput && userError ? <p className="mt-1 text-sm font-medium text-red-700 dark:text-red-300">{userError}</p> : userResults.length > 0 ? <div className="mt-2"><p className="text-sm">Selecione o leitor correto{(userQuery.data?.total ?? 0) > userResults.length ? ' ou refine a busca' : ''}.</p><ul className="mt-2 space-y-2">{userResults.map((item) => <li key={item.id}><Button type="button" size="sm" variant="secondary" onClick={() => { setSelectedReaderId(item.id); focusConfirmAfterLookup.current = false }} >{item.name || item.username} (@{item.username})</Button></li>)}</ul></div> : <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Aguardando dados do leitor.</p>}</section>
         </div>
         <p id="loan-confirmation-status" className={`text-sm ${canCreate ? 'font-medium text-emerald-800 dark:text-emerald-200' : 'text-slate-600 dark:text-slate-300'}`}>{canCreate ? 'Formulário pronto para confirmar o empréstimo.' : 'A confirmação ficará disponível após identificar um exemplar disponível e um leitor elegível.'}</p>
       </form> : <form onSubmit={(event) => { event.preventDefault(); if (returnKind === 'copy' && returnCopyResult) handleReturn({ id: returnCopyResult.loan.id, source: 'copy' }); else identifyReturn() }} className="flex flex-col gap-4">

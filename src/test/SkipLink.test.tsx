@@ -35,4 +35,19 @@ describe('SkipLink', () => {
     await user.tab()
     expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Pular para o conteúdo principal' }))
   })
+
+  it('moves keyboard focus to the main content when activated', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <SkipLink />
+        <button type="button">Navegação</button>
+        <main id="main-content" tabIndex={-1}>Conteúdo principal</main>
+      </>,
+    )
+
+    await user.tab()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('main')).toHaveFocus()
+  })
 })
