@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Pagination } from '@/components/ui/Pagination'
 import { Select } from '@/components/ui/Select'
-import { Autocomplete, type AutocompleteOption } from '@/components/ui/Autocomplete'
+import { Autocomplete, AutocompleteOptionItem, type AutocompleteOption } from '@/components/ui/Autocomplete'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { PageDescription } from '@/components/ui/PageDescription'
 import { SchoolSuggestion } from '@/components/ui/SchoolSuggestion'
@@ -201,6 +201,11 @@ function OperationalLoansPage() {
   })
   const [situation, setSituation] = useState<LoanSituation>('')
   const [internalCode, setInternalCode] = useState('')
+  const [bookSearchQuery, setBookSearchQuery] = useState('')
+  const [searchedBookId, setSearchedBookId] = useState<number | undefined>()
+  const [copyPickerOpen, setCopyPickerOpen] = useState(false)
+  const [suggestionIndex, setSuggestionIndex] = useState(0)
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false)
   const [cpf, setCpf] = useState('')
   const [copyLookupCode, setCopyLookupCode] = useState('')
   const [copySchoolId, setCopySchoolId] = useState('')
@@ -249,13 +254,28 @@ function OperationalLoansPage() {
   const pickupReservation = reservationQuery.data?.status === 'ready'
     ? reservationQuery.data : undefined
   const preselectedBookId = pickupReservation?.book_id
-    ?? (Number.isSafeInteger(bookIdParam) && bookIdParam > 0 ? bookIdParam : undefined)
+    ?? (Number.isSafeInteger(bookIdParam) && bookIdParam > 0 ? bookIdParam : searchedBookId)
   const announce = useAnnouncer()
   const { consumeOperationalFocus } = useNavigationFocusIntent()
   const qc = useQueryClient()
   const { user: currentUser } = useAuth()
   const isSuperAdmin = currentUser?.role === 'super_admin'
   const canManageLoans = !isSuperAdmin
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBookSearchQuery(internalCode.trim()), 350)
+    return () => window.clearTimeout(timer)
+  }, [internalCode])
+
+  useEffect(() => {
+    if (suggestionIndex >= 0) document.getElementById(`loan-book-suggestion-${suggestionIndex}`)?.scrollIntoView({ block: 'nearest' })
+  }, [suggestionIndex])
+
+  const bookSearchResults = useQuery({
+    queryKey: ['loan-book-search', bookSearchQuery],
+    enabled: canManageLoans && operation === 'borrow' && !pickupReservation && !bookIdParam && !searchedBookId && bookSearchQuery.length >= 2,
+    queryFn: async () => (await api.get<{ items: Book[] }>('/books/suggest', { params: { q: bookSearchQuery, limit: 10 } })).data,
+  })
 
   const selectedBookQuery = useQuery({
     queryKey: ['loan-selected-book', preselectedBookId],
@@ -329,7 +349,7 @@ function OperationalLoansPage() {
   })
 
   useEffect(() => {
-    if (operation !== 'borrow') return
+    if (operation !== 'borrow' || (searchedBookId && (!selectedBookQuery.data || internalCode.trim() === selectedBookQuery.data.title))) return
     const code = internalCode.trim()
     if (code.length <= 2) {
       // O valor é separado para preservar o debounce da consulta do exemplar.
@@ -342,7 +362,7 @@ function OperationalLoansPage() {
       setCopyLookupCode(code)
     }, 350)
     return () => window.clearTimeout(timer)
-  }, [internalCode, operation])
+  }, [internalCode, operation, searchedBookId, selectedBookQuery.data])
 
   const copyMatchesInput = copyLookupCode === internalCode.trim()
   const userMatchesInput = userLookupCpf === cpf.trim()
@@ -395,7 +415,7 @@ function OperationalLoansPage() {
     ?? (!copyBelongsToSelectedBook ? 'O exemplar informado não pertence ao livro selecionado.' : undefined)
     ?? (!copyMatchesPickupReservation ? 'Este exemplar está reservado para outro atendimento.' : undefined)
     ?? (copyMatchesInput && copy && !copyAvailable && !pickupReservation ? 'Este exemplar não está disponível para empréstimo.' : undefined)
-    ?? (copyMatchesInput && copyQuery.isError ? 'Exemplar não encontrado. Verifique o código e tente novamente.' : undefined)
+    ?? (copyMatchesInput && copyQuery.isError && (pickupReservation || bookIdParam || (!bookSearchResults.isFetching && bookSearchQuery === internalCode.trim() && !bookSearchResults.data?.items.length)) ? 'Nenhum livro ou exemplar encontrado. Verifique o título ou código.' : undefined)
   const userError = userInputError ?? (userMatchesInput && (userQuery.isError || (!!userQuery.data && userResults.length === 0) || (!!copy && !!user && !reader)) ? 'Leitor não encontrado. Verifique os dados e tente novamente.' : undefined)
 
   const returnKind = returnLookupKind(returnLookup)
@@ -438,6 +458,7 @@ function OperationalLoansPage() {
 
   useEffect(() => {
     if (operation !== 'borrow' || copyQuery.isFetching || !copyMatchesInput) return
+    if (copyQuery.isError && !pickupReservation && !bookIdParam && (bookSearchQuery !== internalCode.trim() || bookSearchResults.isFetching || !!bookSearchResults.data?.items.length)) return
     const shouldRestoreFocus = focusCodeAfterLookup.current || focusCpfAfterLookup.current
     const invalidCopy = copyQuery.isError || !copy || !copyBelongsToSelectedBook || !copyEligible
     if (!invalidCopy) return
@@ -456,7 +477,7 @@ function OperationalLoansPage() {
       focusCpfAfterLookup.current = false
       window.setTimeout(() => codeRef.current?.focus(), 150)
     }
-  }, [announce, copy, copyEligible, copyBelongsToSelectedBook, copyLookupCode, copyMatchesInput, copyQuery.isError, copyQuery.isFetching, operation, pickupReservation])
+  }, [announce, bookIdParam, bookSearchQuery, bookSearchResults.data, bookSearchResults.isFetching, internalCode, copy, copyEligible, copyBelongsToSelectedBook, copyLookupCode, copyMatchesInput, copyQuery.isError, copyQuery.isFetching, operation, pickupReservation])
 
   useEffect(() => {
     if (operation !== 'borrow' || !copy || copyQuery.isFetching || copyQuery.isError || !copyEligible || !copyBelongsToSelectedBook) return
@@ -533,6 +554,7 @@ function OperationalLoansPage() {
   }
 
   const selectCopyFromList = (selected: Copy) => {
+    setCopyPickerOpen(false)
     setInternalCode(selected.code)
     setCopyLookupCode(selected.code)
     setCopySchoolId(isSuperAdmin ? String(selected.school_id) : '')
@@ -541,6 +563,15 @@ function OperationalLoansPage() {
     setUserInputError(undefined)
     announcedCopyKey.current = null
     focusCpfAfterLookup.current = true
+  }
+
+  const selectSuggestedBook = (book: Book) => {
+    setSearchedBookId(book.id)
+    setInternalCode(book.title)
+    setCopyLookupCode('')
+    setCopyInputError(undefined)
+    setSuggestionIndex(-1)
+    setCopyPickerOpen(true)
   }
 
   const identifyUser = () => {
@@ -614,7 +645,7 @@ function OperationalLoansPage() {
       setLoanConfirmationError(null)
       setLoanSuccessMessage(message)
       await announce(message, 'polite')
-      setInternalCode(''); setCpf(''); setSelectedReaderId(null); setCopyLookupCode(''); setUserLookupCpf('')
+      setInternalCode(''); setCpf(''); setSelectedReaderId(null); setCopyLookupCode(''); setUserLookupCpf(''); setSearchedBookId(undefined)
       setCopySchoolId(''); setCopyInputError(undefined); setUserInputError(undefined)
       announcedCopyKey.current = null
       announcedUserKey.current = null
@@ -791,14 +822,25 @@ function OperationalLoansPage() {
     </CardHeader><CardBody>
       {operation === 'borrow' ? <form onSubmit={(event) => { event.preventDefault(); if (!copy) { identifyCopy(false); return }; if (!reader) { identifyUser(); return }; if (canCreate) setLoanConfirmationOpen(true) }} className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:grid-rows-[auto_auto_auto] sm:items-start sm:gap-x-3 sm:gap-y-1.5">
-          <div className="w-full sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:[&>div]:contents"><Input ref={codeRef} id="loan-internal-code" label="Código interno do exemplar" value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setCopyLookupCode(''); setCopySchoolId(''); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyCopy(true) } }} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Escaneie ou digite o código e pressione Enter para buscar o leitor.'} aria-describedby="copy-identification" required autoComplete="off" placeholder={`Ex: ${copyPlaceholder}`} /></div>
+          <div className="relative w-full sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:[&>div:not(.loan-suggestions)]:contents"><Input ref={codeRef} id="loan-internal-code" label={pickupReservation ? 'Código interno do exemplar' : 'Título do livro ou código do exemplar'} value={internalCode} onChange={(event) => { setInternalCode(event.target.value); setSearchedBookId(undefined); setSuggestionsDismissed(false); setSuggestionIndex(0); setCopyLookupCode(''); setCopyInputError(undefined); setCopySchoolId(''); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { const suggestions = !searchedBookId && !suggestionsDismissed && bookSearchQuery === internalCode.trim() && !copy ? bookSearchResults.data?.items ?? [] : []; if (event.key === 'ArrowDown' && suggestions.length) { event.preventDefault(); setSuggestionIndex((index) => (index + 1) % suggestions.length) } else if (event.key === 'ArrowUp' && suggestions.length) { event.preventDefault(); setSuggestionIndex((index) => (index - 1 + suggestions.length) % suggestions.length) } else if (event.key === 'Escape') { setSuggestionsDismissed(true); setSuggestionIndex(-1) } else if (event.key === 'Enter') { event.preventDefault(); if (suggestionIndex >= 0 && suggestions[suggestionIndex]) selectSuggestedBook(suggestions[suggestionIndex]); else if (!searchedBookId) identifyCopy(true) } }} role={pickupReservation || bookIdParam ? undefined : 'combobox'} aria-autocomplete={pickupReservation || bookIdParam ? undefined : 'list'} aria-expanded={!suggestionsDismissed && !searchedBookId && !copy && bookSearchQuery === internalCode.trim() && !!bookSearchResults.data?.items.length} aria-controls="loan-book-suggestions" aria-activedescendant={!suggestionsDismissed && !searchedBookId && !copy && bookSearchQuery === internalCode.trim() && bookSearchResults.data?.items[suggestionIndex] ? `loan-book-suggestion-${suggestionIndex}` : undefined} error={copyError} hint={pickupReservation ? `Exemplar esperado: ${pickupReservation.internal_code ?? 'código não informado'}. Escaneie ou digite o código e pressione Enter para confirmar.` : 'Digite o título para escolher um livro ou escaneie o código do exemplar.'} aria-describedby="copy-identification" required autoComplete="off" placeholder={`Título ou ${copyPlaceholder}`} /><div className="loan-suggestions absolute left-0 right-0 top-full z-30 mt-1">        {!pickupReservation && !bookIdParam && !searchedBookId && !suggestionsDismissed && !copy && internalCode.trim().length >= 2 && internalCode.trim() === bookSearchQuery && <div aria-live="polite" className="w-full">
+          {bookSearchResults.isFetching ? <p className="text-sm text-slate-600 dark:text-slate-300">Buscando livros…</p> : bookSearchResults.isError ? <p role="alert" className="text-sm text-red-700 dark:text-red-300">Não foi possível buscar livros.</p> : !!bookSearchResults.data?.items.length && <ul id="loan-book-suggestions" role="listbox" className="max-h-[228px] overflow-y-auto overscroll-contain rounded-lg border border-slate-300 bg-white p-1 shadow-md dark:border-slate-600 dark:bg-slate-800" aria-label="Sugestões de livros">{bookSearchResults.data.items.map((book, index) => <AutocompleteOptionItem key={book.id} id={`loan-book-suggestion-${index}`} active={index === suggestionIndex} selected={false} disabled={false} onSelect={() => selectSuggestedBook(book)}>{book.title}</AutocompleteOptionItem>)}</ul>}
+        </div>}
+</div></div>
           <div className="w-full sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:[&>div]:contents">{pickupReservation ? <Input id="loan-reserved-reader" label="Leitor da reserva" value={pickupReservation.reserver_username} readOnly tabIndex={-1} hint={`${roleLabel(pickupReservation.reserver_role)}. Leitor já identificado pela reserva; o CPF não precisa ser informado novamente.`} /> : <Input ref={cpfRef} id="loan-cpf" label="Nome, usuário ou CPF do leitor" type={/^\d+$/.test(cpf) ? "password" : "text"} value={/^\d+$/.test(cpf) ? formatCpfInput(cpf) : cpf} onChange={(event) => { const value = event.target.value; setCpf(/^[\d.\-\s]+$/.test(value) ? onlyDigits(value) : value); setSelectedReaderId(null); setUserLookupCpf(''); setUserInputError(undefined) }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); identifyUser() } }} error={userError} hint="Busque pelo nome, usuário ou CPF. O CPF permanece oculto." aria-describedby="user-identification" required autoComplete="off" placeholder="Nome, usuário ou CPF" />}</div>
           <div className="flex w-full flex-col sm:col-start-3 sm:row-start-2 sm:self-stretch sm:w-auto">
             <Button ref={confirmLoanRef} type="submit" variant={canCreate ? 'primary' : 'secondary'} disabled={(!internalCode.trim() && !cpf) || createMut.isPending} className="loan-confirmation-button w-full whitespace-nowrap sm:h-full sm:w-auto" aria-describedby="loan-confirmation-status">{createMut.isPending ? 'Confirmando…' : 'Confirmar empréstimo'}</Button>
           </div>
         </div>
         {reservationId && reservationQuery.isError && <p role="alert" className="text-sm font-medium text-red-700 dark:text-red-300">A reserva não está disponível para retirada.</p>}
-        {preselectedBookId && <section aria-labelledby="selected-loan-book" className="rounded-lg border border-slate-200 bg-slate-100 p-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+        {copyPickerOpen && searchedBookId && <ModalDialog title={`Escolher exemplar${selectedBookQuery.data ? ` — ${selectedBookQuery.data.title}` : ''}`} variant="form" onClose={() => setCopyPickerOpen(false)}>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Escolha um exemplar disponível para continuar o empréstimo.</p>
+          {selectedBookCopiesQuery.isFetching && <p role="status" className="mt-3 text-sm">Carregando exemplares…</p>}
+          {selectedBookCopiesQuery.isError && <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">Não foi possível carregar os exemplares.</p>}
+          {selectedBookCopiesQuery.data?.items.length === 0 && <p className="mt-3 text-sm">Este livro não possui exemplares cadastrados nesta escola.</p>}
+          {!!selectedBookCopiesQuery.data?.items.length && <ul className="mt-3 grid gap-2" aria-label="Exemplares do livro">{selectedBookCopiesQuery.data.items.map((item) => <li key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700"><div><p className="font-mono font-medium">{item.code}</p><p className="text-slate-600 dark:text-slate-300">{bookStateLabel(item.state)} · {bookConditionLabel(item.condition)}</p></div>{item.state === 'available' ? <Button type="button" size="sm" variant="secondary" onClick={() => selectCopyFromList(item)} aria-label={`Selecionar exemplar ${item.code}`}>Selecionar</Button> : <span>Indisponível</span>}</li>)}</ul>}
+        </ModalDialog>}
+        {searchedBookId && !copyPickerOpen && !copy && <Button type="button" variant="secondary" onClick={() => setCopyPickerOpen(true)}>Escolher exemplar</Button>}
+        {preselectedBookId && !searchedBookId && <section aria-labelledby="selected-loan-book" className="rounded-lg border border-slate-200 bg-slate-100 p-3 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
           <h3 id="selected-loan-book" className="font-semibold">Livro selecionado</h3>
           {selectedBookQuery.isFetching && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Carregando livro…</p>}
           {selectedBookQuery.isError && <p className="mt-1 text-sm text-red-700 dark:text-red-300">Não foi possível carregar o livro selecionado.</p>}

@@ -59,7 +59,7 @@ describe('LoansPage', () => {
     fixtures.user.role = 'librarian'
     renderPage()
 
-    const copyInput = await screen.findByLabelText(/Código interno do exemplar/)
+    const copyInput = await screen.findByLabelText(/Título do livro ou código do exemplar/)
     const cpfInput = screen.getByLabelText(/CPF do leitor/)
     const confirm = screen.getByRole('button', { name: 'Confirmar empréstimo' })
 
@@ -84,7 +84,7 @@ describe('LoansPage', () => {
     fixtures.post.mockResolvedValue({ data: { book_title: 'Livro de teste', internal_code: 'EX-001', borrower_username: 'ana.souza' } })
     renderPage()
     const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/Código interno do exemplar/), 'EX-001')
+    await user.type(screen.getByLabelText(/Título do livro ou código do exemplar/), 'EX-001')
     await screen.findByText('Livro de teste')
     await user.type(screen.getByLabelText(/Nome, usuário ou CPF do leitor/), 'Ana')
     await user.click(await screen.findByRole('button', { name: 'Ana Souza (@ana.souza)' }))
